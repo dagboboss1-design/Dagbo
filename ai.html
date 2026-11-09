@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F5F7" id="themeColor">
+<title>Ask AI · DAGBO SIGNAL</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="dagbo.css">
+
+<style>
+  .ai-header-card { display: flex; align-items: center; gap: 16px; padding: 16px; background: var(--dg-card); border-radius: var(--dg-r-card); box-shadow: var(--dg-shadow); margin-bottom: 20px; border: 0.5px solid var(--dg-line); }
+  .ai-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--dg-fill); display: flex; align-items: center; justify-content: center; font-size: 24px; border: 2px solid var(--dg-green); }
+  .ai-status { display: inline-flex; align-items: center; gap: 4px; background: var(--dg-green-soft); color: var(--dg-green-ink); padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; margin-left: 8px; }
+  .ai-status::before { content: ""; width: 6px; height: 6px; background: var(--dg-green); border-radius: 50%; }
+  .chat-container { display: flex; flex-direction: column; gap: 16px; min-height: 300px; margin-bottom: 20px; }
+  .chat-bubble { max-width: 85%; padding: 14px 18px; border-radius: 20px; font-size: 15px; line-height: 1.5; }
+  .chat-bubble.ai { align-self: flex-start; background: var(--dg-card); color: var(--dg-text); border-bottom-left-radius: 4px; border: 0.5px solid var(--dg-line); box-shadow: var(--dg-shadow); }
+  .chat-bubble.me { align-self: flex-end; background: var(--dg-green); color: #fff; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(52, 199, 89, 0.3); }
+  .chat-bubble.ai b { color: var(--dg-blue-ink); }
+  .chat-time { display: block; font-size: 10px; margin-top: 6px; opacity: 0.6; text-align: right; }
+  .input-row { display: flex; align-items: center; gap: 8px; background: var(--dg-card); border-radius: 999px; padding: 6px; box-shadow: var(--dg-shadow); border: 0.5px solid var(--dg-line); }
+  .input-row input { flex: 1; border: none; background: transparent; color: var(--dg-text); font-size: 15px; padding: 0 12px; min-height: 44px; outline: none; }
+  .input-row .send-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--dg-green); color: #fff; border: none; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; transition: transform 0.15s; }
+  .input-row .send-btn:active { transform: scale(0.92); }
+  .quick-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; margin-top: 16px; }
+  .quick-chips::-webkit-scrollbar { display: none; }
+  .quick-chip { flex: none; background: var(--dg-card); border: 0.5px solid var(--dg-line); padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--dg-text); cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: var(--dg-shadow); }
+  .quick-chip:active { background: var(--dg-fill); }
+</style>
+
+<script>
+  (function(){ try{ var s = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; var follow = s.followSystem !== false; var dark = follow ? window.matchMedia('(prefers-color-scheme: dark)').matches : s.theme === 'dark'; document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light'); }catch(e){} })();
+</script>
+</head>
+<body>
+
+<main class="dg-page">
+  <div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">AI CHAT</div></div>
+  <div class="ai-header-card" style="margin-top:16px">
+    <div class="ai-avatar">🤖</div>
+    <div style="flex:1"><div style="font-size:18px;font-weight:700;display:flex;align-items:center">Dagbo AI <span class="ai-status">Online</span></div><div class="dg-muted" style="font-size:13px;margin-top:2px">Your Trading Assistant. Ask anything...</div></div>
+  </div>
+  <div class="chat-container" id="chatArea"></div>
+  <div class="quick-chips">
+    <button class="quick-chip" onclick="askQuestion('Latest Signal')">📊 Latest Signal</button>
+    <button class="quick-chip" onclick="askQuestion('Trading Tips')">🎓 Trading Tips</button>
+    <button class="quick-chip" onclick="askQuestion('FAQ')">❓ FAQ</button>
+    <button class="quick-chip" onclick="askQuestion('Next NFP?')">📅 Next NFP</button>
+  </div>
+  <div class="input-row" style="margin-top:12px">
+    <button class="dg-btn" style="min-height:44px;width:44px;padding:0;border-radius:50%;background:var(--dg-fill);font-size:18px" onclick="startVoice()">🎤</button>
+    <input type="text" id="chatInput" placeholder="Type your message..." onkeypress="handleEnter(event)">
+    <button class="send-btn" onclick="sendMessage()">➤</button>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:0 8px">
+    <span class="dg-muted" style="font-size:13px;font-weight:600">🔊 Read replies aloud</span>
+    <label class="dg-switch"><input type="checkbox" id="tgAutoRead" onchange="toggleAutoRead(this)"><span class="dg-switch__track"></span></label>
+  </div>
+  <p class="dg-note">Dagbo AI never gives live prices or trade calls.<br>Always check the chart before you trade.</p>
+</main>
+
+<nav class="dg-tabbar" aria-label="Main">
+  <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
+  <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
+  <a class="dg-tab" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
+  <a class="dg-tab" aria-current="page" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
+  <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
+</nav>
+
+<script src="pwa.js" defer></script>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   DAGBO BRAIN — FULL ENGINE (Part 1: Setup & Engines)
+   ═══════════════════════════════════════════════════════════════════════════ */
+var SETTINGS_KEY = 'dagbo_settings';
+function readSettings(){ try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch(e){ return {}; } }
+function getName(){ var s = readSettings(); return (s.name || 'Oga').replace(/^Oga\s+/i, ''); }
+function getAutoRead(){ return readSettings().autoRead === true; }
+function getRiskPct(){ return Number(readSettings().risk) || 1; }
+function getAccount(){ return Number(readSettings().accountSize) || 100; }
+function getGroqKey(){ return (readSettings().groqKey || '').trim(); }
+function hasGroqKey(){ return getGroqKey().length > 10; }
+
+/* DATE ENGINE */
+var NFP_EXCEPTIONS = { '2013-10':'2013-10-22', '2025-01':'2025-01-10', '2026-01':'2026-01-09' };
+function firstFriday(year, mIdx){ var d = new Date(year, mIdx, 1); var offset = (5 - d.getDay() + 7) % 7; return new Date(year, mIdx, 1 + offset); }
+function nfpDatesForYear(year){ var out = []; for (var m = 0; m < 12; m++){ var key = year + '-' + String(m + 1).padStart(2, '0'); if (NFP_EXCEPTIONS[key]){ var p = NFP_EXCEPTIONS[key].split('-'); out.push(new Date(parseInt(p[0],10), parseInt(p[1],10) - 1, parseInt(p[2],10))); } else { out.push(firstFriday(year, m)); } } return out; }
+function fmtDateObj(d){ return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] + ', ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); }
+var FOMC_DATES = { 2019:['01-30','03-20','05-01','06-19','07-31','09-18','10-30','12-11'],2020:['01-29','03-03','03-15','04-29','06-10','07-29','09-16','11-05','12-16'],2021:['01-27','03-17','04-28','06-16','07-28','09-22','11-03','12-15'],2022:['01-26','03-16','05-04','06-15','07-27','09-21','11-02','12-14'],2023:['02-01','03-22','05-03','06-14','07-26','09-20','11-01','12-13'],2024:['01-31','03-20','05-01','06-12','07-31','09-18','11-07','12-18'],2025:['01-29','03-19','05-07','06-18','07-30','09-17','10-29','12-10'],2026:['01-28','03-18','04-29','06-17','07-29','09-16','11-04','12-16'] };
+var CPI_DATES = { 2023:['01-12','02-14','03-14','04-12','05-10','06-13','07-12','08-10','09-13','10-12','11-14','12-12'],2024:['01-11','02-13','03-12','04-10','05-15','06-12','07-11','08-14','09-11','10-10','11-13','12-11'],2025:['01-15','02-12','03-12','04-10','05-13','06-11','07-15','08-12','09-10','10-15','11-12','12-10'],2026:['01-14','02-11','03-11','04-14','05-12','06-10','07-14','08-11','09-09','10-14','11-11','12-09'] };
+function tryDate(q, e){ var t = q.toLowerCase(), today = new Date(), yr = e.year; if (/nfp|non-?farm|jobs report/.test(t)){ if (/next|upcoming|coming/.test(t)){ var found = null; for (var y = today.getFullYear(); y <= today.getFullYear() + 1 && !found; y++){ var ds = nfpDatesForYear(y); for (var i = 0; i < ds.length; i++){ if (ds[i] > today){ found = ds[i]; break; } } } if (found) return 'Oga, the <b>next NFP</b> na <b>' + fmtDateObj(found) + '</b> · 1:30pm Naija.<br><br><b>Dagbo Rule:</b> No trade 30 min before/after.'; return 'Oga, check <b>forexfactory.com</b>.'; } if (yr && yr >= 2008 && yr <= 2026){ return '<b>NFP dates for ' + yr + ':</b><br>' + nfpDatesForYear(yr).map(function(d){ return '• ' + fmtDateObj(d); }).join('<br>'); } return '<b>NFP</b> = First Friday, 1:30pm Naija.<br>Ask "Next NFP".'; } if (/fomc|fed|interest rate/.test(t)){ if (yr && FOMC_DATES[yr]){ return '<b>FOMC dates for ' + yr + ':</b><br>' + FOMC_DATES[yr].map(function(d){ var p = d.split('-'); return '• ' + fmtDateObj(new Date(yr, parseInt(p[0],10)-1, parseInt(p[1],10))); }).join('<br>'); } return '<b>FOMC</b> = 8×/year, 7pm Naija.<br>Ask "FOMC 2024".'; } if (/cpi|inflation/.test(t)){ if (yr && CPI_DATES[yr]){ return '<b>CPI dates for ' + yr + ':</b><br>' + CPI_DATES[yr].map(function(d){ var p = d.split('-'); return '• ' + fmtDateObj(new Date(yr, parseInt(p[0],10)-1, parseInt(p[1],10))); }).join('<br>'); } return '<b>CPI</b> = Mid-month, 1:30pm Naija.<br>Ask "CPI 2024".'; } return null; }
+
+/* MATH ENGINE */
+function tryMath(q, e){ var t = q.toLowerCase(), acc = e.amount || getAccount(), risk = e.percent !== null ? e.percent : getRiskPct(); if (/(risk|percent|%|loss)/.test(t) && (e.percent !== null || e.amount !== null)){ return 'Oga, <b>Risk math:</b><br>Account: $' + acc.toLocaleString() + '<br>Risk: ' + risk + '%<br><b>Risk amount: $' + (acc * risk / 100).toFixed(2) + '</b><br><br>Formula: <b>Risk $ = Account × Risk% ÷ 100</b>'; } if (/lot/.test(t) && /pip/.test(t)){ return '<b>Pip value:</b><br>• 0.01 lot = $0.10/pip<br>• 0.10 lot = $1.00/pip<br><b>GOLD 0.01 lot:</b> $0.01 per 0.10 move'; } if (/(position size|how many lot|what lot|which lot)/.test(t)){ var slPips = e.numbers.length ? e.numbers[0] : 20; var riskAmt = acc * risk / 100; return '<b>Position size:</b><br>Account: $' + acc + '<br>Risk: ' + risk + '% = $' + riskAmt.toFixed(2) + '<br>SL: ' + slPips + ' pips<br><b>Lot: ' + (riskAmt / (slPips * 10)).toFixed(2) + '</b><br><br><b>Dagbo Rule:</b> If < 0.01, skip trade.'; } return null; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   END OF PART 1
+   ═══════════════════════════════════════════════════════════════════════════ *//* ═══════════════════════════════════════════════════════════════════════════
+   PART 2: THE 200 KB & LOGIC
+   ═══════════════════════════════════════════════════════════════════════════ */
+var KB = [
+  { k:['what is forex','forex meaning'], a:'<b>Forex</b> = buy/sell currencies. Market open 24/5. <b>Dagbo Rule:</b> Forex na skill, no be quick money.' },
+  { k:['support','support level'], a:'<b>Support</b> = floor where buyers wait. <b>Dagbo Rule:</b> No buy just because e touch. Wait for confirmation.' },
+  { k:['resistance','resistance level'], a:'<b>Resistance</b> = ceiling where sellers wait. <b>Dagbo Rule:</b> Round numbers na strongest resistance.' },
+  { k:['trend'], a:'<b>Trend</b> = direction. Uptrend = HH+HL. Downtrend = LH+LL. <b>Dagbo Rule:</b> No fight trend.' },
+  { k:['rsi','relative strength'], a:'<b>RSI</b> = momentum 0–100. >70 overbought, <30 oversold. <b>Dagbo Rule:</b> No trade RSI alone.' },
+  { k:['macd'], a:'<b>MACD</b> = trend + momentum. <b>Dagbo Rule:</b> Best on 1H–4H.' },
+  { k:['ema','moving average'], a:'<b>EMA</b> = exponential MA. <b>Dagbo Rule:</b> Only BUY when price above EMA200.' },
+  { k:['bollinger'], a:'<b>Bollinger Bands</b> = SMA20 ± 2σ. <b>Dagbo Rule:</b> Best for range markets.' },
+  { k:['atr'], a:'<b>ATR</b> = volatility. <b>Dagbo Rule:</b> SL = 1.5× ATR, TP = 3× ATR.' },
+  { k:['order block','ob'], a:'<b>Order Block</b> = last opposite candle before impulse. <b>Dagbo Rule:</b> Fresh OB = strong.' },
+  { k:['fvg','fair value gap'], a:'<b>FVG</b> = 3-candle gap. <b>Dagbo Rule:</b> FVG inside OB = best entry.' },
+  { k:['liquidity','stop hunt'], a:'<b>Liquidity</b> = stop cluster. <b>Dagbo Rule:</b> Liquidity sweep + FVG + OB = A+ reversal.' },
+  { k:['bos','break of structure'], a:'<b>BOS</b> = break previous high/low. <b>Dagbo Rule:</b> BOS = continuation.' },
+  { k:['choch','change of character'], a:'<b>CHoCH</b> = reversal warning. <b>Dagbo Rule:</b> CHoCH na warning, no be entry.' },
+  { k:['pin bar','hammer'], a:'<b>Pin Bar</b> = long wick, small body. <b>Dagbo Rule:</b> Pin AT support = strong.' },
+  { k:['engulfing'], a:'<b>Engulfing</b> = body covers previous. <b>Dagbo Rule:</b> Engulfing at KEY ZONE = A+ setup.' },
+  { k:['doji'], a:'<b>Doji</b> = small body, indecision. <b>Dagbo Rule:</b> No trade doji alone.' },
+  { k:['lot size','position size'], a:'<b>Lot = (Account × Risk%) ÷ (SL pips × Pip Value)</b>. <b>Dagbo Rule:</b> No use big lot to win back loss.' },
+  { k:['risk','risk per trade'], a:'<b>Risk</b> = how much you fit lose. <b>Dagbo Rule:</b> 1% per trade. After 3 losses, STOP for day.' },
+  { k:['pip'], a:'<b>Pip</b> = smallest price move. EURUSD=0.0001, GOLD=0.10. <b>Dagbo Rule:</b> Know pip value before entry.' },
+  { k:['leverage'], a:'<b>Leverage</b> = borrowed money. <b>Dagbo Rule:</b> Use 0.01 lot no matter leverage.' },
+  { k:['margin','margin call'], a:'<b>Margin</b> = broker holds. <b>Margin Call</b> = warning. <b>Dagbo Rule:</b> Small lot always.' },
+  { k:['risk reward','rr'], a:'<b>R:R</b> = risk vs target. <b>Dagbo Rule:</b> No trade below 1:2.' },
+  { k:['drawdown'], a:'<b>Drawdown</b> = peak-to-trough loss. <b>Dagbo Rule:</b> Protect capital FIRST.' },
+  { k:['fomo'], a:'<b>FOMO</b> = late entry from fear. <b>Dagbo Rule:</b> Missed trade > bad trade.' },
+  { k:['revenge trade','tilt'], a:'<b>Revenge</b> = enter to win back. <b>Dagbo Rule:</b> After loss, close app 30 min.' },
+  { k:['discipline','psychology'], a:'<b>Discipline</b> = #1 edge. <b>Dagbo Rule:</b> No rules = no survival.' },
+  { k:['journal','trade log'], a:'<b>Journal</b> = write every trade. <b>Dagbo Rule:</b> No journal = no improvement.' },
+  { k:['overtrading'], a:'<b>Overtrading</b> = too many trades. <b>Dagbo Rule:</b> 1–3 A+ trades per day.' },
+  { k:['gold','xauusd'], a:'<b>GOLD</b> = fast, news-sensitive. 1 pip = 0.10. <b>Dagbo Rule:</b> Wider SL. News = walk away.' },
+  { k:['eurusd','euro'], a:'<b>EURUSD</b> = best for beginners. 0.01 lot = $0.10/pip. <b>Dagbo Rule:</b> Watch London open (8am Naija).' },
+  { k:['btc','bitcoin'], a:'<b>BTC</b> = 24/7 crypto. <b>Dagbo Rule:</b> Small lot only. SL 1.5–2% min.' },
+  { k:['session','best time'], a:'<b>Sessions:</b> London fast, NY fastest. Best = 1pm–4pm Naija. <b>Dagbo Rule:</b> Avoid Sunday night.' },
+  { k:['why lose','blown account'], a:'<b>Lose because:</b> Big lot, No SL, Revenge, Overtrade. <b>Dagbo Rule:</b> Loss na data, no be failure.' },
+  { k:['entry','when to enter'], a:'<b>Entry:</b> trend → zone → wait → confirmation. <b>Dagbo Rule:</b> No confirmation = no trade.' },
+  { k:['stochastic'], a:'<b>Stochastic</b> = momentum 0–100. >80 overbought, <20 oversold. <b>Dagbo Rule:</b> Confirm with structure.' },
+  { k:['adx'], a:'<b>ADX</b> = trend strength. >25 = strong trend. <b>Dagbo Rule:</b> Read price structure before bias.' },
+  { k:['ichimoku'], a:'<b>Ichimoku</b> = cloud. Price above = bullish. <b>Dagbo Rule:</b> Learn each line before using cloud.' },
+  { k:['vwap'], a:'<b>VWAP</b> = volume-weighted average. <b>Dagbo Rule:</b> Forex volume = tick volume, not real.' },
+  { k:['elliott wave'], a:'<b>Elliott Wave</b> = 5 impulse + 3 correction. <b>Dagbo Rule:</b> No force count.' },
+  { k:['wyckoff'], a:'<b>Wyckoff</b> = accumulation/distribution. <b>Dagbo Rule:</b> Don call every range accumulation.' },
+  { k:['killzone','ict killzone'], a:'<b>Killzones:</b> London 8–11am, NY 1:30–4pm. <b>Dagbo Rule:</b> Convert to Naija time.' },
+  { k:['power of three','amd'], a:'<b>AMD</b> = Accumulation, Manipulation, Distribution. <b>Dagbo Rule:</b> Let chart confirm.' },
+  { k:['premium discount','ote'], a:'<b>Premium/Discount</b> = above/below midpoint. <b>Dagbo Rule:</b> Premium no mean auto sell.' },
+  { k:['judas swing'], a:'<b>Judas Swing</b> = fake early move. <b>Dagbo Rule:</b> Wait for structure.' },
+  { k:['smt divergence'], a:'<b>SMT</b> = related markets disagree. <b>Dagbo Rule:</b> Divergence = clue, no be proof.' },
+  { k:['breaker block'], a:'<b>Breaker</b> = former OB broken and used opposite. <b>Dagbo Rule:</b> Identify structure break first.' },
+  { k:['mitigation block'], a:'<b>Mitigation Block</b> = return to earlier opposing zone. <b>Dagbo Rule:</b> Wait for structure confirmation.' },
+  { k:['ifvg'], a:'<b>IFVG</b> = FVG that failed and acts opposite. <b>Dagbo Rule:</b> Confirm break + retest.' },
+  { k:['turtle soup'], a:'<b>Turtle Soup</b> = false break of prior high/low. <b>Dagbo Rule:</b> Wait for reclaim.' },
+  { k:['liquidity void'], a:'<b>Liquidity Void</b> = fast delivery area. <b>Dagbo Rule:</b> Mark as reaction zone, not promise.' },
+  { k:['balanced price range'], a:'<b>BPR</b> = overlap of opposing FVGs. <b>Dagbo Rule:</b> Wait for confirmation.' },
+  { k:['ict'], a:'<b>ICT</b> = Smart Money framework. <b>Dagbo Rule:</b> Learn structure break first.' },
+  { k:['morning star','evening star'], a:'<b>Stars</b> = 3-candle reversal. <b>Dagbo Rule:</b> Needs location + confirmation.' },
+  { k:['three white soldiers'], a:'<b>3 White Soldiers</b> = strong bullish. <b>Dagbo Rule:</b> Avoid chasing.' },
+  { k:['harami'], a:'<b>Harami</b> = inside body. <b>Dagbo Rule:</b> Wait for next candle.' },
+  { k:['inside bar'], a:'<b>Inside Bar</b> = full range inside previous. <b>Dagbo Rule:</b> Mark mother bar. Wait for break.' },
+  { k:['outside bar'], a:'<b>Outside Bar</b> = engulfing wick. <b>Dagbo Rule:</b> Study close + location.' },
+  { k:['ascending triangle'], a:'<b>Ascending Triangle</b> = flat top + rising lows. <b>Dagbo Rule:</b> Wait for confirmed close.' },
+  { k:['bull flag'], a:'<b>Bull Flag</b> = pause after strong up. <b>Dagbo Rule:</b> Check breakout confirmation.' },
+  { k:['cup and handle'], a:'<b>Cup and Handle</b> = rounded recovery + pullback. <b>Dagbo Rule:</b> Check volume quality.' },
+  { k:['triple top'], a:'<b>Triple Top</b> = 3 failed resistance tests. <b>Dagbo Rule:</b> Support break matters more.' },
+  { k:['rectangle pattern'], a:'<b>Rectangle</b> = horizontal range. <b>Dagbo Rule:</b> Mark boundaries. Wait for close outside.' },
+  { k:['wedge'], a:'<b>Wedge</b> = narrowing trend. <b>Dagbo Rule:</b> Wait for confirmed break + retest.' },
+  { k:['marubozu'], a:'<b>Marubozu</b> = large body, tiny wicks. <b>Dagbo Rule:</b> No enter late.' },
+  { k:['spinning top'], a:'<b>Spinning Top</b> = indecision. <b>Dagbo Rule:</b> Wait for next candles.' },
+  { k:['tweezer'], a:'<b>Tweezer</b> = matching highs/lows. <b>Dagbo Rule:</b> Wait for confirmation.' },
+  { k:['keltner channels'], a:'<b>Keltner</b> = ATR bands. <b>Dagbo Rule:</b> Touching band ≠ reversal.' },
+  { k:['donchian channels'], a:'<b>Donchian</b> = high/low channels. <b>Dagbo Rule:</b> Check candle close + retest.' },
+  { k:['heikin ashi'], a:'<b>Heikin Ashi</b> = averaged candles. <b>Dagbo Rule:</b> Use standard candles for entries.' },
+  { k:['supertrend'], a:'<b>Supertrend</b> = ATR trend line. <b>Dagbo Rule:</b> Confirm change with candle close.' },
+  { k:['pivot points'], a:'<b>Pivots</b> = calculated from prior high/low/close. <b>Dagbo Rule:</b> References, not guarantees.' },
+  { k:['obv'], a:'<b>OBV</b> = cumulative volume. <b>Dagbo Rule:</b> Divergence = clue, not confirmation.' },
+  { k:['cci'], a:'<b>CCI</b> = price vs average. <b>Dagbo Rule:</b> CCI alone ≠ buy/sell signal.' },
+  { k:['williams r'], a:'<b>Williams %R</b> = momentum. <b>Dagbo Rule:</b> Use for momentum, not prediction.' },
+  { k:['momentum indicator'], a:'<b>Momentum</b> = speed of change. <b>Dagbo Rule:</b> Momentum supports, structure leads.' },
+  { k:['roc'], a:'<b>ROC</b> = % change. <b>Dagbo Rule:</b> Compare with chart.' },
+  { k:['parabolic sar'], a:'<b>SAR</b> = dots for trend. <b>Dagbo Rule:</b> SAR dot switch ≠ new trend.' },
+  { k:['elliott correction'], a:'<b>Correction</b> = A-B-C. <b>Dagbo Rule:</b> Corrections are complex.' },
+  { k:['wyckoff spring'], a:'<b>Spring</b> = break below support, returns. <b>Dagbo Rule:</b> Wait for successful reclaim.' },
+  { k:['sign of strength'], a:'<b>SOS</b> = strong rally. <b>Dagbo Rule:</b> Check if move sustains.' },
+  { k:['london open'], a:'<b>London Open</b> = key session start. <b>Dagbo Rule:</b> Check UK-Naija time diff.' },
+  { k:['new york open'], a:'<b>NY Open</b> = US activity. <b>Dagbo Rule:</b> Know server timezone.' },
+  { k:['asian range'], a:'<b>Asian Range</b> = high/low. <b>Dagbo Rule:</b> Define exact session.' },
+  { k:['adr'], a:'<b>ADR</b> = average daily range. <b>Dagbo Rule:</b> Context tool, no hard limit.' },
+  { k:['atr stop'], a:'<b>ATR Stop</b> = stop based on volatility. <b>Dagbo Rule:</b> Choose stop from structure.' },
+  { k:['opening range breakout'], a:'<b>ORB</b> = break of early range. <b>Dagbo Rule:</b> Confirm break. Account for false breaks.' },
+  { k:['time based stop'], a:'<b>Time Stop</b> = close after set time. <b>Dagbo Rule:</b> Set in advance.' },
+  { k:['session bias'], a:'<b>Session Bias</b>  { k:['session bias'], a:'<b>Session Bias</b> = expected behavior. <b>Dagbo Rule:</b> No replace chart evidence.' },
+  { k:['kelly criterion'], a:'<b>Kelly</b> = optimal sizing. <b>Dagbo Rule:</b> Beginners no apply full Kelly.' },
+  { k:['expectancy'], a:'<b>Expectancy</b> = avg gain/loss. <b>Dagbo Rule:</b> Track enough trades. Include costs.' },
+  { k:['r multiple'], a:'<b>R-Multiple</b> = result vs risk. <b>Dagbo Rule:</b> Record in R.' },
+  { k:['compound growth'], a:'<b>Compound</b> = gains affect future. <b>Dagbo Rule:</b> Compounding increases losses too.' },
+  { k:['position scaling'], a:'<b>Scaling</b> = enter in portions. <b>Dagbo Rule:</b> Total risk first.' },
+  { k:['pyramiding'], a:'<b>Pyramiding</b> = add to winning trade. <b>Dagbo Rule:</b> Plan every addition.' },
+  { k:['partial exits'], a:'<b>Partial Exit</b> = close some. <b>Dagbo Rule:</b> Decide plan before entry.' },
+  { k:['break even stop'], a:'<b>Break Even</b> = SL to entry. <b>Dagbo Rule:</b> No move too early.' },
+  { k:['advanced trailing stop'], a:'<b>Trailing Stop</b> = follow structure. <b>Dagbo Rule:</b> Choose one method.' },
+  { k:['portfolio heat'], a:'<b>Portfolio Heat</b> = total open risk. <b>Dagbo Rule:</b> Add all stop risks.' },
+  { k:['gbpusd'], a:'<b>GBPUSD</b> = volatile. <b>Dagbo Rule:</b> Small size. Avoid trading news blindly.' },
+  { k:['usdjpy'], a:'<b>USDJPY</b> = 1 pip = 0.01. <b>Dagbo Rule:</b> Verify contract + pip value.' },
+  { k:['gbpjpy'], a:'<b>GBPJPY</b> = very volatile. <b>Dagbo Rule:</b> Conservative size.' },
+  { k:['us100'], a:'<b>US100</b> = Nasdaq CFD. <b>Dagbo Rule:</b> Verify tick value. No forex assumptions.' },
+  { k:['us500'], a:'<b>US500</b> = S&P CFD. <b>Dagbo Rule:</b> Treat as index product.' },
+  { k:['us30'], a:'<b>US30</b> = Dow CFD. <b>Dagbo Rule:</b> Check value per point.' },
+  { k:['ethusd'], a:'<b>ETHUSD</b> = Ethereum. <b>Dagbo Rule:</b> Confirm product type. Size conservative.' },
+  { k:['audusd'], a:'<b>AUDUSD</b> = 0.01 lot = $0.10/pip. <b>Dagbo Rule:</b> Check Australian releases.' },
+  { k:['usdchf'], a:'<b>USDCHF</b> = variable pip value. <b>Dagbo Rule:</b> Verify CHF conversion.' },
+  { k:['trading plan'], a:'<b>Plan</b> = written rules. <b>Dagbo Rule:</b> Write rules before session.' },
+  { k:['pre market routine'], a:'<b>Pre-Market</b> = preparation. <b>Dagbo Rule:</b> Prepare before busy.' },
+  { k:['post market review'], a:'<b>Post-Market</b> = review. <b>Dagbo Rule:</b> Record one lesson.' },
+  { k:['emotional journaling'], a:'<b>Emotional Journal</b> = record feelings. <b>Dagbo Rule:</b> Honest recording.' },
+  { k:['loss acceptance'], a:'<b>Loss Acceptance</b> = planned loss is normal. <b>Dagbo Rule:</b> Never widen stop.' },
+  { k:['winning psychology'], a:'<b>Winning Psych</b> = manage confidence. <b>Dagbo Rule:</b> No increase risk after wins.' },
+  { k:['overtrading recovery'], a:'<b>Overtrading Recovery</b> = stop + review. <b>Dagbo Rule:</b> Repeated broken rules → stop session.' },
+  { k:['fear vs greed'], a:'<b>Fear & Greed</b> = emotional pressures. <b>Dagbo Rule:</b> Written rules.' },
+  { k:['patience'], a:'<b>Patience</b> = wait for setup. <b>Dagbo Rule:</b> No setup = do nothing.' },
+  { k:['confidence building'], a:'<b>Confidence</b> = from preparation. <b>Dagbo Rule:</b> Build through process.' },
+  { k:['mt4 vs mt5'], a:'<b>MT4 vs MT5</b> = platforms. <b>Dagbo Rule:</b> Choose by broker support.' },
+  { k:['order types'], a:'<b>Order Types</b> = market, limit, stop. <b>Dagbo Rule:</b> Understand triggers.' },
+  { k:['slippage'], a:'<b>Slippage</b> = price difference. <b>Dagbo Rule:</b> Include in risk planning.' },
+  { k:['requotes'], a:'<b>Requotes</b> = new price offered. <b>Dagbo Rule:</b> Read execution policy.' },
+  { k:['ecn vs market maker'], a:'<b>ECN</b> = routes to liquidity. <b>Dagbo Rule:</b> Compare total costs.' },
+  { k:['deposit withdrawal'], a:'<b>Deposit/Withdrawal</b> = moving money. <b>Dagbo Rule:</b> Test withdrawal via official process.' },
+  { k:['kyc verification'], a:'<b>KYC</b> = identity check. <b>Dagbo Rule:</b> Use only official portal.' },
+  { k:['demo to live transition'], a:'<b>Demo→Live</b> = simulation to real. <b>Dagbo Rule:</b> Don rush.' },
+  { k:['broker regulation'], a:'<b>Regulation</b> = oversight. <b>Dagbo Rule:</b> Verify license.' },
+  { k:['spread types'], a:'<b>Spread</b> = fixed or floating. <b>Dagbo Rule:</b> Compare during your hours.' },
+  { k:['body vs wick'], a:'<b>Body vs Wick</b> = candle proportions. <b>Dagbo Rule:</b> Read with location.' },
+  { k:['pin bar confirmation'], a:'<b>Pin Bar Confirm</b> = wick + location. <b>Dagbo Rule:</b> Identify zone first.' },
+  { k:['engulfing confirmation'], a:'<b>Engulfing Confirm</b> = body covers previous. <b>Dagbo Rule:</b> Confirm with trend.' },
+  { k:['doji types'], a:'<b>Doji Types</b> = Standard, Dragonfly, Gravestone. <b>Dagbo Rule:</b> Wait for next candle.' },
+  { k:['volume confirmation'], a:'<b>Volume Confirmation</b> = activity supports move. <b>Dagbo Rule:</b> Forex volume = tick.' },
+  { k:['multi timeframe confluence'], a:'<b>Multi-Timeframe</b> = HTF + LTF. <b>Dagbo Rule:</b> Decide HTF bias first.' },
+  { k:['candle close vs wick'], a:'<b>Close vs Wick</b> = close is final. <b>Dagbo Rule:</b> Define if method requires close.' },
+  { k:['gap analysis'], a:'<b>Gap</b> = price jumps. <b>Dagbo Rule:</b> Gap no must fill.' },
+  { k:['wick rejection'], a:'<b>Wick Rejection</b> = price probes then retreats. <b>Dagbo Rule:</b> Confirm with level.' },
+  { k:['trend continuation candles'], a:'<b>Continuation</b> = pause then resume. <b>Dagbo Rule:</b> Confirm trend + break.' },
+  { k:['higher high'], a:'<b>HH</b> = swing high above previous. <b>Dagbo Rule:</b> Use clearly visible swings.' },
+  { k:['higher low'], a:'<b>HL</b> = swing low above previous. <b>Dagbo Rule:</b> Track alongside HH.' },
+  { k:['lower high'], a:'<b>LH</b> = swing high below previous. <b>Dagbo Rule:</b> Combine with LL.' },
+  { k:['lower low'], a:'<b>LL</b> = swing low below previous. <b>Dagbo Rule:</b> Confirm with close.' },
+  { k:['market range'], a:'<b>Range</b> = sideways. <b>Dagbo Rule:</b> Mark boundaries.' },
+  { k:['breakout'], a:'<b>Breakout</b> = price beyond boundary. <b>Dagbo Rule:</b> Define confirmation.' },
+  { k:['fakeout'], a:'<b>Fakeout</b> = failed breakout. <b>Dagbo Rule:</b> Wait for close.' },
+  { k:['retest'], a:'<b>Retest</b> = return to broken level. <b>Dagbo Rule:</b> Retest is optional.' },
+  { k:['trend continuation'], a:'<b>Continuation</b> = resume direction. <b>Dagbo Rule:</b> Confirm original trend.' },
+  { k:['market reversal'], a:'<b>Reversal</b> = direction change. <b>Dagbo Rule:</b> No call from one candle.' },
+  { k:['correlation between pairs'], a:'<b>Correlation</b> = pairs move together. <b>Dagbo Rule:</b> Check current correlation.' },
+  { k:['currency strength'], a:'<b>Currency Strength</b> = performance. <b>Dagbo Rule:</b> Confirm on chart.' },
+  { k:['economic calendar'], a:'<b>Economic Calendar</b> = releases. <b>Dagbo Rule:</b> Know event time in Naija.' },
+  { k:['spread widening'], a:'<b>Spread Widening</b> = higher gap. <b>Dagbo Rule:</b> Check live spread.' },
+  { k:['swap fees'], a:'<b>Swap</b> = overnight financing. <b>Dagbo Rule:</b> Read schedule.' },
+  { k:['leverage and margin'], a:'<b>Leverage/Margin</b>. <b>Dagbo Rule:</b> Risk from stop distance.' },
+  { k:['margin call level'], a:'<b>Margin Call</b> = warning. <b>Stop Out</b> = forced close. <b>Dagbo Rule:</b> Know broker rules.' }
+];
+
+/* MATCHER */
+var STOPWORDS = new Set(['the','a','an','is','are','was','were','be','been','being','of','in','on','at','to','for','with','about','by','as','from','that','this','these','those','it','its']);
+var KEYWORD_CACHE = null;
+function normalizeText(s){ return typeof s === 'string' ? s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim() : ''; }
+function buildKeywordCache(kb){
+  var entries = [];
+  for (var i = 0; i < kb.length; i++){
+    var rawKws = kb[i].k || [], kws = [];
+    for (var j = 0; j < rawKws.length; j++){
+      var norm = normalizeText(rawKws[j]); if (!norm) continue;
+      kws.push({ text: norm, words: norm.split(' '), len: norm.length });
+    }
+    entries.push({ idx: i, keywords: kws, maxScore: 100 });
+  }
+  return { entries: entries };
+}
+function matchKB(q){
+  if (!KEYWORD_CACHE) KEYWORD_CACHE = buildKeywordCache(KB);
+  var qNorm = normalizeText(q); if (!qNorm) return [];
+  var words = qNorm.split(' ').filter(function(w){ return !STOPWORDS.has(w); });
+  var rawByIdx = Object.create(null);
+  for (var i = 0; i < KEYWORD_CACHE.entries.length; i++){
+    var ent = KEYWORD_CACHE.entries[i], total = 0;
+    for (var j = 0; j < ent.keywords.length; j++){
+      var kw = ent.keywords[j], pos = -1;
+      for (var k = 0; k <= words.length - kw.words.length; k++){
+        var ok = true; for (var m = 0; m < kw.words.length; m++){ if (words[k+m] !== kw.words[m]){ ok = false; break; } }
+        if (ok){ pos = k; break; }
+      }
+      if (pos > -1) total += (kw.len * 2) + 10;
+    }
+    if (total > 0) rawByIdx[ent.idx] = Math.min(100, total);
+  }
+  var results = [];
+  for (var ei = 0; ei < KEYWORD_CACHE.entries.length; ei++){
+    if (rawByIdx[ei]) results.push({ idx: ei, score: rawByIdx[ei] });
+  }
+  results.sort(function(a, b){ return b.score - a.score; });
+  return results;
+}
+
+/* COMPOSER & GROQ */
+function compose(userQ){
+  var raw = String(userQ).trim(), low = raw.toLowerCase();
+  if (/\b(current|live|price)\b/i.test(low)) return "I no dey give live price. Open the Chart page to see real price from TradingView.";
+  if (/\b(should|can|make)\b i (buy|sell)\b/i.test(low)) return "I no dey give trade calls, I only teach. Check the Chart page.";
+  
+  var e = { numbers: raw.match(/\d+(?:\.\d+)?/g) || [], amount: null, percent: null, year: null };
+  var am = raw.match(/\$\s?([\d,]+(?:\.\d+)?)/); if (am) e.amount = parseFloat(am[1].replace(/,/g,''));
+  var pc = raw.match(/([\d.]+)\s?%/); if (pc) e.percent = parseFloat(pc[1]);
+  var yr = raw.match(/\b(20\d{2})\b/); if (yr) e.year = parseInt(yr[1],10);
+
+  var m = tryMath(raw, e); if (m) return m;
+  var d = tryDate(raw, e); if (d) return d;
+
+  var results = matchKB(raw);
+  if (results.length > 0 && results[0].score >= 30) return KB[results[0].idx].a;
+
+  if (hasGroqKey()) return { type: 'groq', query: raw };
+  return "I no get correct answer for that inside my notes.<br><br>Option 1: rephrase am short.<br>Option 2: add a Groq key in Settings.";
+}
+
+function askGroq(userQ){
+  return new Promise(function(resolve, reject){
+    var key = getGroqKey(); if (!key) return reject(new Error('No key'));
+    var sys = 'You are Dagbo Brain, a trading teacher for ' + getName() + '. Speak in Pidgin English. Never give live prices or trade calls. Answer in 3-6 sentences. Use <b>bold</b> for key terms.';
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://api.groq.com/openai/v1/chat/completions', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.setRequestHeader('Authorization', 'Bearer ' + key);
+    xhr.onload = function(){
+      if (xhr.status === 200) {
+        var data = JSON.parse(xhr.responseText);
+        var ans = data.choices[0].message.content.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+        resolve(ans);
+      } else { reject(new Error('Groq error ' + xhr.status)); }
+    };
+    xhr.onerror = function(){ reject(new Error('Network error')); };
+    xhr.send(JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'system', content: sys }, { role: 'user', content: userQ }], temperature: 0.4, max_tokens: 400 }));
+  });
+}
+
+/* UI WIRING */
+var chatArea = document.getElementById('chatArea');
+var chatInput = document.getElementById('chatInput');
+var _hist = [];
+var _rec = null;
+
+function addMessage(role, text) {
+  var d = document.createElement('div');
+  d.className = 'chat-bubble ' + role;
+  var html = String(text).replace(/\n/g, '<br>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  var time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  d.innerHTML = html + '<span class="chat-time">' + time + '</span>';
+  chatArea.appendChild(d);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  if (role === 'ai' || role === 'me') _hist.push({ role: role, text: text });
+}
+
+function sendMessage() {
+  var text = chatInput.value.trim();
+  if (!text) return;
+  chatInput.value = '';
+  addMessage('me', text);
+  
+  var typing = document.createElement('div');
+  typing.className = 'chat-bubble ai';
+  typing.innerHTML = '...';
+  chatArea.appendChild(typing);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+  setTimeout(function() {
+    chatArea.removeChild(typing);
+    var reply = compose(text);
+    if (reply && reply.type === 'groq') {
+      askGroq(reply.query).then(function(ans) {
+        addMessage('ai', ans);
+        if (getAutoRead()) speak(ans);
+      }).catch(function(err) {
+        addMessage('ai', 'Error: ' + err.message);
+      });
+    } else {
+      addMessage('ai', reply);
+      if (getAutoRead()) speak(reply);
+    }
+  }, 600);
+}
+
+function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
+function askQuestion(q) { chatInput.value = q; sendMessage(); }
+
+function speak(text) {
+  try {
+    var clean = String(text).replace(/<[^>]*>/g, ' ');
+    var u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'en-NG'; u.rate = 0.95;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch(e){}
+}
+
+function startVoice() {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert("Voice not supported on this browser."); return; }
+  if (_rec) { _rec.stop(); return; }
+  _rec = new SR();
+  _rec.lang = 'en-NG'; _rec.interimResults = false;
+  _rec.onstart = function() { chatInput.placeholder = "Listening..."; };
+  _rec.onend = function() { chatInput.placeholder = "Type your message..."; _rec = null; };
+  _rec.onresult = function(e) { chatInput.value = e.results[0][0].transcript; sendMessage(); };
+  _rec.start();
+}
+
+function toggleAutoRead(el) {
+  var s = readSettings();
+  s.autoRead = el.checked;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
+(function boot() {
+  document.getElementById('tgAutoRead').checked = getAutoRead();
+  var name = getName();
+  addMessage('ai', "Hello " + name + "! 👋<br>I'm Dagbo AI. How can I help you today?<br><br>✅ Explain any signal<br>✅ Teach trading concepts<br>✅ Answer your questions");
+})();
+</script>
+</body>
+</html>
