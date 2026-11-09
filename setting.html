@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F5F7" id="themeColor">
+<title>Settings · DAGBO SIGNAL</title>
+
+<!-- PWA Links -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<!-- THE NEW DESIGN SYSTEM -->
+<link rel="stylesheet" href="dagbo.css">
+
+<script>
+  (function(){
+    try{
+      var s = JSON.parse(localStorage.getItem('dagbo_settings')) || {};
+      var follow = s.followSystem !== false;
+      var dark = follow ? window.matchMedia('(prefers-color-scheme: dark)').matches : s.theme === 'dark';
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    }catch(e){}
+  })();
+</script>
+</head>
+<body>
+
+<main class="dg-page">
+
+  <!-- Top Header -->
+  <div class="dg-top">
+    <div class="dg-brand">◈ DAGBO SIGNAL</div>
+    <div class="dg-badge">SETTINGS</div>
+  </div>
+
+  <!-- PROFILE CARD (Top) -->
+  <div class="dg-card" style="display:flex;align-items:center;gap:16px;padding:20px;margin-top:16px;cursor:pointer" onclick="document.getElementById('inName').focus()">
+    <div style="width:64px;height:64px;border-radius:50%;background:var(--dg-green-soft);border:2px solid var(--dg-green);display:flex;align-items:center;justify-content:center;position:relative">
+      <span style="font-size:22px;font-weight:800;color:var(--dg-green-ink)" id="avatarInitials">DS</span>
+      <span style="position:absolute;bottom:-6px;right:-6px;font-size:16px">👑</span>
+    </div>
+    <div style="flex:1">
+      <h2 style="font-size:20px;font-weight:700;margin:0" id="displayName">Oga Emma</h2>
+      <div style="font-size:13px;font-weight:600;color:var(--dg-amber-ink);margin-top:2px">Premium Trader</div>
+      <div class="dg-muted" style="font-size:13px;margin-top:4px">Account Size: <span id="displayAccount">$100.00</span></div>
+    </div>
+    <div style="color:var(--dg-text-3);font-size:20px">›</div>
+  </div>
+
+  <!-- PROFILE EDIT INPUTS (Hidden slightly, integrated) -->
+  <div class="dg-card" style="padding:16px;margin-bottom:24px">
+    <label class="dg-field" style="margin-top:0">
+      <span class="dg-label">Your Name (How AI greets you)</span>
+      <input class="dg-input" type="text" id="inName" placeholder="Oga Emma">
+    </label>
+    <label class="dg-field">
+      <span class="dg-label">Account Size ($)</span>
+      <input class="dg-input" type="number" id="inAccount" placeholder="100">
+    </label>
+  </div>
+
+  <!-- APP PREFERENCES -->
+  <h3 class="dg-section" style="margin-top:0">App Preferences</h3>
+  <div class="dg-card dg-card--flush">
+    
+    <!-- Push Notifications Toggle -->
+    <div class="dg-row">
+      <span class="dg-row__icon">🔔</span>
+      <span class="dg-row__body">
+        <span class="dg-row__title">Push Notifications</span>
+        <span class="dg-row__sub">Get instant signal alerts</span>
+      </span>
+      <label class="dg-switch"><input type="checkbox" id="tgNotify"><span class="dg-switch__track"></span></label>
+    </div>
+
+    <!-- Dark Mode Toggle -->
+    <div class="dg-row">
+      <span class="dg-row__icon dg-row__icon--grey">☾</span>
+      <span class="dg-row__body">
+        <span class="dg-row__title">Dark Mode</span>
+        <span class="dg-row__sub">Keep the app in dark theme</span>
+      </span>
+      <label class="dg-switch"><input type="checkbox" id="tgFollow" checked><span class="dg-switch__track"></span></label>
+    </div>
+
+    <!-- Language (Static for now) -->
+    <div class="dg-row dg-row--link" onclick="alert('Pidgin & English supported.')">
+      <span class="dg-row__icon dg-row__icon--grey">🌐</span>
+      <span class="dg-row__body">
+        <span class="dg-row__title">Language</span>
+      </span>
+      <span class="dg-row__value">English</span>
+    </div>
+
+    <!-- Time Zone (Static) -->
+    <div class="dg-row">
+      <span class="dg-row__icon dg-row__icon--grey">🕐</span>
+      <span class="dg-row__body">
+        <span class="dg-row__title">Time Zone</span>
+      </span>
+      <span class="dg-row__value">(GMT+1) West Africa</span>
+    </div>
+
+  </div>
+
+  <!-- TRADING SETTINGS -->
+  <h3 class="dg-section">Trading Settings</h3>
+  <div class="dg-card dg-card--flush">
+    
+    <!-- Risk % -->
+    <label class="dg-row" style="cursor:default">
+      <span class="dg-row__icon dg-row__icon--green">🛡</span>
+      <span class="dg-row__body">
+        <span class="dg-row__title">Risk Per Trade</span>
+      </span>
+      <select id="selRisk" class="dg-input" style="width:auto;min-height:36px;padding:4px 28px 4px 12px;font-size:15px;font-weight:600;background:var(--dg-fill);border:none;appearance:none;text-align:right">
+        <option value="0.5">0.5%</option>
+        <option value="1">1.0%</option>
+        <option value="2">2.0%</option>
+        <option value="5">5.0%</option>
+      </select>
+    </label>
+
+    <!-- Default Pair -->
+    <label class="dg-row" style="cursor:default">
+      <span class="dg-row__icon dg-row__icon--green">📊</span>
+      <span class="dg-row__body">
+        <span class="dg-row__title">Default Pair</span>
+      </span>
+      <select id="selPair" class="dg-input" style="width:auto;min-height:36px;padding:4px 28px 4px 12px;font-size:15px;font-weight:600;background:var(--dg-fill);border:none;appearance:none;text-align:right">
+        <!-- JS fills this -->
+      </select>
+    </label>
+
+    <!-- Sound Alert Toggle -->
+    <div class="dg-row">
+      <span class="dg-row__icon dg-row__icon--red">🔊</span>
+      <span class="dg-row__body">
+        <span class="dg-row__title">Sound Alert</span>
+        <span class="dg-row__sub">Beep on STRONG signals</span>
+      </span>
+      <label class="dg-switch"><input type="checkbox" id="tgSound"><span class="dg-switch__track"></span></label>
+    </div>
+
+  </div>
+
+  <!-- YOUR PAIRS -->
+  <h3 class="dg-section">Your Pairs</h3>
+  <div class="dg-card" style="padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="dg-muted" style="font-size:14px">Show on Signals & Chart</div>
+      <button class="dg-btn" style="min-height:30px;padding:0 12px;font-size:13px;border-radius:20px" onclick="toggleAllPairs()">Toggle All</button>
+    </div>
+    <div class="dg-grid-2" id="pairGrid">
+      <!-- Checkboxes filled by JS -->
+    </div>
+  </div>
+
+  <!-- DANGER ZONE -->
+  <h3 class="dg-section" style="color:var(--dg-red-ink)">Danger Zone</h3>
+  <div class="dg-card dg-card--flush">
+    <button class="dg-row" onclick="saveSettings()">
+      <span class="dg-row__body" style="text-align:center;color:var(--dg-blue-ink);font-weight:700">Save Settings</span>
+    </button>
+    <button class="dg-row" onclick="resetSettings()">
+      <span class="dg-row__body" style="text-align:center;color:var(--dg-text-2);font-weight:600">Reset To My Saved</span>
+    </button>
+    <button class="dg-row" onclick="clearAllData()">
+      <span class="dg-row__body" style="text-align:center;color:var(--dg-red-ink);font-weight:700">Clear All Data</span>
+    </button>
+  </div>
+
+  <p class="dg-note" style="margin-top:24px;margin-bottom:40px">
+    DAGBO SIGNAL v1.0.0<br>
+    No broker. No API key. No login.
+  </p>
+
+</main>
+
+<!-- BOTTOM TAB BAR -->
+<nav class="dg-tabbar" aria-label="Main">
+  <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
+  <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
+  <a class="dg-tab" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
+  <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
+  <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
+</nav>
+
+<script src="pwa.js" defer></script>
+<script>
+(function(){
+  'use strict';
+
+  const KEY = 'dagbo_settings';
+  const KEY_SAVED = 'dagbo_settings_saved';
+  const ALL_PAIRS = ['XAUUSD','EURUSD','GBPUSD','USDJPY','GBPJPY','US30','US100','NAS100','US500','BTCUSD','ETHUSD','AUDUSD','USDCHF'];
+
+  var state = {};
+
+  // Load settings
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      state = raw ? JSON.parse(raw) : {};
+    } catch(e) { state = {}; }
+
+    if (!state.pairs) state.pairs = ALL_PAIRS.slice();
+    if (state.risk === undefined) state.risk = 1;
+    if (state.accountSize === undefined) state.accountSize = 100;
+    if (state.defaultPair === undefined) state.defaultPair = 'XAUUSD';
+    if (state.followSystem === undefined) state.followSystem = true;
+    if (state.theme === undefined) state.theme = 'light';
+  }
+
+  function save() {
+    localStorage.setItem(KEY, JSON.stringify(state));
+    window.dispatchEvent(new Event('dagbo:settings-changed'));
+    updateProfileUI();
+  }
+
+  // Update UI
+  function updateProfileUI() {
+    var name = (state.name || 'Oga Emma').trim();
+    var acc = Number(state.accountSize) || 100;
+    
+    document.getElementById('displayName').textContent = name;
+    document.getElementById('displayAccount').textContent = '$' + acc.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('avatarInitials').textContent = name.substring(0, 2).toUpperCase();
+    
+    document.getElementById('inName').value = state.name || '';
+    document.getElementById('inAccount').value = acc;
+    document.getElementById('selRisk').value = state.risk;
+    document.getElementById('tgNotify').checked = state.notify !== false;
+    document.getElementById('tgFollow').checked = state.followSystem !== false;
+    document.getElementById('tgSound').checked = state.sound === true;
+    
+    // Default Pair Dropdown
+    var selPair = document.getElementById('selPair');
+    selPair.innerHTML = '';
+    ALL_PAIRS.forEach(function(p) {
+      if (state.pairs.indexOf(p) > -1) {
+        var opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p === 'XAUUSD' ? 'GOLD (XAUUSD)' : p;
+        selPair.appendChild(opt);
+      }
+    });
+    if (state.pairs.indexOf(state.defaultPair) === -1 && state.pairs.length > 0) {
+      state.defaultPair = state.pairs[0];
+    }
+    selPair.value = state.defaultPair;
+
+    // Render Pair Grid
+    var grid = document.getElementById('pairGrid');
+    grid.innerHTML = '';
+    ALL_PAIRS.forEach(function(p) {
+      var isChecked = state.pairs.indexOf(p) > -1;
+      var label = document.createElement('label');
+      label.style.display = 'flex';
+      label.style.alignItems = 'center';
+      label.style.gap = '8px';
+      label.style.fontSize = '14px';
+      label.style.fontWeight = '500';
+      label.style.padding = '4px 0';
+      label.innerHTML = '<input type="checkbox" value="' + p + '" ' + (isChecked ? 'checked' : '') + ' style="width:18px;height:18px;accent-color:var(--dg-blue)"> ' + p;
+      
+      label.querySelector('input').addEventListener('change', function(e){
+        if (e.target.checked) {
+          if (state.pairs.indexOf(p) === -1) state.pairs.push(p);
+        } else {
+          state.pairs = state.pairs.filter(function(x){ return x !== p; });
+        }
+        save();
+      });
+      
+      grid.appendChild(label);
+    });
+  }
+
+  // Event Listeners
+  document.getElementById('inName').addEventListener('input', function(e){ state.name = e.target.value; save(); });
+  document.getElementById('inAccount').addEventListener('input', function(e){ state.accountSize = parseFloat(e.target.value) || 0; save(); });
+  document.getElementById('selRisk').addEventListener('change', function(e){ state.risk = parseFloat(e.target.value); save(); });
+  document.getElementById('selPair').addEventListener('change', function(e){ state.defaultPair = e.target.value; save(); });
+  
+  document.getElementById('tgFollow').addEventListener('change', function(e){ 
+    state.followSystem = e.target.checked; 
+    save();
+    // Apply theme instantly
+    var isDark = state.followSystem ? window.matchMedia('(prefers-color-scheme: dark)').matches : state.theme === 'dark';
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  });
+  
+  document.getElementById('tgSound').addEventListener('change', function(e){ state.sound = e.target.checked; save(); });
+  
+  document.getElementById('tgNotify').addEventListener('click', function(e){
+    if (window.DagboPWA && window.DagboPWA.enableNotifications) {
+      window.DagboPWA.enableNotifications().then(function(res){
+        if (res.status === 'granted') {
+          state.notify = true; save(); alert('Notifications enabled! ✅');
+        } else {
+          state.notify = false; save(); alert(res.message || 'Permission denied');
+          e.target.checked = false;
+        }
+      });
+    } else {
+      alert("Notification module not loaded yet.");
+      e.target.checked = false;
+    }
+  });
+
+  window.toggleAllPairs = function() {
+    if (state.pairs.length === ALL_PAIRS.length) {
+      state.pairs = [];
+    } else {
+      state.pairs = ALL_PAIRS.slice();
+    }
+    save();
+  };
+
+  window.saveSettings = function() {
+    save();
+    localStorage.setItem(KEY_SAVED, JSON.stringify(state));
+    alert('Settings Saved! Hello ' + (state.name || 'Trader'));
+  };
+
+  window.resetSettings = function() {
+    var raw = localStorage.getItem(KEY_SAVED);
+    if (raw) {
+      state = JSON.parse(raw);
+      save();
+      alert('Reverted to last saved.');
+    } else {
+      alert('No saved settings found.');
+    }
+  };
+
+  window.clearAllData = function() {
+    if (confirm("Are you sure? This will delete your Journal and all Settings.")) {
+      localStorage.clear();
+      location.reload();
+    }
+  };
+
+  load();
+  updateProfileUI();
+
+})();
+</script>
+</body>
+</html>
