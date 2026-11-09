@@ -1,0 +1,203 @@
+/* =====================================================================
+   DAGBO SIGNAL · master.css  (one file for all pages)
+   Mobile-first. Light + dark. Apple Settings look. No JavaScript needed.
+   Dark mode: follows the phone by default. To force a theme, set
+   <html data-theme="light"> or <html data-theme="dark"> (the Settings page does this).
+   All classes start with dg- so they never clash with page-specific CSS.
+   ===================================================================== */
+
+/* ---------- 1. Design tokens ---------- */
+:root{
+  color-scheme:light;
+  --dg-bg:#F5F5F7; --dg-card:#FFFFFF; --dg-inset:#F5F5F7;
+  --dg-text:#1D1D1F; --dg-text-2:#6E6E73; --dg-text-3:#AEAEB2;
+  --dg-line:rgba(60,60,67,.14); --dg-fill:rgba(120,120,128,.12); --dg-fill-strong:rgba(120,120,128,.32);
+  --dg-glass:rgba(245,245,247,.80); --dg-seg-thumb:#FFFFFF;
+  --dg-blue:#0071E3; --dg-blue-ink:#0071E3; --dg-blue-soft:rgba(0,113,227,.12);
+  --dg-green:#34C759; --dg-green-ink:#1E8E3E; --dg-green-soft:rgba(52,199,89,.16);
+  --dg-red:#FF3B30;   --dg-red-ink:#D70015;   --dg-red-soft:rgba(255,59,48,.12);
+  --dg-amber:#FF9F0A; --dg-amber-ink:#B26A00; --dg-amber-soft:rgba(255,159,10,.16);
+  --dg-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.06);
+  --dg-shadow-btn:0 4px 14px rgba(0,113,227,.28);
+  --dg-r-card:20px; --dg-r-btn:14px; --dg-r-sm:12px; --dg-r-pill:999px;
+  --dg-gap:16px; --dg-max:560px;
+  --dg-font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --dg-bg:#000000; --dg-card:#1C1C1E; --dg-inset:#2C2C2E;
+  --dg-text:#F5F5F7; --dg-text-2:#98989D; --dg-text-3:#636366;
+  --dg-line:rgba(84,84,88,.55); --dg-fill:rgba(120,120,128,.24); --dg-fill-strong:rgba(120,120,128,.40);
+  --dg-glass:rgba(0,0,0,.72); --dg-seg-thumb:#636366;
+  --dg-blue-ink:#2997FF; --dg-blue-soft:rgba(41,151,255,.18);
+  --dg-green-ink:#34C759; --dg-green-soft:rgba(52,199,89,.20);
+  --dg-red-ink:#FF453A;   --dg-red-soft:rgba(255,59,48,.20);
+  --dg-amber-ink:#FFB340; --dg-amber-soft:rgba(255,159,10,.20);
+  --dg-shadow:0 0 0 .5px rgba(255,255,255,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --dg-bg:#000000; --dg-card:#1C1C1E; --dg-inset:#2C2C2E;
+    --dg-text:#F5F5F7; --dg-text-2:#98989D; --dg-text-3:#636366;
+    --dg-line:rgba(84,84,88,.55); --dg-fill:rgba(120,120,128,.24); --dg-fill-strong:rgba(120,120,128,.40);
+    --dg-glass:rgba(0,0,0,.72); --dg-seg-thumb:#636366;
+    --dg-blue-ink:#2997FF; --dg-blue-soft:rgba(41,151,255,.18);
+    --dg-green-ink:#34C759; --dg-green-soft:rgba(52,199,89,.20);
+    --dg-red-ink:#FF453A;   --dg-red-soft:rgba(255,59,48,.20);
+    --dg-amber-ink:#FFB340; --dg-amber-soft:rgba(255,159,10,.20);
+    --dg-shadow:0 0 0 .5px rgba(255,255,255,.06);
+  }
+}
+
+/* ---------- 2. Base ---------- */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--dg-bg);color:var(--dg-text);font-family:var(--dg-font);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+a{color:var(--dg-blue-ink)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--dg-blue-soft);outline-offset:2px;box-shadow:0 0 0 2px var(--dg-blue)}
+.dg-muted{color:var(--dg-text-2)}
+.dg-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.dg-pos{color:var(--dg-green-ink)} .dg-neg{color:var(--dg-red-ink)} .dg-key{color:var(--dg-blue-ink)}
+.dg-hide{display:none!important}
+
+/* ---------- 3. Page shell + header ---------- */
+.dg-page{max-width:var(--dg-max);margin:0 auto;
+  padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(104px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.dg-page--notabs{padding-bottom:calc(40px + env(safe-area-inset-bottom,0px))}
+.dg-top{display:flex;justify-content:space-between;align-items:center;margin:0 4px}
+.dg-brand{font-weight:800;font-size:15px;letter-spacing:.04em}
+.dg-badge{background:var(--dg-blue);color:#fff;font-size:11px;font-weight:700;letter-spacing:.05em;padding:5px 10px;border-radius:var(--dg-r-pill)}
+.dg-title{font-size:34px;line-height:1.1;font-weight:700;letter-spacing:-.03em;margin:18px 4px 6px}
+.dg-subtitle{color:var(--dg-text-2);font-size:16px;margin:0 4px 24px}
+.dg-section{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--dg-text-2);margin:28px 20px 8px}
+.dg-stack>*+*{margin-top:var(--dg-gap)}
+.dg-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dg-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.dg-note{color:var(--dg-text-2);font-size:12px;line-height:1.5;text-align:center;margin:20px 12px 0}
+
+/* ---------- 4. Big Card ----------
+   <section class="dg-card"> ... </section>
+   Variants: dg-card--flush (no padding, for lists) · dg-card--accent (blue hero) */
+.dg-card{background:var(--dg-card);border-radius:var(--dg-r-card);box-shadow:var(--dg-shadow);padding:20px;margin:0 0 var(--dg-gap);position:relative}
+.dg-card--flush{padding:0;overflow:hidden}
+.dg-card--accent{background:linear-gradient(145deg,#0A84FF 0%,#0071E3 55%,#005BB8 100%);color:#fff;box-shadow:0 10px 30px rgba(0,113,227,.35)}
+.dg-card--accent .dg-muted,.dg-card--accent .dg-card__sub{color:rgba(255,255,255,.78)}
+.dg-card__head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px}
+.dg-card__title{font-size:22px;font-weight:700;letter-spacing:-.02em;margin:0}
+.dg-card__sub{color:var(--dg-text-2);font-size:14px;margin:0 0 12px}
+.dg-card__body{margin-top:12px}
+.dg-card__foot{margin-top:16px;padding-top:14px;border-top:.5px solid var(--dg-line);color:var(--dg-text-2);font-size:13px}
+
+/* ---------- 5. List rows (iOS Settings style) ----------
+   <div class="dg-card dg-card--flush"><a class="dg-row dg-row--link" href="..."> ... </a></div> */
+.dg-row{position:relative;display:flex;align-items:center;gap:14px;min-height:56px;padding:10px 16px;width:100%;
+  background:none;border:0;text-align:left;text-decoration:none;color:inherit;cursor:default}
+a.dg-row,button.dg-row{cursor:pointer}
+.dg-row+.dg-row::before{content:"";position:absolute;top:0;left:16px;right:0;height:.5px;background:var(--dg-line)}
+a.dg-row:active,button.dg-row:active{background:var(--dg-fill)}
+.dg-row__icon{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--dg-blue);color:#fff;font-size:16px;line-height:1}
+.dg-row__icon--green{background:var(--dg-green)} .dg-row__icon--red{background:var(--dg-red)} .dg-row__icon--amber{background:var(--dg-amber)} .dg-row__icon--grey{background:#8E8E93}
+.dg-row__body{flex:1;min-width:0}
+.dg-row__title{display:block;font-size:17px;font-weight:500;letter-spacing:-.01em}
+.dg-row__sub{display:block;font-size:13px;color:var(--dg-text-2);margin-top:1px}
+.dg-row__value{flex:none;color:var(--dg-text-2);font-size:17px;font-variant-numeric:tabular-nums}
+.dg-row--link::after{content:"";flex:none;width:8px;height:8px;margin-left:2px;border-top:2px solid var(--dg-text-3);border-right:2px solid var(--dg-text-3);border-radius:1px;transform:rotate(45deg)}
+
+/* ---------- 6. iOS toggle switch (pure CSS) ----------
+   <label class="dg-switch"><input type="checkbox"><span class="dg-switch__track"></span></label> */
+.dg-switch{position:relative;flex:none;display:inline-block;width:51px;height:31px}
+.dg-switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;z-index:2;cursor:pointer}
+.dg-switch__track{position:absolute;inset:0;border-radius:var(--dg-r-pill);background:var(--dg-fill-strong);transition:background .25s ease}
+.dg-switch__track::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);transition:transform .25s cubic-bezier(.3,.7,.4,1)}
+.dg-switch input:checked+.dg-switch__track{background:var(--dg-blue)}
+.dg-switch input:checked+.dg-switch__track::after{transform:translateX(20px)}
+.dg-switch input:active+.dg-switch__track::after{width:32px}
+.dg-switch input:checked:active+.dg-switch__track::after{transform:translateX(15px)}
+.dg-switch input:focus-visible+.dg-switch__track{outline:3px solid var(--dg-blue-soft);outline-offset:2px}
+.dg-switch input:disabled{cursor:not-allowed} .dg-switch input:disabled+.dg-switch__track{opacity:.45}
+
+/* ---------- 7. Buttons (min-height 50px) ----------
+   <button class="dg-btn dg-btn--primary dg-btn--block">Save</button> */
+.dg-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:50px;padding:0 22px;border:0;border-radius:var(--dg-r-btn);
+  font-size:17px;font-weight:600;letter-spacing:-.01em;text-decoration:none;cursor:pointer;user-select:none;-webkit-user-select:none;
+  background:var(--dg-fill);color:var(--dg-text);transition:transform .12s ease,filter .12s ease,opacity .12s ease}
+.dg-btn:active{transform:scale(.97);filter:brightness(.94)}
+.dg-btn--block{display:flex;width:100%}
+.dg-btn--primary{background:var(--dg-blue);color:#fff;box-shadow:var(--dg-shadow-btn)}
+.dg-btn--tinted{background:var(--dg-blue-soft);color:var(--dg-blue-ink)}
+.dg-btn--buy{background:var(--dg-green);color:#fff}
+.dg-btn--sell,.dg-btn--danger{background:var(--dg-red);color:#fff}
+.dg-btn--ghost{background:transparent;color:var(--dg-blue-ink)}
+.dg-btn[disabled],.dg-btn[aria-disabled="true"]{opacity:.4;pointer-events:none;box-shadow:none}
+.dg-btn-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+
+/* ---------- 8. Segmented control (pure CSS, radio inputs) ----------
+   <div class="dg-seg" role="radiogroup"><input class="dg-seg__in" type="radio" name="tf" id="a" checked><label class="dg-seg__lb" for="a">15m</label>...</div> */
+.dg-seg{position:relative;display:flex;gap:2px;padding:2px;background:var(--dg-fill);border-radius:10px}
+.dg-seg__in{position:absolute;opacity:0;pointer-events:none}
+.dg-seg__lb{flex:1;display:flex;align-items:center;justify-content:center;min-height:40px;padding:0 8px;border-radius:8px;font-size:15px;font-weight:500;color:var(--dg-text);cursor:pointer;transition:background .2s ease,box-shadow .2s ease}
+.dg-seg__in:checked+.dg-seg__lb{background:var(--dg-seg-thumb);font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.08)}
+.dg-seg__in:focus-visible+.dg-seg__lb{outline:3px solid var(--dg-blue-soft)}
+
+/* ---------- 9. Pair chips (horizontal scroll) ----------
+   <div class="dg-chips"><button class="dg-chip is-active">XAUUSD</button>...</div> */
+.dg-chips{display:flex;gap:8px;overflow-x:auto;padding:2px 20px 14px;margin:0 -16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.dg-chips::-webkit-scrollbar{display:none}
+.dg-chip{flex:none;min-height:44px;padding:0 18px;border:0;border-radius:var(--dg-r-pill);background:var(--dg-card);color:var(--dg-text);font-size:15px;font-weight:600;box-shadow:var(--dg-shadow);cursor:pointer}
+.dg-chip.is-active,.dg-chip[aria-pressed="true"]{background:var(--dg-blue);color:#fff;box-shadow:var(--dg-shadow-btn)}
+
+/* ---------- 10. Status pills (BUY / SELL / WIN / LOSS / WAIT) ---------- */
+.dg-pill{display:inline-flex;align-items:center;min-height:28px;padding:0 12px;border-radius:var(--dg-r-pill);font-size:13px;font-weight:700;letter-spacing:.03em;background:var(--dg-fill);color:var(--dg-text-2)}
+.dg-pill--buy,.dg-pill--win{background:var(--dg-green-soft);color:var(--dg-green-ink)}
+.dg-pill--sell,.dg-pill--loss{background:var(--dg-red-soft);color:var(--dg-red-ink)}
+.dg-pill--wait,.dg-pill--open{background:var(--dg-fill);color:var(--dg-text-2)}
+.dg-pill--warn{background:var(--dg-amber-soft);color:var(--dg-amber-ink)}
+.dg-pill--solid.dg-pill--buy,.dg-pill--solid.dg-pill--win{background:var(--dg-green);color:#fff}
+.dg-pill--solid.dg-pill--sell,.dg-pill--solid.dg-pill--loss{background:var(--dg-red);color:#fff}
+
+/* ---------- 11. Signal + stat blocks ---------- */
+.dg-signal{text-align:center}
+.dg-signal__label{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--dg-text-2)}
+.dg-signal__word{font-size:40px;line-height:1.05;font-weight:800;letter-spacing:-.04em;margin:8px 0 4px}
+.dg-signal__word--buy{color:var(--dg-green-ink)} .dg-signal__word--sell{color:var(--dg-red-ink)} .dg-signal__word--wait{color:var(--dg-text-2)}
+.dg-signal__meta{color:var(--dg-text-2);font-size:14px;margin-bottom:16px}
+.dg-levels{display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left}
+.dg-level{background:var(--dg-inset);border-radius:var(--dg-r-sm);padding:12px 14px}
+.dg-level span{display:block;font-size:12px;color:var(--dg-text-2)}
+.dg-level strong{display:block;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.dg-stat{background:var(--dg-card);border-radius:18px;box-shadow:var(--dg-shadow);padding:14px 10px;text-align:center}
+.dg-stat__label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--dg-text-2)}
+.dg-stat__value{display:block;font-size:24px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+
+/* ---------- 12. Form fields ---------- */
+.dg-field{display:block;margin-top:14px}
+.dg-label{display:block;font-size:13px;font-weight:600;color:var(--dg-text-2);margin:0 0 6px 2px}
+.dg-input{display:block;width:100%;min-height:50px;padding:12px 14px;border:0;border-radius:var(--dg-r-sm);background:var(--dg-inset);color:var(--dg-text);font-size:17px;-webkit-appearance:none;appearance:none}
+textarea.dg-input{min-height:110px;resize:vertical}
+.dg-input::placeholder{color:var(--dg-text-3)}
+.dg-input:focus{outline:2px solid var(--dg-blue);outline-offset:0;box-shadow:none}
+.dg-help{font-size:13px;color:var(--dg-text-2);margin:6px 2px 0;line-height:1.5}
+
+/* ---------- 13. Bottom tab bar (Home · Signals · Chart · AI · Journal) ----------
+   <nav class="dg-tabbar"><a class="dg-tab" aria-current="page" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>... */
+.dg-tabbar{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:50;width:100%;max-width:var(--dg-max);display:flex;
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));background:var(--dg-glass);border-top:.5px solid var(--dg-line);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+.dg-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:50px;border-radius:12px;
+  font-size:11px;font-weight:600;color:var(--dg-text-2);text-decoration:none}
+.dg-tab__icon{font-size:22px;line-height:1}
+.dg-tab[aria-current="page"]{color:var(--dg-blue-ink)}
+.dg-tab:active{background:var(--dg-fill)}
+
+/* ---------- 14. Wider screens + motion ---------- */
+@media (min-width:600px){
+  .dg-title{font-size:40px}
+  .dg-card{padding:24px}
+  .dg-card--flush{padding:0}
+  .dg-page{padding-top:calc(32px + env(safe-area-inset-top,0px))}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+}
