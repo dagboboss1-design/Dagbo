@@ -68,7 +68,7 @@
       <span class="dg-row__icon">🔔</span>
       <span class="dg-row__body">
         <span class="dg-row__title">Push Notifications</span>
-        <span class="dg-row__sub">Get instant signal alerts</span>
+        <span class="dg-row__sub" id="notificationStatus">Checking notification setup…</span>
       </span>
       <label class="dg-switch"><input type="checkbox" id="tgNotify"><span class="dg-switch__track"></span></label>
     </div>
@@ -207,12 +207,12 @@
     document.getElementById('inName').value = state.name || '';
     document.getElementById('inAccount').value = acc;
     document.getElementById('selRisk').value = state.risk;
-    document.getElementById('tgNotify').checked = state.notify !== false;
+    document.getElementById('tgNotify').checked = false;
     document.getElementById('tgDark').checked = state.theme === 'dark';
     document.getElementById('selLang').value = state.language || 'en';
     document.getElementById('tgSound').checked = state.sound === true;
     
-    document.getElementById('testPushRow').style.display = (state.notify !== false) ? 'flex' : 'none';
+    document.getElementById('testPushRow').style.display = 'none';
 
     var selPair = document.getElementById('selPair');
     selPair.innerHTML = '';
@@ -261,6 +261,23 @@
     alert('Language set to: ' + (state.language === 'pidgin' ? 'Pidgin' : 'English'));
   });
   
+  function refreshPushUI() {
+    var status = document.getElementById('notificationStatus');
+    var toggle = document.getElementById('tgNotify');
+    if (!window.DagboPWA || !window.DagboPWA.getStatus) {
+      toggle.checked = false;
+      status.textContent = 'Notification setup is not ready. Refresh this page.';
+      return;
+    }
+    window.DagboPWA.getStatus().then(function(result) {
+      toggle.checked = !!result.enabled;
+      state.notify = !!result.enabled;
+      localStorage.setItem(KEY, JSON.stringify(state));
+      document.getElementById('testPushRow').style.display = result.enabled ? 'flex' : 'none';
+      status.textContent = result.message;
+    });
+  }
+
   document.getElementById('tgNotify').addEventListener('change', function(e) {
     var toggle = e.target;
     toggle.disabled = true;
@@ -274,11 +291,14 @@
       window.DagboPWA.enableNotifications().then(function(res) {
         state.notify = true;
         save();
-        alert("Push notifications enabled on this device.");
+        document.getElementById("notificationStatus").textContent = "This device is registered for push notifications.";
+        document.getElementById("testPushRow").style.display = "flex";
       }).catch(function(err) {
         state.notify = false;
         toggle.checked = false;
         save();
+        document.getElementById("notificationStatus").textContent = err.message || "Could not enable notifications.";
+        document.getElementById("testPushRow").style.display = "none";
         alert(err.message || "Could not enable notifications.");
       }).finally(function() { toggle.disabled = false; });
     } else {
@@ -289,6 +309,8 @@
       window.DagboPWA.disableNotifications().then(function() {
         state.notify = false;
         save();
+        document.getElementById("notificationStatus").textContent = "Notifications are disabled on this device.";
+        document.getElementById("testPushRow").style.display = "none";
       }).catch(function(err) {
         toggle.checked = true;
         alert(err.message || "Could not disable notifications.");
@@ -305,7 +327,7 @@
     btn.disabled = true;
     btn.textContent = "Sending...";
     window.DagboPWA.sendTest().then(function() {
-      alert("Test notification sent. Check your notification shade.");
+      alert("The push service accepted the test. Check your notification shade. If it does not appear, check Android app notification permission and battery restrictions.");
     }).catch(function(err) {
       alert(err.message || "Test notification failed.");
     }).finally(function() {
@@ -321,6 +343,7 @@
 
   load();
   updateProfileUI();
+  refreshPushUI();
 
 })();
 </script>
