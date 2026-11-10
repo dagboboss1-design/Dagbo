@@ -157,11 +157,12 @@ module.exports = async function handler(req,res) {
       const pct = open > 0 ? (close-open)/open*100 : 0;
       const key = "dagbo:news:spike:" + released.name + ":" + released.date.toISOString();
       if (pct >= 0.30 || pct <= -0.30) {
-        if (await claim(key)) {
+        if (!(await redis.get(key))) {
           const up = pct > 0;
           await sendPush(up ? "🚀 POST-NEWS GOLD SPIKE UP" : "🔻 POST-NEWS GOLD SPIKE DOWN",
             "Gold's latest 1-minute candle moved " + (pct>0?"+":"") + pct.toFixed(2) + "% after " + released.name + ". High volatility: confirm price and spread before trading.",
             "news-spike-" + released.name,"/news.html");
+          await claim(key);
           return res.status(200).json({sent:"post-news spike",event:released.name,changePct:pct});
         }
       }
@@ -175,8 +176,9 @@ module.exports = async function handler(req,res) {
 
     if (mins > 59 && mins <= 61) {
       const key = "dagbo:news:1hr:" + id;
-      if (await claim(key)) {
+      if (!(await redis.get(key))) {
         await sendPush("⏰ " + next.name + " IN 1 HOUR",next.name + " releases in about 60 minutes. Prepare and manage risk.","news-1hr","/news.html");
+        await claim(key);
         return res.status(200).json({sent:"1-hour alert",event:next.name});
       }
     }
@@ -188,13 +190,14 @@ module.exports = async function handler(req,res) {
       const goldChange = (q["XAU/USD"].current-q["XAU/USD"].open)/q["XAU/USD"].open*100;
       const bias = calculateBias(dxy.changePct,goldChange);
       const key = "dagbo:news:15min:" + id;
-      if (await claim(key)) {
+      if (!(await redis.get(key))) {
         await sendPush("🎯 15-MIN NEWS BIAS",
           next.name + " in about 15 minutes. Calculated USD basket estimate " + dxy.current.toFixed(2) +
           " (" + (dxy.changePct>=0?"+":"") + dxy.changePct.toFixed(3) + "%). Gold " +
           (goldChange>=0?"+":"") + goldChange.toFixed(3) + "%. Indicative bias: " +
           bias.color + " " + bias.action + " (" + bias.score + "/100). Synthetic basket estimate, not official live ICE DXY.",
           "news-bias","/news.html");
+        await claim(key);
         return res.status(200).json({
           sent:"15-minute news bias",event:next.name,
           dxyEstimate:{value:Number(dxy.current.toFixed(4)),changePct:Number(dxy.changePct.toFixed(4)),
