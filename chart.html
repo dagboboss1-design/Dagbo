@@ -246,21 +246,34 @@
   window.changeTF = function(tf) { currentTF = tf; loadChart(); };
   buildDropdown();
   loadChart();
-  var chartSettings={};try{chartSettings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
+  var chartSettings={};
+  try { chartSettings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}; } catch(e) {}
   document.getElementById('chartPlanAccount').value=Number(chartSettings.accountSize)||100;
   document.getElementById('chartPlanRisk').value=Number(chartSettings.risk)||1;
   document.getElementById('chartPlanCalc').addEventListener('click',function(){
-    var dir=document.getElementById('chartPlanDir').value,account=Number(document.getElementById('chartPlanAccount').value),risk=Number(document.getElementById('chartPlanRisk').value),entry=Number(document.getElementById('chartPlanEntry').value),sl=Number(document.getElementById('chartPlanSL').value),tp=Number(document.getElementById('chartPlanTP').value);
-    var rd=dir==='LONG'?entry-sl:sl-entry,wd=dir==='LONG'?tp-entry:entry-tp,out=document.getElementById('chartPlanResult');out.textContent='';
-    if(![account,risk,entry,sl,tp].every(Number.isFinite)||account<=0||risk<=0||risk>100||entry<=0||sl<=0||tp<=0||rd<=0||wd<=0){out.textContent='Invalid levels. LONG requires SL below entry and TP above. SHORT requires SL above entry and TP below.';return;}
-    var rr=wd/rd;out.textContent='Risk budget: 
-})();
-</script>
-</body>
-  </html>
-+(account*risk/100).toFixed(2)+' · Price risk: '+rd.toPrecision(7)+' · Price reward: '+wd.toPrecision(7)+' · R:R '+rr.toFixed(2)+'R'+(rr>=1.5?' · Meets 1.5R guide':' · Below 1.5R guide');
+    var dir=document.getElementById('chartPlanDir').value;
+    var account=Number(document.getElementById('chartPlanAccount').value);
+    var risk=Number(document.getElementById('chartPlanRisk').value);
+    var entry=Number(document.getElementById('chartPlanEntry').value);
+    var sl=Number(document.getElementById('chartPlanSL').value);
+    var tp=Number(document.getElementById('chartPlanTP').value);
+    var riskDistance=dir==='LONG'?entry-sl:sl-entry;
+    var rewardDistance=dir==='LONG'?tp-entry:entry-tp;
+    var out=document.getElementById('chartPlanResult');
+    if(![account,risk,entry,sl,tp].every(Number.isFinite)||account<=0||risk<=0||risk>100||entry<=0||sl<=0||tp<=0||riskDistance<=0||rewardDistance<=0){
+      out.textContent='Invalid levels. LONG needs SL below entry and TP above. SHORT needs SL above entry and TP below.';
+      return;
+    }
+    var rr=rewardDistance/riskDistance;
+    out.textContent=[
+      'Risk budget: $', (account*risk/100).toFixed(2),
+      ' | Price risk: ', riskDistance.toPrecision(7),
+      ' | Price reward: ', rewardDistance.toPrecision(7),
+      ' | R:R ', rr.toFixed(2), 'R',
+      rr>=1.5?' · Meets 1.5R guide':' · Below 1.5R guide'
+    ].join('');
   });
 })();
 </script>
 </body>
-  </html>
+</html>
