@@ -330,21 +330,86 @@ function compose(userQ){
 
 function askGroq(userQ){
   return new Promise(function(resolve, reject){
-    var key = getGroqKey(); if (!key) return reject(new Error('No key'));
+    var key = getGroqKey();
+    if (!key) return reject(new Error('No key'));
+
     var sys = 'You are Dagbo Brain, a trading teacher for ' + getName() + '. Speak in Pidgin English. Never give live prices or trade calls. Answer in 3-6 sentences. Use <b>bold</b> for key terms.';
+
+    // sendMessage() has already added the current question to _hist.
+    // Remove it here so the current question is not sent twice.
+    var previousHistory = _hist.slice();
+    var lastMessage = previousHistory[previousHistory.length - 1];
+
+    if (lastMessage && lastMessage.role === 'me' &&
+        String(lastMessage.text).trim() === String(userQ).trim()) {
+      previousHistory.pop();
+    }
+
+    var messages = [{ role: 'system', content: sys }];
+
+    // Send the five most recent previous messages.
+    previousHistory.slice(-5).forEach(function(item){
+      if (!item || typeof item.text !== 'string') return;
+
+      if (item.role === 'me') {
+        messages.push({ role: 'user', content: item.text });
+      } else if (item.role === 'ai') {
+        messages.push({
+          role: 'assistant',
+          content: item.text
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<[^>]*>/g, '')
+        });
+      }
+    });
+
+    // Current question is always the final user message.
+    messages.push({ role: 'user', content: String(userQ) });
+
     var xhr = new XMLHttpRequest();
     xhr.open('POST', 'https://api.groq.com/openai/v1/chat/completions', true);
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('Authorization', 'Bearer ' + key);
+
     xhr.onload = function(){
       if (xhr.status === 200) {
-        var data = JSON.parse(xhr.responseText);
-        var ans = data.choices[0].message.content.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-        resolve(ans);
-      } else { reject(new Error('Groq error ' + xhr.status)); }
+        try {
+          var data = JSON.parse(xhr.responseText);
+          var content = data.choices && data.choices[0] &&
+            data.choices[0].message && data.choices[0].message.content;
+
+          if (typeof content !== 'string') {
+            return reject(new Error('Groq returned an empty response'));
+          }
+
+          resolve(content
+            .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+            .replace(/\n/g, '<br>'));
+        } catch(e) {
+          reject(new Error('Invalid Groq response'));
+        }
+      } else {
+        var detail = 'Groq error ' + xhr.status;
+        try {
+          var errData = JSON.parse(xhr.responseText);
+          if (errData.error && errData.error.message) {
+            detail += ': ' + errData.error.message;
+          }
+        } catch(e) {}
+        reject(new Error(detail));
+      }
     };
-    xhr.onerror = function(){ reject(new Error('Network error')); };
-    xhr.send(JSON.stringify({ model: 'openai/gpt-oss-120b', messages: [{ role: 'system', content: sys }, { role: 'user', content: userQ }], temperature: 0.4, max_tokens: 400 }));
+
+    xhr.onerror = function(){
+      reject(new Error('Network error'));
+    };
+
+    xhr.send(JSON.stringify({
+      model: 'openai/gpt-oss-120b',
+      messages: messages,
+      temperature: 0.4,
+      max_tokens: 400
+    }));
   });
 }
 
@@ -354,6 +419,17 @@ var chatInput = document.getElementById('chatInput');
 var _hist = [];
 var _rec = null;
 
+var HISTORY_KEY = 'dagbo_ai_history';
+
+function saveChatHistory() {
+  try {
+    _hist = _hist.slice(-200);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(_hist));
+  } catch(e) {
+    console.warn('Could not save Dagbo AI history:', e);
+  }
+}
+
 function addMessage(role, text) {
   var d = document.createElement('div');
   d.className = 'chat-bubble ' + role;
@@ -362,7 +438,42 @@ function addMessage(role, text) {
   d.innerHTML = html + '<span class="chat-time">' + time + '</span>';
   chatArea.appendChild(d);
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-  if (role === 'ai' || role === 'me') _hist.push({ role: role, text: text });
+
+  if (role === 'ai' || role === 'me') {
+    _hist.push({ role: role, text: String(text) });
+    saveChatHistory();
+  }
+}
+
+function loadChatHistory() {
+  try {
+    var saved = localStorage.getItem(HISTORY_KEY);
+    if (!saved) return false;
+
+    var parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) return false;
+
+    var validHistory = parsed.filter(function(item) {
+      return item &&
+        (item.role === 'me' || item.role === 'ai') &&
+        typeof item.text === 'string';
+    }).slice(-200);
+
+    if (!validHistory.length) return false;
+
+    _hist = [];
+    chatArea.innerHTML = '';
+
+    validHistory.forEach(function(item) {
+      addMessage(item.role, item.text);
+    });
+
+    return true;
+  } catch(e) {
+    console.warn('Could not load Dagbo AI history:', e);
+    _hist = [];
+    return false;
+  }
 }
 
 function sendMessage() {
@@ -427,8 +538,14 @@ function toggleAutoRead(el) {
 
 (function boot() {
   document.getElementById('tgAutoRead').checked = getAutoRead();
-  var name = getName();
-  addMessage('ai', "Hello " + name + "! 👋<br>I'm Dagbo AI. How can I help you today?<br><br>✅ Explain any signal<br>✅ Teach trading concepts<br>✅ Answer your questions");
+
+  // Restore saved messages; show welcome only for a new conversation.
+  var restored = loadChatHistory();
+
+  if (!restored) {
+    var name = getName();
+    addMessage('ai', "Hello " + name + "! 👋<br>I'm Dagbo AI. How can I help you today?<br><br>✅ Explain any signal<br>✅ Teach trading concepts<br>✅ Answer your questions");
+  }
 })();
 </script>
 </body>
