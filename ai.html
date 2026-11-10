@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F5F5F7" id="themeColor">
 <title>Ask AI · DAGBO SIGNAL</title>
-
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
@@ -38,27 +37,39 @@
 <body>
 
 <main class="dg-page">
-  <div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">AI CHAT</div></div>
+  <div class="dg-top">
+    <div class="dg-brand">◈ DAGBO SIGNAL</div>
+    <div class="dg-badge">AI CHAT</div>
+  </div>
+
   <div class="ai-header-card" style="margin-top:16px">
     <div class="ai-avatar">🤖</div>
-    <div style="flex:1"><div style="font-size:18px;font-weight:700;display:flex;align-items:center">Dagbo AI <span class="ai-status">Online</span></div><div class="dg-muted" style="font-size:13px;margin-top:2px">Your Trading Assistant. Ask anything...</div></div>
+    <div style="flex:1">
+      <div style="font-size:18px;font-weight:700;display:flex;align-items:center">Dagbo AI <span class="ai-status">Online</span></div>
+      <div class="dg-muted" style="font-size:13px;margin-top:2px">Your Trading Assistant. Ask anything...</div>
+    </div>
   </div>
+
   <div class="chat-container" id="chatArea"></div>
+
   <div class="quick-chips">
     <button class="quick-chip" onclick="askQuestion('Latest Signal')">📊 Latest Signal</button>
     <button class="quick-chip" onclick="askQuestion('Trading Tips')">🎓 Trading Tips</button>
     <button class="quick-chip" onclick="askQuestion('FAQ')">❓ FAQ</button>
     <button class="quick-chip" onclick="askQuestion('Next NFP?')">📅 Next NFP</button>
   </div>
+
   <div class="input-row" style="margin-top:12px">
     <button class="dg-btn" style="min-height:44px;width:44px;padding:0;border-radius:50%;background:var(--dg-fill);font-size:18px" onclick="startVoice()">🎤</button>
     <input type="text" id="chatInput" placeholder="Type your message..." onkeypress="handleEnter(event)">
     <button class="send-btn" onclick="sendMessage()">➤</button>
   </div>
+
   <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding:0 8px">
     <span class="dg-muted" style="font-size:13px;font-weight:600">🔊 Read replies aloud</span>
     <label class="dg-switch"><input type="checkbox" id="tgAutoRead" onchange="toggleAutoRead(this)"><span class="dg-switch__track"></span></label>
   </div>
+  
   <p class="dg-note">Dagbo AI never gives live prices or trade calls.<br>Always check the chart before you trade.</p>
 </main>
 
@@ -73,9 +84,6 @@
 <script src="pwa.js" defer></script>
 
 <script>
-/* ═══════════════════════════════════════════════════════════════════════════
-   DAGBO BRAIN — FULL ENGINE (Part 1: Setup & Engines)
-   ═══════════════════════════════════════════════════════════════════════════ */
 var SETTINGS_KEY = 'dagbo_settings';
 function readSettings(){ try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch(e){ return {}; } }
 function getName(){ var s = readSettings(); return (s.name || 'Oga').replace(/^Oga\s+/i, ''); }
@@ -85,7 +93,6 @@ function getAccount(){ return Number(readSettings().accountSize) || 100; }
 function getGroqKey(){ return (readSettings().groqKey || '').trim(); }
 function hasGroqKey(){ return getGroqKey().length > 10; }
 
-/* DATE ENGINE */
 var NFP_EXCEPTIONS = { '2013-10':'2013-10-22', '2025-01':'2025-01-10', '2026-01':'2026-01-09' };
 function firstFriday(year, mIdx){ var d = new Date(year, mIdx, 1); var offset = (5 - d.getDay() + 7) % 7; return new Date(year, mIdx, 1 + offset); }
 function nfpDatesForYear(year){ var out = []; for (var m = 0; m < 12; m++){ var key = year + '-' + String(m + 1).padStart(2, '0'); if (NFP_EXCEPTIONS[key]){ var p = NFP_EXCEPTIONS[key].split('-'); out.push(new Date(parseInt(p[0],10), parseInt(p[1],10) - 1, parseInt(p[2],10))); } else { out.push(firstFriday(year, m)); } } return out; }
@@ -94,13 +101,9 @@ var FOMC_DATES = { 2019:['01-30','03-20','05-01','06-19','07-31','09-18','10-30'
 var CPI_DATES = { 2023:['01-12','02-14','03-14','04-12','05-10','06-13','07-12','08-10','09-13','10-12','11-14','12-12'],2024:['01-11','02-13','03-12','04-10','05-15','06-12','07-11','08-14','09-11','10-10','11-13','12-11'],2025:['01-15','02-12','03-12','04-10','05-13','06-11','07-15','08-12','09-10','10-15','11-12','12-10'],2026:['01-14','02-11','03-11','04-14','05-12','06-10','07-14','08-11','09-09','10-14','11-11','12-09'] };
 function tryDate(q, e){ var t = q.toLowerCase(), today = new Date(), yr = e.year; if (/nfp|non-?farm|jobs report/.test(t)){ if (/next|upcoming|coming/.test(t)){ var found = null; for (var y = today.getFullYear(); y <= today.getFullYear() + 1 && !found; y++){ var ds = nfpDatesForYear(y); for (var i = 0; i < ds.length; i++){ if (ds[i] > today){ found = ds[i]; break; } } } if (found) return 'Oga, the <b>next NFP</b> na <b>' + fmtDateObj(found) + '</b> · 1:30pm Naija.<br><br><b>Dagbo Rule:</b> No trade 30 min before/after.'; return 'Oga, check <b>forexfactory.com</b>.'; } if (yr && yr >= 2008 && yr <= 2026){ return '<b>NFP dates for ' + yr + ':</b><br>' + nfpDatesForYear(yr).map(function(d){ return '• ' + fmtDateObj(d); }).join('<br>'); } return '<b>NFP</b> = First Friday, 1:30pm Naija.<br>Ask "Next NFP".'; } if (/fomc|fed|interest rate/.test(t)){ if (yr && FOMC_DATES[yr]){ return '<b>FOMC dates for ' + yr + ':</b><br>' + FOMC_DATES[yr].map(function(d){ var p = d.split('-'); return '• ' + fmtDateObj(new Date(yr, parseInt(p[0],10)-1, parseInt(p[1],10))); }).join('<br>'); } return '<b>FOMC</b> = 8×/year, 7pm Naija.<br>Ask "FOMC 2024".'; } if (/cpi|inflation/.test(t)){ if (yr && CPI_DATES[yr]){ return '<b>CPI dates for ' + yr + ':</b><br>' + CPI_DATES[yr].map(function(d){ var p = d.split('-'); return '• ' + fmtDateObj(new Date(yr, parseInt(p[0],10)-1, parseInt(p[1],10))); }).join('<br>'); } return '<b>CPI</b> = Mid-month, 1:30pm Naija.<br>Ask "CPI 2024".'; } return null; }
 
-/* MATH ENGINE */
 function tryMath(q, e){ var t = q.toLowerCase(), acc = e.amount || getAccount(), risk = e.percent !== null ? e.percent : getRiskPct(); if (/(risk|percent|%|loss)/.test(t) && (e.percent !== null || e.amount !== null)){ return 'Oga, <b>Risk math:</b><br>Account: $' + acc.toLocaleString() + '<br>Risk: ' + risk + '%<br><b>Risk amount: $' + (acc * risk / 100).toFixed(2) + '</b><br><br>Formula: <b>Risk $ = Account × Risk% ÷ 100</b>'; } if (/lot/.test(t) && /pip/.test(t)){ return '<b>Pip value:</b><br>• 0.01 lot = $0.10/pip<br>• 0.10 lot = $1.00/pip<br><b>GOLD 0.01 lot:</b> $0.01 per 0.10 move'; } if (/(position size|how many lot|what lot|which lot)/.test(t)){ var slPips = e.numbers.length ? e.numbers[0] : 20; var riskAmt = acc * risk / 100; return '<b>Position size:</b><br>Account: $' + acc + '<br>Risk: ' + risk + '% = $' + riskAmt.toFixed(2) + '<br>SL: ' + slPips + ' pips<br><b>Lot: ' + (riskAmt / (slPips * 10)).toFixed(2) + '</b><br><br><b>Dagbo Rule:</b> If < 0.01, skip trade.'; } return null; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   END OF PART 1
-   ═══════════════════════════════════════════════════════════════════════════ *//* ═══════════════════════════════════════════════════════════════════════════
-   PART 2: THE 200 KB & LOGIC
+  /* ═══════════════════════════════════════════════════════════════════════════
+   PART 2: THE 200 KB (Knowledge Base)
    ═══════════════════════════════════════════════════════════════════════════ */
 var KB = [
   { k:['what is forex','forex meaning'], a:'<b>Forex</b> = buy/sell currencies. Market open 24/5. <b>Dagbo Rule:</b> Forex na skill, no be quick money.' },
@@ -191,7 +194,7 @@ var KB = [
   { k:['atr stop'], a:'<b>ATR Stop</b> = stop based on volatility. <b>Dagbo Rule:</b> Choose stop from structure.' },
   { k:['opening range breakout'], a:'<b>ORB</b> = break of early range. <b>Dagbo Rule:</b> Confirm break. Account for false breaks.' },
   { k:['time based stop'], a:'<b>Time Stop</b> = close after set time. <b>Dagbo Rule:</b> Set in advance.' },
-  { k:['session bias'], a:'<b>Session Bias</b>  { k:['session bias'], a:'<b>Session Bias</b> = expected behavior. <b>Dagbo Rule:</b> No replace chart evidence.' },
+  { k:['session bias'], a:'<b>Session Bias</b> = expected behavior. <b>Dagbo Rule:</b> No replace chart evidence.' },
   { k:['kelly criterion'], a:'<b>Kelly</b> = optimal sizing. <b>Dagbo Rule:</b> Beginners no apply full Kelly.' },
   { k:['expectancy'], a:'<b>Expectancy</b> = avg gain/loss. <b>Dagbo Rule:</b> Track enough trades. Include costs.' },
   { k:['r multiple'], a:'<b>R-Multiple</b> = result vs risk. <b>Dagbo Rule:</b> Record in R.' },
@@ -259,11 +262,15 @@ var KB = [
   { k:['leverage and margin'], a:'<b>Leverage/Margin</b>. <b>Dagbo Rule:</b> Risk from stop distance.' },
   { k:['margin call level'], a:'<b>Margin Call</b> = warning. <b>Stop Out</b> = forced close. <b>Dagbo Rule:</b> Know broker rules.' }
 ];
-
-/* MATCHER */
+  
+/* ═══════════════════════════════════════════════════════════════════════════
+   PART 3: MATCHER, COMPOSER, GROQ & UI LOGIC
+   ═══════════════════════════════════════════════════════════════════════════ */
 var STOPWORDS = new Set(['the','a','an','is','are','was','were','be','been','being','of','in','on','at','to','for','with','about','by','as','from','that','this','these','those','it','its']);
 var KEYWORD_CACHE = null;
+
 function normalizeText(s){ return typeof s === 'string' ? s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim() : ''; }
+
 function buildKeywordCache(kb){
   var entries = [];
   for (var i = 0; i < kb.length; i++){
@@ -272,38 +279,37 @@ function buildKeywordCache(kb){
       var norm = normalizeText(rawKws[j]); if (!norm) continue;
       kws.push({ text: norm, words: norm.split(' '), len: norm.length });
     }
-    entries.push({ idx: i, keywords: kws, maxScore: 100 });
+    entries.push({ idx: i, keywords: kws });
   }
   return { entries: entries };
 }
+
 function matchKB(q){
   if (!KEYWORD_CACHE) KEYWORD_CACHE = buildKeywordCache(KB);
   var qNorm = normalizeText(q); if (!qNorm) return [];
   var words = qNorm.split(' ').filter(function(w){ return !STOPWORDS.has(w); });
-  var rawByIdx = Object.create(null);
+  var results = [];
+  
   for (var i = 0; i < KEYWORD_CACHE.entries.length; i++){
     var ent = KEYWORD_CACHE.entries[i], total = 0;
     for (var j = 0; j < ent.keywords.length; j++){
       var kw = ent.keywords[j], pos = -1;
       for (var k = 0; k <= words.length - kw.words.length; k++){
-        var ok = true; for (var m = 0; m < kw.words.length; m++){ if (words[k+m] !== kw.words[m]){ ok = false; break; } }
+        var ok = true; 
+        for (var m = 0; m < kw.words.length; m++){ if (words[k+m] !== kw.words[m]){ ok = false; break; } }
         if (ok){ pos = k; break; }
       }
       if (pos > -1) total += (kw.len * 2) + 10;
     }
-    if (total > 0) rawByIdx[ent.idx] = Math.min(100, total);
-  }
-  var results = [];
-  for (var ei = 0; ei < KEYWORD_CACHE.entries.length; ei++){
-    if (rawByIdx[ei]) results.push({ idx: ei, score: rawByIdx[ei] });
+    if (total > 0) results.push({ idx: ent.idx, score: Math.min(100, total) });
   }
   results.sort(function(a, b){ return b.score - a.score; });
   return results;
 }
 
-/* COMPOSER & GROQ */
 function compose(userQ){
   var raw = String(userQ).trim(), low = raw.toLowerCase();
+  
   if (/\b(current|live|price)\b/i.test(low)) return "I no dey give live price. Open the Chart page to see real price from TradingView.";
   if (/\b(should|can|make)\b i (buy|sell)\b/i.test(low)) return "I no dey give trade calls, I only teach. Check the Chart page.";
   
