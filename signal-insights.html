@@ -36,10 +36,6 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
  <button id="refreshIntel" class="dg-btn dg-btn--primary dg-btn--block">Refresh saved results</button>
  <a class="dg-row dg-row--link" href="signals.html" style="margin-top:12px"><span class="dg-row__body"><span class="dg-row__title">← Back to Signals</span></span></a>
 </main>
-<button class="intel-trigger" id="menuOpen" aria-label="Open page menu"><span></span><span></span><span></span></button>
-<div class="intel-backdrop" id="menuBackdrop"></div>
-<aside class="intel-panel" id="menuPanel"><h2>DAGBO SIGNAL <button id="menuClose" style="float:right">×</button></h2>
-<a href="index.html">Home</a><a href="signals.html">Signals</a><a href="chart.html">Chart</a><a href="news.html">Market News</a><a href="boss1.html">BOSS1</a><a href="ai.html">AI Commander</a><a href="journal.html">Journal</a><a href="trader-score.html">Trader Score</a><a href="strategy-lab.html">Strategy Lab</a></aside>
 <script>
 (function(){
  function read(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch(e){return fallback}}
@@ -72,9 +68,7 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
   });
  }
  document.getElementById('refreshIntel').addEventListener('click',render);render();
- var open=document.getElementById('menuOpen'),close=document.getElementById('menuClose'),back=document.getElementById('menuBackdrop');
- function setOpen(v){document.body.classList.toggle('intel-open',v)}
- open.addEventListener('click',function(){setOpen(true)});close.addEventListener('click',function(){setOpen(false)});back.addEventListener('click',function(){setOpen(false)});
+
 })();
 </script>
 </body></html>
