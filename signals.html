@@ -333,13 +333,73 @@
     grid.innerHTML = listHtml;
   }
 
-  window.executeTrade = function(pair, signal, entry, sl, tp) {
+  window.executeTrade = async function(pair, signal, entry, sl, tp) {
     var dir = signal.includes('BUY') ? 'BUY' : 'SELL';
+    var journal = [];
+    try { journal = JSON.parse(localStorage.getItem('dagbo_journal')) || []; } catch(e) {}
+    var duplicate = journal.find(function(t) {
+      return String(t.pair).toUpperCase() === String(pair).toUpperCase() && t.result === 'OPEN';
+    });
+    if (duplicate) {
+      alert('You already have an OPEN ' + pair + ' trade in your journal. Manage it first.');
+      return;
+    }
+
     var trade = {
-      pair: pair, direction: dir, entry: entry, stopLoss: sl, takeProfit: tp,
-      result: 'OPEN', dateOpened: new Date().toISOString()
+      id: String(Date.now()),
+      pair: pair,
+      direction: dir,
+      entry: Number(entry),
+      stopLoss: Number(sl),
+      takeProfit: Number(tp),
+      lotSize: Number(settings.lotSize) || 0.01,
+      result: 'OPEN',
+      status: 'OPEN',
+      pnl: 0,
+      rMultiple: 0,
+      dateOpened: new Date().toISOString(),
+      dateClosed: null
     };
-    sessionStorage.setItem('dagbo_pending_journal', JSON.stringify(trade));
+
+    var subscription = null;
+    try {
+      if (window.DagboPWA && window.DagboPWA.getSubscription) {
+        subscription = await window.DagboPWA.getSubscription();
+      }
+    } catch(e) {}
+
+    if (subscription) {
+      try {
+        var response = await fetch('/api/trades?action=open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: subscription,
+            pair: trade.pair,
+            direction: trade.direction,
+            entry: trade.entry,
+            stopLoss: trade.stopLoss,
+            takeProfit: trade.takeProfit,
+            lotSize: trade.lotSize
+          })
+        });
+        var result = await response.json();
+        if (!response.ok) {
+          alert(result.error || 'Could not register this trade for automatic monitoring.');
+          return;
+        }
+        trade.id = result.trade.id;
+        trade.serverTracked = true;
+      } catch(e) {
+        alert('Trade was not registered for automatic monitoring because the server could not be reached. Please try again.');
+        return;
+      }
+    } else {
+      alert('Enable push notifications in Settings first so DAGBO can monitor this trade and alert you. This trade will still be saved locally.');
+    }
+
+    journal.push(trade);
+    localStorage.setItem('dagbo_journal', JSON.stringify(journal));
     window.location.href = 'journal.html';
   };
 
