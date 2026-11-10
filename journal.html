@@ -197,6 +197,7 @@
       var pill = addText(head,'span','dg-pill ' + (t.result === 'WIN' ? 'dg-pill--win' : t.result === 'LOSS' ? 'dg-pill--loss' : 'dg-pill--open'),t.result || 'OPEN');
       card.appendChild(head);
       addText(card,'div','dg-muted',(t.direction || '') + ' · Entry ' + (t.entry ?? '—') + ' · SL ' + (t.stopLoss ?? '—') + ' · TP ' + (t.takeProfit ?? '—'));
+      addText(card,'div','dg-muted',(t.strategy || 'Strategy not tagged') + ' · ' + (t.timeframe || 'Timeframe not tagged'));
       addText(card,'div',Number(t.pnl)>0?'dg-pos':Number(t.pnl)<0?'dg-neg':'dg-muted',t.result === 'OPEN' ? 'Open trade · Monitoring ' + (t.serverTracked ? 'enabled' : 'local only') : money(t.pnl) + (t.closeReason ? ' · ' + t.closeReason.replace('_',' ') : ''));
       list.appendChild(card);
     });
