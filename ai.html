@@ -344,7 +344,7 @@ function askGroq(userQ){
       } else { reject(new Error('Groq error ' + xhr.status)); }
     };
     xhr.onerror = function(){ reject(new Error('Network error')); };
-    xhr.send(JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'system', content: sys }, { role: 'user', content: userQ }], temperature: 0.4, max_tokens: 400 }));
+    xhr.send(JSON.stringify({ model: 'model: 'openai/gpt-oss-120b', messages: [{ role: 'system', content: sys }, { role: 'user', content: userQ }], temperature: 0.4, max_tokens: 400 }));
   });
 }
 
