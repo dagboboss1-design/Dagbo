@@ -596,8 +596,8 @@
 })();
 </script>
 <style>
-.dg-menu-trigger{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:12px;z-index:120;width:46px;height:46px;border:1px solid rgba(150,170,200,.28);border-radius:14px;background:rgba(15,25,40,.94);color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;box-shadow:0 5px 18px rgba(0,0,0,.2);cursor:pointer}
-.dg-menu-trigger span{display:block;width:19px;height:2px;border-radius:2px;background:currentColor}
+.dg-menu-trigger{position:fixed!important;top:calc(7px + env(safe-area-inset-top,0px));right:8px;z-index:120;width:34px;height:34px;border:1px solid rgba(150,170,200,.3);border-radius:10px;background:rgba(15,25,40,.96);color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;box-shadow:0 3px 12px rgba(0,0,0,.22);cursor:pointer;padding:0}
+.dg-menu-trigger span{display:block;width:15px;height:1.8px;border-radius:2px;background:currentColor}
 .dg-menu-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:121;opacity:0;visibility:hidden;transition:opacity .22s,visibility .22s}
 .dg-menu-panel{position:fixed;top:0;right:0;bottom:0;z-index:122;width:min(310px,86vw);padding:calc(22px + env(safe-area-inset-top,0px)) 18px calc(22px + env(safe-area-inset-bottom,0px));background:#0d1725;color:#eef4ff;border-left:1px solid #26384f;box-shadow:-16px 0 40px rgba(0,0,0,.32);transform:translateX(105%);transition:transform .25s ease;overflow-y:auto}
 .dg-menu-open .dg-menu-backdrop{opacity:1;visibility:visible}.dg-menu-open .dg-menu-panel{transform:translateX(0)}
