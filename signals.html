@@ -436,6 +436,21 @@
 
   loadAllSignals();
 
+  window.addEventListener('load', async function() {
+    try {
+      if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
+      var subscription = await window.DagboPWA.getSubscription();
+      if (!subscription) return;
+      await fetch('/api/trades?action=preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: subscription, pairs: enabledPairs })
+      });
+    } catch(e) {
+      console.warn('Could not sync scanner market preferences:', e);
+    }
+  });
+
 })();
 </script>
 </body>
