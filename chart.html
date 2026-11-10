@@ -9,6 +9,11 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
 <style>
+  .chart-indicator-legend{display:flex;gap:7px;overflow-x:auto;padding:9px 2px 12px;margin:0 0 4px;scrollbar-width:none}
+  .chart-indicator-legend span{flex:none;border:1px solid var(--dg-line);border-radius:4px;padding:6px 8px;color:var(--dg-text-2);font-size:10px;font-weight:750;letter-spacing:.35px;white-space:nowrap}
+  #chartOverlayTools{background:rgba(12,14,17,.94);border:1px solid rgba(180,195,215,.18);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+  #chartOverlayTools button{border-radius:5px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);padding:6px 9px}
+  #chartOverlayTools #drawingStatus{display:none}
   /* THE FIX: Force the container height and position */
   #tv-chart-container {
     width: 100%;
@@ -44,7 +49,7 @@
     text-align: center; margin-bottom: 12px;
   }
   #tv-chart-container{position:relative;touch-action:pan-y;overflow:hidden}
-  #chartOverlayTools{position:absolute;z-index:12;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:6px;background:rgba(12,20,32,.94);border:1px solid rgba(180,195,215,.22);border-radius:13px;box-shadow:0 5px 18px rgba(0,0,0,.28);backdrop-filter:blur(12px)}
+  #chartOverlayTools{position:absolute;z-index:12;top:auto;bottom:10px;left:10px;right:10px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:6px;background:rgba(12,20,32,.94);border:1px solid rgba(180,195,215,.22);border-radius:13px;box-shadow:0 5px 18px rgba(0,0,0,.28);backdrop-filter:blur(12px)}
   #chartOverlayTools .tool-label{font-size:9px;font-weight:900;letter-spacing:.7px;color:#91a5bd;padding:0 5px}
   #chartOverlayTools button{border:1px solid rgba(130,155,184,.25);background:rgba(30,45,64,.82);color:#e9f0fa;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;min-height:34px;white-space:nowrap}
   #chartOverlayTools button[data-tool="long"]{border-color:rgba(47,202,133,.5);color:#73e2ad}
@@ -88,7 +93,9 @@
   </div>
 
 
-  <section class="dg-card" style="margin:12px 0">
+  <div class="chart-indicator-legend" aria-label="Chart indicators"><span>VOL · VOLUME</span><span>RSI · 14</span><span>MACD · 12 / 26 / 9</span><span>PRICE STRUCTURE · BOS / CHoCH</span></div>
+
+  <section class="dg-card" id="chartRiskPlanner" style="margin:12px 0">
     <h2 class="dg-card__title">Long / Short Risk Planner</h2>
     <div class="dg-grid-2">
       <label class="dg-field"><span class="dg-label">Direction</span><select id="chartPlanDir" class="dg-input"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select></label>
@@ -104,6 +111,7 @@
 
   <!-- Chart Box -->
   <div id="tv-chart-container"></div>
+  <section class="dg-card" style="margin:12px 0"><h2 class="dg-card__title">Indicator key</h2><p class="dg-muted" style="font-size:12px;line-height:1.6;margin:8px 0 0">Volume, RSI and MACD are loaded as TradingView studies. The BOS / CHoCH label is a structure-analysis category; the embedded TradingView chart cannot load private or account-only Pine indicators from your TradingView app. Long / Short and drawing tools here are visual planning overlays, not broker orders.</p></section>
 
 
 </main>
@@ -190,8 +198,8 @@
       '&symboledit=0' +
       '&saveimage=0' +
       '&toolbarbg=rgba(0,0,0,0)' +
-      '&hide_volume=true' +
-      '&studies=RSI%40tv-basicstudies';
+      '&hide_volume=false' +
+      '&studies=Volume%40tv-basicstudies;RSI%40tv-basicstudies;MACD%40tv-basicstudies';
 
     container.appendChild(iframe);
     var layer=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -201,7 +209,7 @@
     container.appendChild(layer);
     var toolbar=document.createElement('div');
     toolbar.id='chartOverlayTools';
-    toolbar.innerHTML='<span class="tool-label">CHART TOOLS</span><button type="button" data-tool="off">↖ Move</button><button type="button" data-tool="long">↗ Long Position</button><button type="button" data-tool="short">↘ Short Position</button><button type="button" data-tool="line">╱ Trendline</button><button type="button" data-tool="rect">▭ Rectangle</button><button type="button" data-tool="triangle">△ Triangle</button><button type="button" data-tool="fib">Fibonacci</button><button type="button" data-tool="hline">— Horizontal</button><button type="button" id="undoDrawing">Undo</button><button type="button" id="clearDrawings">Clear</button><span id="drawingStatus">Choose a chart tool, then drag on the chart.</span>';
+    toolbar.innerHTML='<span class="tool-label">DRAW</span><button type="button" data-tool="off" aria-label="Move chart">↖</button><button type="button" data-tool="long">↗ Long</button><button type="button" data-tool="short">↘ Short</button><button type="button" data-tool="line">╱</button><button type="button" data-tool="rect">▭</button><button type="button" data-tool="triangle">△</button><button type="button" data-tool="fib">FIB</button><button type="button" data-tool="hline">—</button><button type="button" id="undoDrawing">↶</button><button type="button" id="clearDrawings">×</button><span id="drawingStatus">Select a tool and drag on the chart.</span>';
     container.appendChild(toolbar);
     initDrawingLayer(layer,container);
   }
