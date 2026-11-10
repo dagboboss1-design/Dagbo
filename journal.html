@@ -328,6 +328,15 @@
   renderStats();
   renderList();
   syncCloudTrades();
+
+  // A Track Trade action from Signals opens the saved trade with its levels already filled in.
+  try {
+    var pendingJournalId = sessionStorage.getItem('dagbo_open_journal_trade');
+    if (pendingJournalId) {
+      sessionStorage.removeItem('dagbo_open_journal_trade');
+      window.editTrade(pendingJournalId);
+    }
+  } catch(e) {}
 })();
 </script>
 </body>
