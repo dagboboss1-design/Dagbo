@@ -32,17 +32,11 @@
   <h1 class="dg-title">Signal Board</h1>
   <p class="dg-subtitle">3 Systems. Confluence Engine.</p>
 
-  <section class="dg-card" style="margin-top:16px">
-    <div class="dg-card__head"><h2 class="dg-card__title">🏆 Best Opportunity Finder</h2><span class="dg-pill dg-pill--open">Live scan</span></div>
-    <p class="dg-muted" style="font-size:13px;margin:6px 0 12px">Ranks the strongest current signals by agreement between the three existing systems. This is a confluence ranking, not a win-probability score.</p>
-    <div id="bestOpportunityList" class="dg-stack"><p class="dg-muted">Waiting for market data…</p></div>
-  </section>
-
-  <section class="dg-card">
-    <div class="dg-card__head"><h2 class="dg-card__title">🧭 Trend Agreement Monitor</h2><span class="dg-pill dg-pill--open">5m / 15m</span></div>
-    <p class="dg-muted" style="font-size:13px;margin:6px 0 12px">Compares the 5-minute and 15-minute signal direction saved on this device. Higher-timeframe confirmation (1H / 4H) is not connected yet.</p>
-    <div id="trendAgreementList"><p class="dg-muted">Switch between 5m and 15m and refresh both scans to compare them.</p></div>
-  </section>
+  <a class="dg-row dg-row--link dg-card" href="signal-insights.html" style="margin-top:16px;border-radius:16px">
+    <span class="dg-row__icon dg-row__icon--amber">◈</span>
+    <span class="dg-row__body"><span class="dg-row__title">Opportunity & Trend Intelligence</span><span class="dg-row__sub">Open Best Opportunity Finder and Trend Agreement Monitor</span></span>
+    <span aria-hidden="true">›</span>
+  </a>
 
   <a class="dg-row dg-row--link dg-card" href="alerts.html" style="margin-bottom:18px;border-radius:16px">
     <span class="dg-row__icon dg-row__icon--amber">🔔</span>
@@ -309,6 +303,7 @@
       return { pair:pair, signal:item.final, score:score, direction:buys > sells ? 'BUY' : sells > buys ? 'SELL' : 'WAIT' };
     }).filter(function(x){ return x.score >= 2; }).sort(function(a,b){ return b.score-a.score; }).slice(0,3);
 
+    try { localStorage.setItem('dagbo_best_opportunities', JSON.stringify({timeframe:currentSignalTF,updatedAt:new Date().toISOString(),items:ranked})); } catch(e) {}
     var best = document.getElementById('bestOpportunityList');
     best.textContent = '';
     if (!ranked.length) {
