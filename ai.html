@@ -46,9 +46,20 @@
     <div class="ai-avatar">🤖</div>
     <div style="flex:1">
       <div style="font-size:18px;font-weight:700;display:flex;align-items:center">Dagbo AI <span class="ai-status">Online</span></div>
-      <div class="dg-muted" style="font-size:13px;margin-top:2px">Your Trading Assistant. Ask anything...</div>
+      <div class="dg-muted" style="font-size:13px;margin-top:2px">AI Market Commander · Trading teacher · Signal explainer</div>
     </div>
   </div>
+
+  <section class="dg-card" style="margin-bottom:18px">
+    <div class="dg-card__head"><h2 class="dg-card__title">🧠 AI Market Commander</h2><span class="dg-pill dg-pill--open">Context-aware</span></div>
+    <p class="dg-muted" style="font-size:13px;line-height:1.5;margin:6px 0 12px">Ask Dagbo to explain your latest saved Signals-page scan, market structure concepts or news you provide. It does not have an independent live price feed.</p>
+    <div class="quick-chips" style="margin-top:0">
+      <button class="quick-chip" onclick="askQuestion('Explain my latest DAGBO signal scan. Which markets show confluence and what confirmation is still needed?')">📊 Explain my signals</button>
+      <button class="quick-chip" onclick="askQuestion('Explain how I can choose between scalping and intraday trading in the current market conditions. Do not invent live data.')">⚡ Scalping or intraday?</button>
+      <button class="quick-chip" onclick="askQuestion('Explain the risks of trading around high-impact economic news and what I should check before entering.')">📰 News risk briefing</button>
+      <button class="quick-chip" onclick="askQuestion('Why might the Signals page show NO TRADE, and what confirmation should I wait for?')">⏳ Why no trade?</button>
+    </div>
+  </section>
 
   <div class="chat-container" id="chatArea"></div>
 
@@ -348,7 +359,13 @@ function askGroq(userQ){
         body: JSON.stringify({
           question: String(userQ),
           name: name,
-          subscription: subscription
+          subscription: subscription,
+          marketContext: (function(){
+            try {
+              var saved = JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots')) || {};
+              return JSON.stringify({ savedAt: new Date().toISOString(), timeframes: saved }).slice(0, 2500);
+            } catch(e) { return ''; }
+          })()
         })
       });
     }).then(function(res){
