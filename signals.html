@@ -207,6 +207,18 @@
     return 'NO TRADE';
   }
 
+  // Attribute each trade to the methods that actually agreed on its signal.
+  function getSignalStrategy(s1, s2, s3, final) {
+    var direction = final.indexOf('BUY') >= 0 ? 'BUY' : final.indexOf('SELL') >= 0 ? 'SELL' : null;
+    if (!direction) return 'No confirmed strategy';
+    return [
+      { vote: s1, name: 'RSI + EMA Trend' },
+      { vote: s2, name: 'Candlestick Reversal' },
+      { vote: s3, name: '20-Candle Range Reversal' }
+    ].filter(function(x){ return x.vote === direction; })
+     .map(function(x){ return x.name; }).join(' + ') || '3-System Confluence';
+  }
+
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
     let apiSym = API_SYMBOLS[pair] || 'XAU/USD';
@@ -261,6 +273,7 @@
 
       return { 
         pair, final, entry, sl, tp1, tp2, s1, s2, s3,
+        strategy: getSignalStrategy(s1, s2, s3, final),
         lastCandleOpen: parseFloat(lastC.open).toFixed(2),
         lastCandleClose: parseFloat(lastC.close).toFixed(2),
         rsiValue: currentRSI,
@@ -406,7 +419,7 @@
           '</div>' +
           cardInner +
           '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;">' +
-            (s.final === 'NO TRADE' ? '' : '<button onclick="executeTrade(\'' + s.pair + '\', \'' + s.final + '\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ')" style="flex:1;padding:10px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:14px;cursor:pointer;">Track Trade</button>') +
+            (s.final === 'NO TRADE' ? '' : '<button onclick="executeTrade(\'' + s.pair + '\', \'' + s.final + '\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ', ' + JSON.stringify(s.strategy) + ')" style="flex:1;padding:10px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:14px;cursor:pointer;">Track Trade</button>') +
             '<a href="chart.html?pair=' + s.pair + '" style="flex:1;text-align:center;padding:10px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:14px;">View Chart</a>' +
           '</div>' +
         '</section>';
@@ -419,7 +432,7 @@
     renderInsights();
   }
 
-  window.executeTrade = async function(pair, signal, entry, sl, tp) {
+  window.executeTrade = async function(pair, signal, entry, sl, tp, strategy) {
     var dir = signal.includes('BUY') ? 'BUY' : 'SELL';
     var journal = [];
     try { journal = JSON.parse(localStorage.getItem('dagbo_journal')) || []; } catch(e) {}
@@ -440,7 +453,7 @@
       takeProfit: Number(tp),
       lotSize: Number(settings.lotSize) || 0.01,
       riskAmount: (Number(settings.accountSize) || 100) * (Number(settings.risk) || 1) / 100,
-      strategy: '3-System Confluence',
+      strategy: strategy || '3-System Confluence',
       timeframe: currentSignalTF + 'm',
       result: 'OPEN',
       status: 'OPEN',
