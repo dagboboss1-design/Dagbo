@@ -75,6 +75,11 @@
 
   <!-- Chart Box -->
   <div id="tv-chart-container"></div>
+  <section class="dg-card" style="margin-top:12px">
+    <h2 class="dg-card__title" style="font-size:18px">Full drawing workspace</h2>
+    <p class="dg-muted" style="font-size:13px">For the complete TradingView drawing set — Long Position, Short Position, Rectangle, Triangle, Trend Line, Fibonacci and more — open the full TradingView chart. The embedded chart toolbar is controlled by TradingView and may show fewer tools on mobile.</p>
+    <a id="fullTradingView" class="dg-btn dg-btn--primary dg-btn--block" href="https://www.tradingview.com/chart/" target="_blank" rel="noopener">Open full TradingView chart ↗</a>
+  </section>
 
 </main>
 
@@ -173,10 +178,15 @@
     container.appendChild(iframe);
   }
 
-  window.changePair = function(tvSymbol) { currentPair = tvSymbol; loadChart(); };
-  window.changeTF = function(tf) { currentTF = tf; loadChart(); };
+  function updateFullChartLink() {
+    var link = document.getElementById('fullTradingView');
+    link.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(currentPair) + '&interval=' + encodeURIComponent(currentTF);
+  }
+  window.changePair = function(tvSymbol) { currentPair = tvSymbol; updateFullChartLink(); loadChart(); };
+  window.changeTF = function(tf) { currentTF = tf; updateFullChartLink(); loadChart(); };
 
   buildDropdown();
+  updateFullChartLink();
   loadChart();
 })();
 </script>
