@@ -37,6 +37,38 @@
   <h1 class="dg-title">Market News</h1>
   <p class="dg-subtitle">Stay awake. Don't let news catch you.</p>
 
+  <section class="dg-card" style="margin:18px 0;padding:16px">
+    <div class="dg-section" style="margin-top:0">15-Minute Pre-News Countdown</div>
+    <h2 id="newsEventTitle" style="font-size:18px;margin:8px 0">Next scheduled event</h2>
+    <div id="newsCountdown" style="font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;margin:8px 0">--:--:--</div>
+    <div id="newsCountdownStatus" class="dg-pill dg-pill--wait">Set a confirmed release time</div>
+    <p id="newsCountdownInfo" class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:10px">The analysis window activates automatically at T-minus 15:00. Enter a confirmed event time below.</p>
+    <label for="newsEventName" class="dg-muted" style="display:block;font-size:12px;margin-top:12px">Event name</label>
+    <input id="newsEventName" type="text" maxlength="90" placeholder="e.g. US Retail Sales" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--dg-line);border-radius:10px;background:var(--dg-fill);color:var(--dg-text);margin-top:5px">
+    <label for="newsEventTime" class="dg-muted" style="display:block;font-size:12px;margin-top:10px">Confirmed release date/time (Nigeria local time)</label>
+    <input id="newsEventTime" type="datetime-local" style="width:100%;box-sizing:border-box;padding:11px;border:1px solid var(--dg-line);border-radius:10px;background:var(--dg-fill);color:var(--dg-text);margin-top:5px">
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="saveNewsEvent" class="dg-btn" type="button">Set countdown</button>
+      <button id="clearNewsEvent" class="dg-btn" type="button">Clear</button>
+    </div>
+    <p class="dg-muted" style="font-size:11px;line-height:1.5;margin-bottom:0">This timer counts down to the time you enter. It does not fetch or verify economic calendar schedules automatically, and the timer alone does not generate a BUY/SELL bias.</p>
+  </section>
+  <section class="dg-card" style="margin:18px 0;padding:16px">
+    <div class="dg-section" style="margin-top:0">Multi-Market Impact Scanner</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+      <div class="dg-card"><b>Forex</b><div class="dg-muted">EURUSD · GBPUSD · USDJPY · GBPJPY · AUDUSD · USDCAD</div></div>
+      <div class="dg-card"><b>Metals & Energy</b><div class="dg-muted">XAUUSD · XAGUSD · Oil</div></div>
+      <div class="dg-card"><b>Indices</b><div class="dg-muted">US30 · US100 · NAS100 · US500</div></div>
+      <div class="dg-card"><b>Crypto</b><div class="dg-muted">BTCUSD · ETHUSD</div></div>
+    </div>
+    <p class="dg-muted" style="font-size:12px;line-height:1.5">Each instrument needs its own evidence-based assessment. One event does not mean every market gets the same direction.</p>
+  </section>
+  <section class="dg-card" style="margin:18px 0;padding:16px">
+    <div class="dg-section" style="margin-top:0">DAGBO AI News Analyst</div>
+    <p class="dg-muted" style="font-size:13px;line-height:1.5">Ask AI to explain market headlines and identify potentially affected forex pairs, metals, indices and crypto markets.</p>
+    <button id="openNewsAI" class="dg-btn" type="button">Ask DAGBO AI about news</button>
+  </section>
+
   <h3 class="dg-section" style="margin-top:0">Session Status</h3>
   <div class="dg-card" style="padding:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
@@ -140,6 +172,38 @@
     }
   }
 
+
+  var NEWS_EVENT_KEY = 'dagbo_news_countdown_event';
+  function updateNewsCountdown() {
+    var raw = localStorage.getItem(NEWS_EVENT_KEY);
+    var title = document.getElementById('newsEventTitle');
+    var clock = document.getElementById('newsCountdown');
+    var status = document.getElementById('newsCountdownStatus');
+    var info = document.getElementById('newsCountdownInfo');
+    if (!raw) { title.textContent='Next scheduled event'; clock.textContent='--:--:--'; status.textContent='Set a confirmed release time'; status.className='dg-pill dg-pill--wait'; return; }
+    var ev;
+    try { ev=JSON.parse(raw); } catch(e) { localStorage.removeItem(NEWS_EVENT_KEY); return; }
+    var target = new Date(ev.time).getTime();
+    if (!Number.isFinite(target)) { localStorage.removeItem(NEWS_EVENT_KEY); return; }
+    title.textContent = ev.name || 'Scheduled news event';
+    var diff = target - Date.now();
+    if (diff <= 0) { clock.textContent='00:00:00'; status.textContent='RELEASE TIME PASSED'; status.className='dg-pill dg-pill--wait'; info.textContent='The scheduled time has passed. Check the calendar in case the release was delayed.'; return; }
+    var secs = Math.floor(diff/1000), days=Math.floor(secs/86400), hours=Math.floor((secs%86400)/3600), mins=Math.floor((secs%3600)/60), rem=secs%60;
+    clock.textContent=(days ? days+'d ' : '')+[hours,mins,rem].map(function(n){return String(n).padStart(2,'0');}).join(':');
+    if (diff <= 60000) { status.textContent='1-MINUTE WARNING'; status.className='dg-pill dg-pill--buy'; info.textContent='Final warning window. Expect possible volatility; verify spreads and market conditions.'; }
+    else if (diff <= 300000) { status.textContent='5-MINUTE WARNING'; status.className='dg-pill dg-pill--buy'; info.textContent='Pre-news window active. Refresh analysis for each affected instrument.'; }
+    else if (diff <= 900000) { status.textContent='15-MINUTE ANALYSIS ACTIVE'; status.className='dg-pill dg-pill--buy'; info.textContent='The 15-minute window is active. Assess each affected market separately; countdown alone does not create a directional bias.'; }
+    else { status.textContent='COUNTING DOWN'; status.className='dg-pill dg-pill--wait'; info.textContent='Pre-news analysis activates automatically at T-minus 15:00.'; }
+  }
+  function saveNewsCountdown() {
+    var time=document.getElementById('newsEventTime').value;
+    var name=document.getElementById('newsEventName').value.trim();
+    if (!time) { alert('Enter a confirmed release time first.'); return; }
+    if (new Date(time).getTime() <= Date.now()) { alert('Choose a future release time.'); return; }
+    localStorage.setItem(NEWS_EVENT_KEY, JSON.stringify({name:name || 'Scheduled news event',time:time}));
+    updateNewsCountdown();
+  }
+
   function showMessage(message) {
     var wrap = document.createElement('div');
     wrap.className = 'dg-card';
@@ -211,6 +275,14 @@
         showMessage(err.message || 'Could not load news. Check your internet and try again.');
       });
   }
+
+
+  document.getElementById('saveNewsEvent').addEventListener('click', saveNewsCountdown);
+  document.getElementById('clearNewsEvent').addEventListener('click', function(){ localStorage.removeItem(NEWS_EVENT_KEY); document.getElementById('newsEventName').value=''; document.getElementById('newsEventTime').value=''; updateNewsCountdown(); });
+  document.getElementById('openNewsAI').addEventListener('click', function(){ localStorage.setItem('dagbo_news_prefill','Explain the latest market-moving news and identify potentially affected forex pairs, metals, indices and crypto markets. Separate confirmed facts from possible market reactions.'); window.location.href='ai.html'; });
+  try { var savedEvent=JSON.parse(localStorage.getItem(NEWS_EVENT_KEY)||'null'); if(savedEvent){document.getElementById('newsEventName').value=savedEvent.name||'';document.getElementById('newsEventTime').value=savedEvent.time||'';} } catch(e) { localStorage.removeItem(NEWS_EVENT_KEY); }
+  updateNewsCountdown();
+  setInterval(updateNewsCountdown,1000);
 
   updateSession();
   setInterval(updateSession, 60000);
