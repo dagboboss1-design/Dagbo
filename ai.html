@@ -373,7 +373,7 @@ function askGroq(userQ){
         if (!res.ok || !data.success || typeof data.answer !== 'string') {
           throw new Error(data.error || 'Dagbo AI could not answer right now');
         }
-        resolve(data.answer.replace(/\n/g, '<br>'));
+        resolve(data.answer);
       });
     }).catch(function(err){
       reject(err);
@@ -401,9 +401,13 @@ function saveChatHistory() {
 function addMessage(role, text) {
   var d = document.createElement('div');
   d.className = 'chat-bubble ' + role;
-  var html = String(text).replace(/\n/g, '<br>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   var time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-  d.innerHTML = html + '<span class="chat-time">' + time + '</span>';
+  d.style.whiteSpace = 'pre-wrap';
+  d.textContent = String(text);
+  var timeNode = document.createElement('span');
+  timeNode.className = 'chat-time';
+  timeNode.textContent = time;
+  d.appendChild(timeNode);
   chatArea.appendChild(d);
   window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
