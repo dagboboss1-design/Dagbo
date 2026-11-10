@@ -174,18 +174,28 @@
     else if(upper>Math.max(body*2,range*.45)&&c<o){candleDir='SELL';candleName='Bearish rejection / pin bar';}
     add('Candlestick reading',candleDir,candleName);
     var look=candles.slice(-21,-1),sHigh=Math.max.apply(null,look.map(function(x){return candleNumber(x,'high')})),sLow=Math.min.apply(null,look.map(function(x){return candleNumber(x,'low')}));
+    var priorTrend=calculateEMA(closes.slice(0,-1),20)>calculateEMA(closes.slice(0,-1),50)?'BUY':'SELL';
     var structure=c>sHigh?'BUY':c<sLow?'SELL':'WAIT';
-    add('Market structure / BOS',structure,structure==='BUY'?'close broke recent swing high':structure==='SELL'?'close broke recent swing low':'no confirmed range break');
+    var structureName=structure==='WAIT'?'No confirmed break':structure===priorTrend?'BOS':'CHoCH';
+    add('ICT / SMC '+structureName,structure,structure==='BUY'?'close broke recent swing high':structure==='SELL'?'close broke recent swing low':'no confirmed swing break');
     var sweepDir=(h>sHigh&&c<sHigh)?'SELL':(l<sLow&&c>sLow)?'BUY':'WAIT';
     add('ICT liquidity sweep',sweepDir,sweepDir==='SELL'?'swept prior high and closed back below':sweepDir==='BUY'?'swept prior low and closed back above':'no sweep-and-reclaim');
     var a=candles[n-3],fvgDir='WAIT';
     if(a&&l>candleNumber(a,'high'))fvgDir='BUY';
     else if(a&&h<candleNumber(a,'low'))fvgDir='SELL';
     add('ICT fair value gap',fvgDir,fvgDir==='BUY'?'bullish 3-candle imbalance':fvgDir==='SELL'?'bearish 3-candle imbalance':'no 3-candle gap');
+    var recent=closes.slice(-20),mean=recent.reduce(function(sum,v){return sum+v},0)/recent.length;
+    var variance=recent.reduce(function(sum,v){return sum+Math.pow(v-mean,2)},0)/recent.length,dev=Math.sqrt(variance);
+    var bbDir=c<mean-2*dev&&c>o?'BUY':c>mean+2*dev&&c<o?'SELL':'WAIT';
+    add('Bollinger Bands(20,2)',bbDir,bbDir==='BUY'?'lower-band rejection':bbDir==='SELL'?'upper-band rejection':'no band-rejection setup');
+    var volumes=candles.slice(-21,-1).map(function(x){return Number(x.volume)}).filter(Number.isFinite);
+    var currentVolume=Number(last.volume),avgVolume=volumes.length?volumes.reduce(function(sum,v){return sum+v},0)/volumes.length:0;
+    var volumeDir=Number.isFinite(currentVolume)&&avgVolume>0&&currentVolume>avgVolume*1.5?(c>o?'BUY':c<o?'SELL':'WAIT'):'WAIT';
+    add('Volume confirmation',volumeDir,'current volume '+(avgVolume>0?(currentVolume/avgVolume).toFixed(2)+'× 20-bar average':'not available'));
     var buys=votes.filter(function(v){return v==='BUY'}).length,sells=votes.filter(function(v){return v==='SELL'}).length;
     var direction=buys>=3&&buys>sells?'BUY':sells>=3&&sells>buys?'SELL':'WAIT';
-    var final=direction==='BUY'?(buys>=5?'STRONG BUY':'BUY'):direction==='SELL'?(sells>=5?'STRONG SELL':'SELL'):'NO TRADE';
-    return {final:final,direction:direction,buyScore:buys,sellScore:sells,totalMethods:7,evidence:evidence,rsi:rsi,emaTrend:trend,macd:macd,candleName:candleName,structure:structure,sweep:sweepDir,fvg:fvgDir};
+    var final=direction==='BUY'?(buys>=6?'STRONG BUY':'BUY'):direction==='SELL'?(sells>=6?'STRONG SELL':'SELL'):'NO TRADE';
+    return {final:final,direction:direction,buyScore:buys,sellScore:sells,totalMethods:9,evidence:evidence,rsi:rsi,emaTrend:trend,macd:macd,candleName:candleName,structure:structure,structureName:structureName,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir};
   }
 
   // --- FETCH REAL DATA ---
@@ -227,7 +237,7 @@
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
         lastCandleOpen:Number(lastC.open).toFixed(2),lastCandleClose:Number(lastC.close).toFixed(2),
         rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
-        macdValue:analysis.macd,structure:analysis.structure,sweep:analysis.sweep,fvg:analysis.fvg,candlePattern:analysis.candleName
+        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName
       };
     } catch(e) {
       console.error(e);
@@ -334,7 +344,7 @@
       // Visual Debug Box
       var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
         '<b>Automatic evidence scan</b><br>RSI: '+Number(s.rsiValue).toFixed(1)+' · EMA: '+s.emaTrend+' · MACD: '+Number(s.macdValue).toPrecision(4)+'<br>' +
-        'BOS: '+s.structure+' · Liquidity sweep: '+s.sweep+' · FVG: '+s.fvg+'<br>Candle: '+s.candlePattern+
+        'Structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+'<br>Bollinger: '+s.bb+' · Volume: '+s.volume+'<br>Candle: '+s.candlePattern+
         '<br><b>Votes:</b> BUY '+s.buyScore+'/'+s.totalMethods+' · SELL '+s.sellScore+'/'+s.totalMethods+'</div>';
       
       var cardInner = '';
