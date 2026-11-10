@@ -96,7 +96,7 @@ function parseBlsEvents(icsText) {
         if (name.includes("employment situation")) eventName = "NFP";
 
         if (eventName) {
-          const match = current.start.match(/:(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/);
+          const match = current.start.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/);
           if (match) {
             const [, ys, ms, ds, hs, mins, secs, isUtc] = match;
             const year = Number(ys), month = Number(ms), day = Number(ds);
