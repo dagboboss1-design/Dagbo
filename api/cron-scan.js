@@ -260,7 +260,7 @@ module.exports = async function handler(req, res) {
   try {
     const results = {}, errors = [];
     const pairsToScan = await getConfiguredPairs();
-    for (const pair of pairsToScan) {
+    const fetched = await Promise.all(pairsToScan.map(async pair => {
       const symbol = SYMBOLS[pair];
       const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
         "&interval=15min&outputsize=60&apikey=" + encodeURIComponent(apiKey);
@@ -270,30 +270,34 @@ module.exports = async function handler(req, res) {
         if (!response.ok || data.status === "error" || !Array.isArray(data.values) || data.values.length < 50) {
           throw new Error(data.message || "Insufficient candle data");
         }
-        const candles = data.values.slice().reverse();
-        const analysis = analyze(candles, pair);
+        const analysis = analyze(data.values.slice().reverse(), pair);
         if (!analysis) throw new Error("Could not calculate indicators");
-        results[pair] = analysis;
-
-        const stateKey = "dagbo:scan:signal:" + pair;
-        const previousRaw = await redis.get(stateKey);
-        const previous = previousRaw ? (typeof previousRaw === "string" ? JSON.parse(previousRaw) : previousRaw) : null;
-        if (analysis.signal !== "NO TRADE") {
-          if (!previous || previous.signal !== analysis.signal) {
-            const title = !previous || previous.signal === "NO TRADE" ? "🔔 NEW " + analysis.signal + " SIGNAL" :
-              (previous.signal.includes("BUY") !== analysis.signal.includes("BUY") ? "🔄 SIGNAL DIRECTION CHANGED" : "📈 SIGNAL STRENGTH CHANGED");
-            const body = pair + " · " + analysis.signal + " · Entry " + analysis.entry.toFixed(5) +
-              " · SL " + analysis.stopLoss.toFixed(5) + " · TP " + analysis.takeProfit.toFixed(5) +
-              " · 15m scan. Confirm on your chart before acting.";
-            await broadcast(title, body, "signal-" + pair);
-          }
-        } else if (previous && previous.signal !== "NO TRADE") {
-          await broadcast("ℹ️ SIGNAL NO LONGER ACTIVE", pair + " no longer meets the 2-of-3 confluence rule. Review any pending setup.", "signal-ended-" + pair);
-        }
-        await redis.set(stateKey, JSON.stringify({ signal: analysis.signal, candleTime: analysis.candleTime, scannedAt: new Date().toISOString() }), { ex: 60 * 60 * 24 * 7 });
+        return { pair, analysis };
       } catch (err) {
-        errors.push({ pair, error: err.message });
+        return { pair, error: err.message };
       }
+    }));
+
+    for (const item of fetched) {
+      if (item.error) { errors.push({ pair: item.pair, error: item.error }); continue; }
+      const pair = item.pair, analysis = item.analysis;
+      results[pair] = analysis;
+      const stateKey = "dagbo:scan:signal:" + pair;
+      const previousRaw = await redis.get(stateKey);
+      const previous = previousRaw ? (typeof previousRaw === "string" ? JSON.parse(previousRaw) : previousRaw) : null;
+      if (analysis.signal !== "NO TRADE") {
+        if (!previous || previous.signal !== analysis.signal) {
+          const title = !previous || previous.signal === "NO TRADE" ? "🔔 NEW " + analysis.signal + " SIGNAL" :
+            (previous.signal.includes("BUY") !== analysis.signal.includes("BUY") ? "🔄 SIGNAL DIRECTION CHANGED" : "📈 SIGNAL STRENGTH CHANGED");
+          const body = pair + " · " + analysis.signal + " · Entry " + analysis.entry.toFixed(5) +
+            " · SL " + analysis.stopLoss.toFixed(5) + " · TP " + analysis.takeProfit.toFixed(5) +
+            " · 15m scan. Confirm on your chart before acting.";
+          await broadcast(title, body, "signal-" + pair);
+        }
+      } else if (previous && previous.signal !== "NO TRADE") {
+        await broadcast("ℹ️ SIGNAL NO LONGER ACTIVE", pair + " no longer meets the 2-of-3 confluence rule. Review any pending setup.", "signal-ended-" + pair);
+      }
+      await redis.set(stateKey, JSON.stringify({ signal: analysis.signal, candleTime: analysis.candleTime, scannedAt: new Date().toISOString() }), { ex: 60 * 60 * 24 * 7 });
     }
 
     const tradeSummary = await monitorTrades(results);
