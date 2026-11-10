@@ -1,4 +1,4 @@
-const VERSION = "dagbo-v7";
+const VERSION = "dagbo-v8";
 const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "settings.html", "dagbo.css", "manifest.json", "pwa.js"];
 
 self.addEventListener("install", (event) => {
