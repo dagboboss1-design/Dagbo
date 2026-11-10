@@ -8,13 +8,33 @@ const redis = new Redis({
 });
 
 const SYMBOLS = {
-  XAUUSD: "XAU/USD",
-  EURUSD: "EUR/USD",
-  GBPUSD: "GBP/USD",
-  US30: "DJI",
-  BTCUSD: "BTC/USD"
+  XAUUSD: "XAU/USD", GOLD: "XAU/USD",
+  EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY",
+  GBPJPY: "GBP/JPY", AUDUSD: "AUD/USD", USDCHF: "USD/CHF",
+  USDCAD: "USD/CAD", NZDUSD: "NZD/USD", EURJPY: "EUR/JPY", EURGBP: "EUR/GBP",
+  US30: "DJI", US100: "NDX", NAS100: "NDX", US500: "SPX",
+  BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
 };
-const PAIRS = Object.keys(SYMBOLS);
+const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
+const MAX_PAIRS = 6;
+
+async function getConfiguredPairs() {
+  const ids = await redis.smembers("dagbo:push:subscriptions");
+  const selected = new Set();
+  for (const id of ids) {
+    const raw = await redis.get("dagbo:scan:pairs:" + id);
+    if (!raw) continue;
+    let list = [];
+    try { list = typeof raw === "string" ? JSON.parse(raw) : raw; } catch(e) {}
+    if (Array.isArray(list)) {
+      for (const item of list) {
+        const pair = String(item).toUpperCase();
+        if (SYMBOLS[pair]) selected.add(pair);
+      }
+    }
+  }
+  return (selected.size ? Array.from(selected) : DEFAULT_PAIRS).slice(0, MAX_PAIRS);
+}
 
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
 function ema(values, period) {
@@ -186,7 +206,7 @@ async function monitorTrades(marketData) {
       const opposite = market.signal && market.signal !== "NO TRADE" &&
         ((buy && market.signal.includes("SELL")) || (!buy && market.signal.includes("BUY")));
       if (opposite) {
-        const flag = "opposite:" + market.signal + ":" + market.candleTime;
+        const flag = "opposite:" + market.signal;
         if (trade.lastWarning !== flag) {
           trade.lastWarning = flag;
           await redis.set(key, JSON.stringify(trade));
@@ -216,7 +236,8 @@ module.exports = async function handler(req, res) {
 
   try {
     const results = {}, errors = [];
-    for (const pair of PAIRS) {
+    const pairsToScan = await getConfiguredPairs();
+    for (const pair of pairsToScan) {
       const symbol = SYMBOLS[pair];
       const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
         "&interval=15min&outputsize=60&apikey=" + encodeURIComponent(apiKey);
