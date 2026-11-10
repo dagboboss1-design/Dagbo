@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Strategy Performance Lab · DAGBO SIGNAL</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="dagbo.css"><script>(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();</script></head>
+<body><main class="dg-page"><div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">JOURNAL</div></div>
+<h1 class="dg-title">Strategy Performance Lab</h1><p class="dg-subtitle">Compare strategies using trades you have actually recorded.</p>
+<div class="dg-card"><div class="dg-card__head"><h2 class="dg-card__title">Strategy results</h2><span class="dg-pill dg-pill--open" id="sampleCount">0 trades</span></div><div id="strategyList"></div></div>
+<div class="dg-card"><h2 class="dg-card__title">How to improve your data</h2><p class="dg-muted" style="font-size:14px;line-height:1.6">When adding or editing a trade in Journal, select its strategy and timeframe. The Lab will then calculate trade count, win rate, average R and net P&amp;L for each strategy. Older trades without a strategy are grouped as “Not tagged”.</p></div>
+<p class="dg-note">Historical journal results are not proof of future performance. Small samples can be misleading. Include spreads, commissions and slippage when reviewing results.</p>
+<a class="dg-btn dg-btn--primary dg-btn--block" href="journal.html">Back to Journal</a></main>
+<nav class="dg-tabbar" aria-label="Main"><a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a><a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a><a class="dg-tab" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a><a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a><a class="dg-tab" aria-current="page" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a></nav>
+<script>
+(function(){
+var trades=[];try{trades=JSON.parse(localStorage.getItem('dagbo_journal'))||[]}catch(e){}
+var closed=trades.filter(function(t){return ['WIN','LOSS','BREAKEVEN'].includes(t.result)});
+document.getElementById('sampleCount').textContent=closed.length+' closed trades';
+var groups={};closed.forEach(function(t){var key=t.strategy||'Not tagged';(groups[key]||(groups[key]=[])).push(t)});
+var root=document.getElementById('strategyList');var names=Object.keys(groups).sort(function(a,b){return groups[b].length-groups[a].length});
+if(!names.length){var p=document.createElement('p');p.className='dg-muted';p.textContent='No closed trades yet. Record trades and select a strategy to build your comparison.';root.appendChild(p);return;}
+names.forEach(function(name){var rows=groups[name],wins=rows.filter(function(t){return t.result==='WIN'}).length,pnl=rows.reduce(function(a,t){return a+(Number(t.pnl)||0)},0),rs=rows.map(function(t){return Number(t.rMultiple)}).filter(Number.isFinite),avg=rs.length?rs.reduce(function(a,b){return a+b},0)/rs.length:null;var card=document.createElement('div');card.style.cssText='padding:14px 0;border-top:1px solid var(--dg-line)';var title=document.createElement('strong');title.textContent=name;var meta=document.createElement('div');meta.className='dg-muted';meta.style.cssText='font-size:13px;margin-top:5px';meta.textContent=rows.length+' trades · '+Math.round(wins/rows.length*100)+'% wins · Avg R '+(avg===null?'—':avg.toFixed(2)+'R');var money=document.createElement('div');money.className=pnl>0?'dg-pos':pnl<0?'dg-neg':'dg-muted';money.style.cssText='font-weight:700;margin-top:5px';money.textContent=(pnl<0?'-$':'+$')+Math.abs(pnl).toFixed(2)+' net P&L';card.appendChild(title);card.appendChild(meta);card.appendChild(money);root.appendChild(card)});
+})();
+</script></body></html>
