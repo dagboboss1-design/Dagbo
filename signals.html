@@ -6,11 +6,8 @@
 <meta name="theme-color" content="#F5F5F7" id="themeColor">
 <title>Signals · DAGBO SIGNAL</title>
 
-<!-- PWA Links -->
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-
-<!-- THE NEW DESIGN SYSTEM -->
 <link rel="stylesheet" href="dagbo.css">
 
 <script>
@@ -28,7 +25,6 @@
 
 <main class="dg-page">
 
-  <!-- Top Header -->
   <div class="dg-top">
     <div class="dg-brand">◈ DAGBO SIGNAL</div>
     <div class="dg-badge">SIGNALS</div>
@@ -37,7 +33,6 @@
   <h1 class="dg-title">Signal Board</h1>
   <p class="dg-subtitle">3 systems. 1 final signal.</p>
 
-  <!-- Category Filters -->
   <div class="dg-chips" id="filterChips">
     <button class="dg-chip is-active" data-filter="ALL">All Signals</button>
     <button class="dg-chip" data-filter="FX">Forex</button>
@@ -46,12 +41,8 @@
     <button class="dg-chip" data-filter="CRYPTO">Crypto</button>
   </div>
 
-  <!-- The Signal Cards Grid -->
-  <div class="dg-stack" id="signals-grid" style="margin-top:12px">
-    <!-- Cards will be generated here by JavaScript -->
-  </div>
+  <div class="dg-stack" id="signals-grid" style="margin-top:12px"></div>
 
-  <!-- Disclaimer -->
   <div class="dg-card" style="background:var(--dg-fill);box-shadow:none;margin-top:24px">
     <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:0">
       <b>⚠️ DEMO SIGNALS ONLY:</b> These are randomly generated examples for learning. They do not use live market data. Always open the Chart page to see the real price before you trade.
@@ -60,7 +51,6 @@
 
 </main>
 
-<!-- BOTTOM TAB BAR -->
 <nav class="dg-tabbar" aria-label="Main">
   <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
   <a class="dg-tab" aria-current="page" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
@@ -79,7 +69,6 @@
   
   var enabledPairs = Array.isArray(settings.pairs) ? settings.pairs : ['XAUUSD', 'EURUSD', 'GBPUSD', 'US30', 'US100', 'BTCUSD'];
   
-  // Define pair categories for filtering
   var PAIR_TYPES = {
     XAUUSD: 'GOLD', GOLD: 'GOLD',
     EURUSD: 'FX', GBPUSD: 'FX', USDJPY: 'FX', GBPJPY: 'FX', AUDUSD: 'FX', USDCHF: 'FX', USDCAD: 'FX', NZDUSD: 'FX', EURJPY: 'FX', EURGBP: 'FX',
@@ -89,7 +78,6 @@
 
   var currentFilter = 'ALL';
 
-  // Generate a realistic looking demo signal
   function makeSignal(pair) {
     var seed = new Date().toDateString() + pair + Math.random();
     var hash = 0; for (var i = 0; i < seed.length; i++) hash = ((hash << 5) - hash) + seed.charCodeAt(i);
@@ -110,7 +98,7 @@
     else if (p.indexOf('US30') > -1) { anchor = 39500; stop = 150; dp = 0; }
     else if (p.indexOf('US100') > -1 || p.indexOf('NAS') > -1) { anchor = 18000; stop = 100; dp = 0; }
     else if (p.indexOf('US500') > -1) { anchor = 5000; stop = 35; dp = 0; }
-    else { anchor = 1.0850; stop = 0.0020; dp = 5; } // default forex
+    else { anchor = 1.0850; stop = 0.0020; dp = 5; }
     
     var entry = anchor + (rand - 0.5) * stop;
     var sl = isBuy ? entry - stop : entry + stop;
@@ -123,7 +111,6 @@
     var pillCls = isBuy ? 'dg-pill--buy' : (isSell ? 'dg-pill--sell' : 'dg-pill--wait');
     var pillText = isBuy ? 'BUY' : (isSell ? 'SELL' : 'WAIT');
     
-    // Random time in past 2 hours
     var minsAgo = Math.floor(rand * 120);
     var d = new Date(Date.now() - minsAgo * 60000);
     var timeStr = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' • ' + d.toLocaleDateString('en-GB', {day: 'numeric', month: 'short'});
@@ -179,8 +166,9 @@
             '<span style="font-size:11px;color:var(--dg-text-2)">' + s.time + '</span>' +
           '</div>' +
           cardInner +
-          '<div style="margin-top:12px;border-top:0.5px solid var(--dg-line);padding-top:12px;text-align:right">' +
-            '<a href="chart.html?pair=' + s.pair + '" style="font-size:14px;font-weight:600;text-decoration:none;color:var(--dg-blue-ink)">View Chart →</a>' +
+          '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;">' +
+            (s.isNoTrade ? '' : '<button onclick="executeTrade(\'' + s.pair + '\', \'' + s.final + '\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ')" style="flex:1;padding:10px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:14px;cursor:pointer;">Execute & Journal</button>') +
+            '<a href="chart.html?pair=' + s.pair + '" style="flex:1;text-align:center;padding:10px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:14px;">View Chart</a>' +
           '</div>' +
         '</section>';
     });
@@ -192,7 +180,21 @@
     grid.innerHTML = listHtml;
   }
 
-  // Filter Buttons
+  window.executeTrade = function(pair, signal, entry, sl, tp) {
+    var dir = signal.includes('BUY') ? 'BUY' : 'SELL';
+    var trade = {
+      pair: pair,
+      direction: dir,
+      entry: entry,
+      stopLoss: sl,
+      takeProfit: tp,
+      result: 'OPEN',
+      dateOpened: new Date().toISOString()
+    };
+    sessionStorage.setItem('dagbo_pending_journal', JSON.stringify(trade));
+    window.location.href = 'journal.html';
+  };
+
   document.getElementById('filterChips').addEventListener('click', function(e){
     var btn = e.target.closest('.dg-chip');
     if (!btn) return;
@@ -202,10 +204,9 @@
     renderCards();
   });
 
-  // Initial Render
   renderCards();
 
 })();
 </script>
 </body>
-  </html>
+</html>
