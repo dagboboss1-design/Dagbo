@@ -32,6 +32,13 @@
     return result;
   }
 
+  function sameBytes(a, b) {
+    if (!a || !b || a.byteLength !== b.byteLength) return false;
+    var x = new Uint8Array(a), y = new Uint8Array(b);
+    for (var i = 0; i < x.length; i++) if (x[i] !== y[i]) return false;
+    return true;
+  }
+
   function subscribePush() {
     if (!("PushManager" in window)) return Promise.reject(new Error("Push notifications are not supported by this browser"));
     return fetch("/api/push?action=public-key", { cache: "no-store" })
@@ -41,12 +48,21 @@
       })
       .then(function (data) {
         if (!data.publicKey) throw new Error("Push public key is missing on the server");
+        var applicationServerKey = urlBase64ToUint8Array(data.publicKey);
         return registerSW().then(function (reg) {
           return reg.pushManager.getSubscription().then(function (existing) {
-            if (existing) return existing;
-            return reg.pushManager.subscribe({
+            if (existing && existing.options && existing.options.applicationServerKey &&
+                !sameBytes(existing.options.applicationServerKey, applicationServerKey)) {
+              return existing.unsubscribe().then(function (ok) {
+                if (!ok) throw new Error("Could not refresh the old push subscription. Please disable and enable notifications again.");
+                return null;
+              });
+            }
+            return existing;
+          }).then(function (existing) {
+            return existing || reg.pushManager.subscribe({
               userVisibleOnly: true,
-              applicationServerKey: urlBase64ToUint8Array(data.publicKey)
+              applicationServerKey: applicationServerKey
             });
           });
         });
@@ -113,6 +129,18 @@
     });
   }
 
+  function getStatus() {
+    var permission = notifState();
+    if (permission !== "granted") {
+      return Promise.resolve({ enabled: false, permission: permission, message: permission === "denied" ? "Notifications are blocked in browser settings." : "Notifications are not enabled on this device." });
+    }
+    return subscribePush().then(function () {
+      return { enabled: true, permission: permission, message: "This device is registered for push notifications." };
+    }).catch(function (error) {
+      return { enabled: false, permission: permission, message: error.message || "Push subscription could not be verified." };
+    });
+  }
+
   function getSubscription() {
     return registerSW().then(function (reg) {
       return reg.pushManager.getSubscription();
@@ -123,6 +151,7 @@
 
   window.DagboPWA = {
     getSubscription: getSubscription,
+    getStatus: getStatus,
     enableNotifications: enableNotifications,
     disableNotifications: disableNotifications,
     sendTest: sendTest,
