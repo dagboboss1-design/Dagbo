@@ -9,8 +9,8 @@
   ];
   var style=document.createElement('style');
   style.textContent=`
-  #dagboMenuButton{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:12px;z-index:9900;width:42px;height:42px;border:1px solid rgba(150,165,185,.2);border-radius:50%;background:rgba(25,27,30,.94);color:#f7f7f7;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 14px #0005;backdrop-filter:blur(12px);cursor:pointer}
-  #dagboMenuButton svg{width:21px;height:21px}
+  #dagboMenuButton{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:12px;z-index:9900;width:38px;height:38px;border:0;border-radius:8px;background:transparent;color:inherit;display:flex;align-items:center;justify-content:center;box-shadow:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  #dagboMenuButton svg{width:24px;height:24px}
   #dagboMenuShade{position:fixed;inset:0;z-index:9901;background:rgba(0,0,0,.58);opacity:0;visibility:hidden;transition:opacity .22s,visibility .22s}
   #dagboSideMenu{position:fixed;z-index:9902;left:0;top:0;bottom:0;width:min(78vw,290px);padding:calc(16px + env(safe-area-inset-top,0px)) 0 calc(14px + env(safe-area-inset-bottom,0px));background:#171819;color:#f5f5f5;box-shadow:12px 0 38px #0006;transform:translateX(-103%);transition:transform .25s cubic-bezier(.2,.75,.25,1);display:flex;flex-direction:column;overflow:hidden}
   body.dagbo-menu-open #dagboMenuShade{opacity:1;visibility:visible}
@@ -30,7 +30,7 @@
   `;
   document.head.appendChild(style);
   var button=document.createElement('button');button.id='dagboMenuButton';button.type='button';button.setAttribute('aria-label','Open navigation');
-  button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
+  button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>';
   var shade=document.createElement('div');shade.id='dagboMenuShade';
   var panel=document.createElement('aside');panel.id='dagboSideMenu';panel.setAttribute('aria-label','Main navigation');
   var current=location.pathname.split('/').pop()||'index.html';
