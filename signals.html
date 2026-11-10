@@ -30,7 +30,7 @@
   </div>
   
   <h1 class="dg-title">Signal Board</h1>
-  <p class="dg-subtitle">Real market data. 3 systems combined.</p>
+  <p class="dg-subtitle">3 Systems. Confluence Engine.</p>
 
   <!-- TIMEFRAME TOGGLE -->
   <div class="dg-seg" role="radiogroup" style="margin-bottom:16px">
@@ -73,8 +73,9 @@
   <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
   <a class="dg-tab" aria-current="page" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
   <a class="dg-tab" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
+  <a class="dg-tab" href="news.html"><span class="dg-tab__icon">📰</span>News</a>
+  <a class="dg-tab" href="boss1.html"><span class="dg-tab__icon">👑</span>BOSS1</a>
   <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
-  <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
 </nav>
 
 <script src="pwa.js" defer></script>
@@ -181,13 +182,12 @@
   }
 
   function getFinalSignal(s1, s2, s3) {
-    let dirs = [s1, s2, s3];
-    if (dirs.includes('WAIT')) return 'NO TRADE';
-    let buys = dirs.filter(d => d === 'BUY').length;
-    if (buys === 3) return 'STRONG BUY';
-    if (buys === 2) return 'WEAK BUY';
-    if (buys === 1) return 'WEAK SELL';
-    return 'STRONG SELL';
+    var dirs = [s1, s2, s3];
+    var buys = dirs.filter(function(d){ return d === 'BUY'; }).length;
+    var sells = dirs.filter(function(d){ return d === 'SELL'; }).length;
+    if (buys >= 2) return buys === 3 ? 'STRONG BUY' : 'BUY';
+    if (sells >= 2) return sells === 3 ? 'STRONG SELL' : 'SELL';
+    return 'NO TRADE';
   }
 
   // --- FETCH REAL DATA ---
@@ -217,13 +217,23 @@
       let entry = parseFloat(candles[candles.length-1].close);
       let isBuy = final.includes('BUY');
       
-      let slPct = tf === '5' ? 0.0015 : 0.005;
-      let tp1Pct = tf === '5' ? 0.003 : 0.01;
-      let tp2Pct = tf === '5' ? 0.0045 : 0.015;
-
-      let sl = isBuy ? entry * (1 - slPct) : entry * (1 + slPct);
-      let tp1 = isBuy ? entry * (1 + tp1Pct) : entry * (1 - tp1Pct);
-      let tp2 = isBuy ? entry * (1 + tp2Pct) : entry * (1 - tp2Pct);
+      // ATR-based exits adapt to the instrument's current volatility.
+      var atrSum = 0;
+      for (var i = 1; i <= 14; i++) {
+        var candle = candles[candles.length - i];
+        var previous = candles[candles.length - i - 1];
+        var high = parseFloat(candle.high);
+        var low = parseFloat(candle.low);
+        var previousClose = parseFloat(previous.close);
+        atrSum += Math.max(high - low, Math.abs(high - previousClose), Math.abs(low - previousClose));
+      }
+      var atr = atrSum / 14;
+      var slDist = atr * 1.5;
+      var tp1Dist = atr * 2.0;
+      var tp2Dist = atr * 3.5;
+      var sl = isBuy ? entry - slDist : entry + slDist;
+      var tp1 = isBuy ? entry + tp1Dist : entry - tp1Dist;
+      var tp2 = isBuy ? entry + tp2Dist : entry - tp2Dist;
 
       // Debug data to prove we are reading the candle
       let lastC = candles[candles.length-1];
