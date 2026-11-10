@@ -82,7 +82,7 @@
       <label class="dg-field" style="margin:0"><span class="dg-label">Result</span><select id="fResult" class="dg-input"><option value="OPEN">OPEN</option><option value="WIN">WIN</option><option value="LOSS">LOSS</option><option value="BREAKEVEN">BREAKEVEN</option></select></label>
     </div>
     <div class="dg-grid-2" style="margin-top:14px">
-      <label class="dg-field" style="margin:0"><span class="dg-label">Strategy</span><select id="fStrategy" class="dg-input"><option value="">Not specified</option><option>Liquidity Sweep &amp; Reversal</option><option>Session Breakout &amp; Retest</option><option>VWAP Pullback</option><option>Trend Pullback Sniper</option><option>Range Reversal Hunter</option><option>Momentum Expansion</option><option>Other</option></select></label>
+      <label class="dg-field" style="margin:0"><span class="dg-label">Strategy used (auto-filled from Signals)</span><input type="text" id="fStrategy" class="dg-input" placeholder="Filled automatically from the signal"></label>
       <label class="dg-field" style="margin:0"><span class="dg-label">Timeframe</span><select id="fTimeframe" class="dg-input"><option value="">Not specified</option><option>1m</option><option>5m</option><option>15m</option><option>1H</option><option>4H</option><option>Daily</option></select></label>
     </div>
     <div class="dg-grid-2" style="margin-top:14px">
@@ -330,7 +330,7 @@
   renderList();
   syncCloudTrades();
 
-  // A Track Trade action from Signals opens the saved trade with its levels already filled in.
+  // The Add to Journal action from Signals opens the saved trade with its strategy and levels already filled in.
   try {
     var pendingJournalId = sessionStorage.getItem('dagbo_open_journal_trade');
     if (pendingJournalId) {
