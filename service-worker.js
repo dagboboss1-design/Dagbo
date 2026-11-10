@@ -1,5 +1,5 @@
-const VERSION = "dagbo-v8";
-const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "settings.html", "dagbo.css", "manifest.json", "pwa.js"];
+const VERSION = "dagbo-v9";
+const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "settings.html", "dagbo.css", "manifest.json", "pwa.js"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -39,9 +39,15 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "DAGBO SIGNAL", {
       body: data.body || "You have a new trading alert.",
       tag: data.tag || "dagbo-alert",
+      icon: "./icons/icon-192.png",
+      badge: "./icons/icon-192.png",
+      timestamp: Date.now(),
       data: { url: data.url || "./signals.html" },
-      badge: undefined,
-      renotify: false
+      vibrate: [90, 45, 90],
+      renotify: false,
+      requireInteraction: false,
+      silent: false,
+      actions: [{ action: "open-signals", title: "View signal" }]
     })
   );
 });
