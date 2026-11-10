@@ -3,55 +3,70 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F5F5F7" id="themeColor">
+<meta name="theme-color" content="#F5F5F7">
 <title>Chart · DAGBO SIGNAL</title>
-
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
-
 <style>
-  /* Make the chart HUGE and fill the screen */
+  /* MAKE PAGE FILL PHONE */
+  .dg-page { padding-bottom: 90px !important; }
+
+  /* BIG CHART - THIS IS THE FIX */
   #tv-chart-container {
-    height: 65vh; /* 65% of your phone screen */
-    min-height: 500px;
+    height: calc(100dvh - 290px); /* Full phone height minus top + bottom */
+    min-height: 580px;
+    height: calc(100vh - 290px); /* backup for old phone */
     width: 100%;
-    border-radius: var(--dg-r-card);
+    border-radius: 16px;
     overflow: hidden;
-    box-shadow: var(--dg-shadow);
     background: #000;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     position: relative;
   }
-
-  /* Force the TradingView widget to fill the box */
-  #tradingview_widget, 
-  #tradingview_widget > div, 
-  .tradingview-widget-container, 
-  .tradingview-widget-container__widget {
-    height: 100% !important;
+  #tv-chart-container iframe {
     width: 100% !important;
+    height: 100% !important;
+    min-height: 580px !important;
+    border: none !important;
+    display: block;
   }
-  
+  /* FULLSCREEN MODE */
+  body.chart-full #tv-chart-container {
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    z-index: 9999;
+    border-radius: 0;
+    margin: 0;
+  }
+  body.chart-full #tv-chart-container iframe { min-height: 100dvh !important; }
+  #btnFull {
+    position: absolute;
+    top: 10px; right: 10px;
+    z-index: 10;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    border: 1px solid #333;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+  }
   .chart-pair-select {
-    appearance: none;
-    -webkit-appearance: none;
+    appearance: none; -webkit-appearance: none;
     background: var(--dg-card);
     border: 1px solid var(--dg-line);
     color: var(--dg-text);
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 16px; font-weight: 700;
     padding: 14px 16px;
-    border-radius: var(--dg-r-card);
-    box-shadow: var(--dg-shadow);
-    cursor: pointer;
-    width: 100%;
-    text-align: center;
-    margin-bottom: 12px;
+    border-radius: 16px;
+    cursor: pointer; width: 100%;
+    text-align: center; margin-bottom: 12px;
   }
-  .chart-pair-select:focus { outline: 2px solid var(--dg-blue); }
 </style>
-
 <script>
   (function(){
     try{
@@ -63,22 +78,17 @@
 </script>
 </head>
 <body>
-
 <main class="dg-page">
-
   <div class="dg-top">
     <div class="dg-brand">◈ DAGBO SIGNAL</div>
     <div class="dg-badge">CHART</div>
   </div>
-  
   <h1 class="dg-title">Live Chart</h1>
   <p class="dg-subtitle">Real price. Real zones. Check before you enter.</p>
 
-  <select id="pairSelect" class="chart-pair-select" onchange="changePair(this.value)">
-    <!-- Options filled by JS -->
-  </select>
+  <select id="pairSelect" class="chart-pair-select" onchange="changePair(this.value)"></select>
 
-  <div class="dg-seg" role="radiogroup" aria-label="Timeframe" style="margin-bottom:16px" id="tfContainer">
+  <div class="dg-seg" role="radiogroup" aria-label="Timeframe" style="margin-bottom:12px" id="tfContainer">
     <input class="dg-seg__in" type="radio" name="tf" id="tf1" value="5" onchange="changeTF('5')"><label class="dg-seg__lb" for="tf1">5m</label>
     <input class="dg-seg__in" type="radio" name="tf" id="tf2" value="15" onchange="changeTF('15')" checked><label class="dg-seg__lb" for="tf2">15m</label>
     <input class="dg-seg__in" type="radio" name="tf" id="tf3" value="60" onchange="changeTF('60')"><label class="dg-seg__lb" for="tf3">1H</label>
@@ -86,9 +96,12 @@
     <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
   </div>
 
+  <!-- BIG CHART -->
   <div id="tv-chart-container">
-    <div id="tradingview_widget"></div>
+    <button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button>
   </div>
+
+  <button class="dg-btn" style="width:100%;min-height:44px;border-radius:12px;font-weight:700" onclick="toggleFull()">Make Chart Bigger ⛶</button>
 
 </main>
 
@@ -101,11 +114,9 @@
 </nav>
 
 <script src="pwa.js" defer></script>
-
 <script>
 (function(){
   'use strict';
-
   var PAIRS = [
     { id: 'XAUUSD', label: 'GOLD (XAUUSD)', tv: 'CAPITALCOM:XAUUSD' },
     { id: 'EURUSD', label: 'EUR/USD', tv: 'FOREXCOM:EURUSD' },
@@ -124,93 +135,57 @@
     { id: 'EURJPY', label: 'EUR/JPY', tv: 'FOREXCOM:EURJPY' },
     { id: 'EURGBP', label: 'EUR/GBP', tv: 'FOREXCOM:EURGBP' }
   ];
-
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
-  
   var enabledIds = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : PAIRS.map(function(p){ return p.id; });
-  
-  var activePairs = PAIRS.filter(function(p){
-    return enabledIds.indexOf(p.id) > -1 || (enabledIds.indexOf('GOLD') > -1 && p.id === 'XAUUSD');
-  });
-
+  var activePairs = PAIRS.filter(function(p){ return enabledIds.indexOf(p.id) > -1; });
   var currentPair = 'CAPITALCOM:XAUUSD';
   var currentTF = '15';
-
   function buildDropdown() {
     var sel = document.getElementById('pairSelect');
     sel.innerHTML = '';
     activePairs.forEach(function(p) {
       var opt = document.createElement('option');
-      opt.value = p.tv;
-      opt.textContent = p.label;
+      opt.value = p.tv; opt.textContent = p.label;
       sel.appendChild(opt);
     });
-
     var urlParams = new URLSearchParams(window.location.search);
     var urlPair = urlParams.get('pair');
     if (urlPair) {
-      var matched = PAIRS.filter(function(p){ return p.id === urlPair || (urlPair === 'GOLD' && p.id === 'XAUUSD'); })[0];
-      if (matched && activePairs.indexOf(matched) > -1) {
-        currentPair = matched.tv;
-        sel.value = currentPair;
-        window.history.replaceState({}, '', window.location.pathname);
-      }
+      var matched = PAIRS.filter(function(p){ return p.id === urlPair; })[0];
+      if (matched) { currentPair = matched.tv; sel.value = currentPair; }
     } else {
-      if (activePairs.length > 0) {
-        currentPair = activePairs[0].tv;
-        sel.value = currentPair;
-      }
+      if (activePairs.length > 0) { currentPair = activePairs[0].tv; sel.value = currentPair; }
     }
   }
-
-  // Modern TradingView Widget (Fills the box perfectly)
   function loadChart() {
-    var container = document.getElementById('tradingview_widget');
-    container.innerHTML = ''; 
-
+    var container = document.getElementById('tv-chart-container');
+    var btn = document.getElementById('btnFull');
+    container.innerHTML = '';
+    container.appendChild(btn);
     var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-
-    var widgetDiv = document.createElement('div');
-    widgetDiv.className = 'tradingview-widget-container';
-    widgetDiv.style.height = '100%';
-    widgetDiv.style.width = '100%';
-
-    var widgetInner = document.createElement('div');
-    widgetInner.className = 'tradingview-widget-container__widget';
-    widgetInner.style.height = '100%';
-    widgetInner.style.width = '100%';
-    widgetDiv.appendChild(widgetInner);
-
-    var script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.async = true;
-    script.innerHTML = JSON.stringify({
-      "autosize": true,
-      "symbol": currentPair,
-      "interval": currentTF,
-      "timezone": "Africa/Lagos",
-      "theme": isDark ? "dark" : "light",
-      "style": "1",
-      "locale": "en",
-      "hide_side_toolbar": false,
-      "allow_symbol_change": false,
-      "calendar": false,
-      "support_host": "https://www.tradingview.com"
-    });
-
-    widgetDiv.appendChild(script);
-    container.appendChild(widgetDiv);
+    var theme = isDark ? 'dark' : 'light';
+    var iframe = document.createElement('iframe');
+    iframe.src = 'https://s.tradingview.com/widgetembed/?symbol=' + encodeURIComponent(currentPair) +
+                 '&interval=' + currentTF + '&theme=' + theme +
+                 '&style=1&locale=en&timezone=Africa%2FLagos' +
+                 '&hidesidetoolbar=0&symboledit=0&saveimage=0&toolbarbg=rgba(0,0,0,0)' +
+                 '&studies=RSI%40tv-basicstudies' +
+                 '&width=100%25&height=100%25';
+    iframe.setAttribute('allowfullscreen', '');
+    container.appendChild(iframe);
   }
-
   window.changePair = function(tvSymbol) { currentPair = tvSymbol; loadChart(); };
   window.changeTF = function(tf) { currentTF = tf; loadChart(); };
-
+  window.toggleFull = function() {
+    document.body.classList.toggle('chart-full');
+    var btn = document.getElementById('btnFull');
+    btn.textContent = document.body.classList.contains('chart-full') ? '✕ CLOSE' : '⛶ FULLSCREEN';
+    setTimeout(loadChart, 100);
+  };
   buildDropdown();
   loadChart();
-
 })();
 </script>
 </body>
-  </html>
+</html>
