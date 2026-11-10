@@ -224,13 +224,28 @@
         [0,0.236,0.382,0.5,0.618,0.786,1].forEach(function(level){var y=top+height*level;el('line',{x1:left,y1:y,x2:Math.max(left+12,right),y2:y,stroke:'#f4c95d','stroke-width':1,'stroke-dasharray':'4 3'});el('text',{x:left+4,y:Math.max(12,y-3),fill:'#f4c95d','font-size':10}).textContent=(level*100).toFixed(1)+'%';});
       }
       if(d.kind==='long'||d.kind==='short'){
-        var distance=Math.max(3,Math.abs(y2-y1)),mid=y1,left=Math.min(x1,x2),width=Math.max(8,Math.abs(x2-x1));
-        var rewardTop=d.kind==='long'?mid-distance:mid,rewardBottom=d.kind==='long'?mid:mid+distance;
-        var riskTop=d.kind==='long'?mid:mid-distance,riskBottom=d.kind==='long'?mid+distance:mid;
-        el('rect',{x:left,y:rewardTop,width,height:distance,fill:'#25c982','fill-opacity':'.22',stroke:'#25c982','stroke-width':1.5});
-        el('rect',{x:left,y:riskTop,width,height:distance,fill:'#f05b68','fill-opacity':'.2',stroke:'#f05b68','stroke-width':1.5});
-        el('line',{x1:left,y1:mid,x2:left+width,y2:mid,stroke:'#fff','stroke-width':1.5,'stroke-dasharray':'5 4'});
-        el('text',{x:left+5,y:Math.max(14,rewardTop+15),fill:'#fff','font-size':12,'font-weight':700}).textContent=d.kind==='long'?'LONG · reward':'SHORT · reward';
+        var distance=Math.max(8,Math.abs(y2-y1)),entry=y1,left=Math.min(x1,x2),width=Math.max(90,Math.abs(x2-x1));
+        var target=d.kind==='long'?entry-distance:entry+distance;
+        var stop=d.kind==='long'?entry+distance:entry-distance;
+        var rewardTop=Math.min(entry,target),riskTop=Math.min(entry,stop);
+        var right=Math.min(layer.clientWidth-4,left+width);
+        left=Math.max(4,Math.min(left,layer.clientWidth-12));
+        width=Math.max(8,right-left);
+        var green='#27c987',red='#ef6672',labelBg='#101b29';
+        el('rect',{x:left,y:rewardTop,width,height:distance,fill:green,'fill-opacity':'.20',stroke:green,'stroke-width':1.5,rx:2});
+        el('rect',{x:left,y:riskTop,width,height:distance,fill:red,'fill-opacity':'.17',stroke:red,'stroke-width':1.5,rx:2});
+        el('line',{x1:left-4,y1:entry,x2:left+width+4,y2:entry,stroke:'#f4f7fb','stroke-width':1.7,'stroke-dasharray':'5 3'});
+        el('line',{x1:left,y1:target,x2:left+width,y2:target,stroke:green,'stroke-width':1.2});
+        el('line',{x1:left,y1:stop,x2:left+width,y2:stop,stroke:red,'stroke-width':1.2});
+        function tag(text,x,y,color){
+          var w=Math.max(54,text.length*6.2+12),yy=Math.max(13,Math.min(layer.clientHeight-4,y));
+          el('rect',{x:x,y:yy-12,width:w,height:17,rx:4,fill:labelBg,stroke:color,'stroke-width':.8});
+          el('text',{x:x+6,y:yy,fill:color,'font-size':10,'font-weight':800}).textContent=text;
+        }
+        tag(d.kind==='long'?'LONG · TARGET':'SHORT · TARGET',left+3,target,green);
+        tag('ENTRY',left+3,entry,'#f4f7fb');
+        tag('STOP LOSS',left+3,stop,red);
+        tag('R:R 1:1',left+width-57,entry,'#f4c95d');
       }
     }
     function render(){layer.innerHTML='';drawings.forEach(shape);if(preview)shape(preview);}
@@ -242,6 +257,14 @@
     document.getElementById('undoDrawing').onclick=function(){drawings.pop();persist();render()};
     document.getElementById('clearDrawings').onclick=function(){if(confirm('Clear drawings for this market and timeframe?')){drawings=[];persist();render()}};
     selectTool('off');render();
+    if(window.ResizeObserver){
+      var resizeObserver=new ResizeObserver(function(){
+        var w=container.clientWidth,h=container.clientHeight;
+        layer.setAttribute('viewBox','0 0 '+w+' '+h);
+        render();
+      });
+      resizeObserver.observe(container);
+    }
   }
 
   window.changePair = function(tvSymbol) { currentPair = tvSymbol; loadChart(); };
