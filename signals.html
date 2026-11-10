@@ -32,6 +32,23 @@
   <h1 class="dg-title">Signal Board</h1>
   <p class="dg-subtitle">3 Systems. Confluence Engine.</p>
 
+  <section class="dg-card" style="margin-top:16px">
+    <div class="dg-card__head"><h2 class="dg-card__title">🏆 Best Opportunity Finder</h2><span class="dg-pill dg-pill--open">Live scan</span></div>
+    <p class="dg-muted" style="font-size:13px;margin:6px 0 12px">Ranks the strongest current signals by agreement between the three existing systems. This is a confluence ranking, not a win-probability score.</p>
+    <div id="bestOpportunityList" class="dg-stack"><p class="dg-muted">Waiting for market data…</p></div>
+  </section>
+
+  <section class="dg-card">
+    <div class="dg-card__head"><h2 class="dg-card__title">🧭 Trend Agreement Monitor</h2><span class="dg-pill dg-pill--open">5m / 15m</span></div>
+    <p class="dg-muted" style="font-size:13px;margin:6px 0 12px">Compares the 5-minute and 15-minute signal direction saved on this device. Higher-timeframe confirmation (1H / 4H) is not connected yet.</p>
+    <div id="trendAgreementList"><p class="dg-muted">Switch between 5m and 15m and refresh both scans to compare them.</p></div>
+  </section>
+
+  <a class="dg-row dg-row--link dg-card" href="alerts.html" style="margin-bottom:18px;border-radius:16px">
+    <span class="dg-row__icon dg-row__icon--amber">🔔</span>
+    <span class="dg-row__body"><span class="dg-row__title">Smart Alert Centre</span><span class="dg-row__sub">Review signal changes recorded on this device</span></span>
+  </a>
+
   <!-- TIMEFRAME TOGGLE -->
   <div class="dg-seg" role="radiogroup" style="margin-bottom:16px">
     <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_15" value="15" checked onchange="changeSignalTF('15')">
@@ -255,6 +272,74 @@
     }
   }
 
+  function directionOf(value) {
+    return String(value || '').includes('BUY') ? 'BUY' :
+      String(value || '').includes('SELL') ? 'SELL' : 'WAIT';
+  }
+
+  function renderInsights() {
+    var ranked = Object.keys(signalsData).map(function(pair) {
+      var item = signalsData[pair];
+      var votes = [item.s1,item.s2,item.s3];
+      var buys = votes.filter(function(v){ return v === 'BUY'; }).length;
+      var sells = votes.filter(function(v){ return v === 'SELL'; }).length;
+      var score = Math.max(buys,sells);
+      return { pair:pair, signal:item.final, score:score, direction:buys > sells ? 'BUY' : sells > buys ? 'SELL' : 'WAIT' };
+    }).filter(function(x){ return x.score >= 2; }).sort(function(a,b){ return b.score-a.score; }).slice(0,3);
+
+    var best = document.getElementById('bestOpportunityList');
+    best.textContent = '';
+    if (!ranked.length) {
+      var empty = document.createElement('p'); empty.className='dg-muted'; empty.textContent='No setup currently meets the existing 2-of-3 confluence rule. Wait for confirmation.'; best.appendChild(empty);
+    } else ranked.forEach(function(item,index) {
+      var row = document.createElement('div');
+      row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--dg-line)';
+      var left = document.createElement('div');
+      var name = document.createElement('strong'); name.textContent=(index+1)+'. '+item.pair;
+      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/3 systems agree · '+(currentSignalTF==='5'?'Scalping scan':'Intraday scan');
+      left.appendChild(name); left.appendChild(detail);
+      var pill = document.createElement('span'); pill.className='dg-pill '+(item.direction==='BUY'?'dg-pill--buy':'dg-pill--sell'); pill.textContent=item.signal;
+      row.appendChild(left); row.appendChild(pill); best.appendChild(row);
+    });
+
+    var monitor = document.getElementById('trendAgreementList');
+    monitor.textContent = '';
+    var snapshots = {};
+    try { snapshots = JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots')) || {}; } catch(e) {}
+    var otherTF = currentSignalTF === '5' ? '15' : '5';
+    var current = snapshots[currentSignalTF] || {};
+    var other = snapshots[otherTF] || {};
+    var pairs = Array.from(new Set(Object.keys(current).concat(Object.keys(other))));
+    if (!pairs.length) {
+      var note=document.createElement('p'); note.className='dg-muted'; note.textContent='No saved timeframe comparison yet. Refresh both 5m and 15m scans.'; monitor.appendChild(note); return;
+    }
+    pairs.forEach(function(pair) {
+      var a=directionOf(current[pair]), b=directionOf(other[pair]);
+      var line=document.createElement('div'); line.style.cssText='display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--dg-line)';
+      var label=document.createElement('strong'); label.textContent=pair;
+      var value=document.createElement('span'); value.className='dg-muted'; value.style.fontSize='13px';
+      value.textContent='5m: '+(snapshots['5']&&snapshots['5'][pair]||'—')+' · 15m: '+(snapshots['15']&&snapshots['15'][pair]||'—')+' · '+(a===b&&a!=='WAIT'?'Aligned':a==='WAIT'||b==='WAIT'?'Incomplete':'Conflict');
+      line.appendChild(label); line.appendChild(value); monitor.appendChild(line);
+    });
+  }
+
+  function recordSignalSnapshot() {
+    var snapshots = {}, history = [];
+    try { snapshots = JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots')) || {}; } catch(e) {}
+    try { history = JSON.parse(localStorage.getItem('dagbo_alert_history')) || []; } catch(e) {}
+    var previous = snapshots[currentSignalTF] || {};
+    Object.keys(signalsData).forEach(function(pair) {
+      var next = signalsData[pair].final;
+      if (previous[pair] && previous[pair] !== next) {
+        history.push({ id:String(Date.now())+'-'+pair, pair:pair, previous:previous[pair], current:next, timeframe:currentSignalTF+'m', at:new Date().toISOString(), type:'SIGNAL_CHANGE' });
+      }
+      previous[pair] = next;
+    });
+    snapshots[currentSignalTF] = previous;
+    localStorage.setItem('dagbo_signal_tf_snapshots',JSON.stringify(snapshots));
+    localStorage.setItem('dagbo_alert_history',JSON.stringify(history.slice(-100)));
+  }
+
   // --- RENDER UI ---
   function renderCards() {
     var grid = document.getElementById('signals-grid');
@@ -331,6 +416,7 @@
       listHtml = '<div class="dg-card" style="text-align:center;padding:32px 16px"><p class="dg-muted">No signals available. Waiting for market data...</p></div>';
     }
     grid.innerHTML = listHtml;
+    renderInsights();
   }
 
   window.executeTrade = async function(pair, signal, entry, sl, tp) {
@@ -429,6 +515,7 @@
       if (data) signalsData[pair] = data;
     }
     
+    recordSignalSnapshot();
     var now = new Date();
     document.getElementById('lastUpdated').innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     renderCards();
