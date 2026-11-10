@@ -310,9 +310,11 @@
         if (local && remote.status === 'CLOSED' && local.result === 'OPEN') {
           local.result = remote.result || 'CLOSED';
           local.pnl = Number(remote.pnl) || 0;
-          local.rMultiple = local.riskAmount > 0
-            ? Math.round((local.pnl / Number(local.riskAmount)) * 10) / 10
-            : null;
+          if (Number(local.riskAmount) > 0) {
+            local.rMultiple = Math.round((local.pnl / Number(local.riskAmount)) * 10) / 10;
+          } else {
+            delete local.rMultiple;
+          }
           local.exit = remote.exit;
           local.closeReason = remote.closeReason;
           local.dateClosed = remote.dateClosed;
