@@ -84,7 +84,7 @@
     <p class="dg-muted" style="font-size:12px">Select a tool, then drag on the chart. Drawings are saved on this device and do not place broker orders.</p>
     <div id="drawingTools" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px">
       <button type="button" class="dg-btn" data-tool="long">Long Position</button><button type="button" class="dg-btn" data-tool="short">Short Position</button><button type="button" class="dg-btn" data-tool="line">Trend Line</button>
-      <button type="button" class="dg-btn" data-tool="rect">Rectangle</button><button type="button" class="dg-btn" data-tool="triangle">Triangle</button><button type="button" class="dg-btn" data-tool="off">Move Chart</button>
+      <button type="button" class="dg-btn" data-tool="rect">Rectangle</button><button type="button" class="dg-btn" data-tool="triangle">Triangle</button><button type="button" class="dg-btn" data-tool="fib">Fibonacci</button><button type="button" class="dg-btn" data-tool="hline">Horizontal Line</button><button type="button" class="dg-btn" data-tool="off">Move Chart</button>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px"><button type="button" id="undoDrawing" class="dg-btn" style="flex:1">Undo last</button><button type="button" id="clearDrawings" class="dg-btn" style="flex:1">Clear drawings</button></div>
     <p id="drawingStatus" class="dg-muted" style="font-size:12px;margin:8px 0 0">Move Chart is active.</p>
@@ -220,13 +220,19 @@
     function shape(d){
       var x1=d.x1,y1=d.y1,x2=d.x2,y2=d.y2;
       if(d.kind==='line')el('line',{x1,y1,x2,y2,stroke:'#f4c95d','stroke-width':2});
+      if(d.kind==='hline')el('line',{x1:0,y1:y1,x2:layer.clientWidth,y2:y1,stroke:'#f4c95d','stroke-width':2,'stroke-dasharray':'6 4'});
       if(d.kind==='rect')el('rect',{x:Math.min(x1,x2),y:Math.min(y1,y2),width:Math.max(2,Math.abs(x2-x1)),height:Math.max(2,Math.abs(y2-y1)),fill:'#f4c95d','fill-opacity':'.12',stroke:'#f4c95d','stroke-width':2});
       if(d.kind==='triangle')el('polygon',{points:x1+','+y1+' '+x2+','+y2+' '+x1+','+y2,fill:'#f4c95d','fill-opacity':'.12',stroke:'#f4c95d','stroke-width':2});
+      if(d.kind==='fib'){
+        var top=Math.min(y1,y2),bottom=Math.max(y1,y2),height=Math.max(2,bottom-top),left=Math.min(x1,x2),right=Math.max(x1,x2);
+        [0,0.236,0.382,0.5,0.618,0.786,1].forEach(function(level){var y=top+height*level;el('line',{x1:left,y1:y,x2:Math.max(left+12,right),y2:y,stroke:'#f4c95d','stroke-width':1,'stroke-dasharray':'4 3'});el('text',{x:left+4,y:Math.max(12,y-3),fill:'#f4c95d','font-size':10}).textContent=(level*100).toFixed(1)+'%';});
+      }
       if(d.kind==='long'||d.kind==='short'){
-        var top=Math.min(y1,y2),bottom=Math.max(y1,y2),mid=y1,left=Math.min(x1,x2),width=Math.max(8,Math.abs(x2-x1));
-        var rewardTop=d.kind==='long'?top:mid,rewardBottom=d.kind==='long'?mid:bottom,riskTop=d.kind==='long'?mid:top,riskBottom=d.kind==='long'?bottom:mid;
-        el('rect',{x:left,y:rewardTop,width,height:Math.max(3,rewardBottom-rewardTop),fill:'#25c982','fill-opacity':'.22',stroke:'#25c982','stroke-width':1.5});
-        el('rect',{x:left,y:riskTop,width,height:Math.max(3,riskBottom-riskTop),fill:'#f05b68','fill-opacity':'.2',stroke:'#f05b68','stroke-width':1.5});
+        var distance=Math.max(3,Math.abs(y2-y1)),mid=y1,left=Math.min(x1,x2),width=Math.max(8,Math.abs(x2-x1));
+        var rewardTop=d.kind==='long'?mid-distance:mid,rewardBottom=d.kind==='long'?mid:mid+distance;
+        var riskTop=d.kind==='long'?mid:mid-distance,riskBottom=d.kind==='long'?mid+distance:mid;
+        el('rect',{x:left,y:rewardTop,width,height:distance,fill:'#25c982','fill-opacity':'.22',stroke:'#25c982','stroke-width':1.5});
+        el('rect',{x:left,y:riskTop,width,height:distance,fill:'#f05b68','fill-opacity':'.2',stroke:'#f05b68','stroke-width':1.5});
         el('line',{x1:left,y1:mid,x2:left+width,y2:mid,stroke:'#fff','stroke-width':1.5,'stroke-dasharray':'5 4'});
         el('text',{x:left+5,y:Math.max(14,rewardTop+15),fill:'#fff','font-size':12,'font-weight':700}).textContent=d.kind==='long'?'LONG · reward':'SHORT · reward';
       }
