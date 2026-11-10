@@ -128,6 +128,75 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, total: ids.length, sent, failed, removed });
     }
 
+    // 5. AI BACKGROUND NOTIFICATION
+    if (req.method === "POST" && action === "ask-ai") {
+      const { question, name, subscription } = req.body || {};
+      const groqKey = process.env.GROQ_API_KEY;
+      if (typeof question !== "string" || !question.trim() || question.length > 2000 || !groqKey) {
+        return res.status(!groqKey ? 503 : 400).json({
+          error: !groqKey ? "AI service is not configured on the server" : "A valid question is required"
+        });
+      }
+
+      // Keep the Groq API key on the server; never accept it from the browser.
+      const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${groqKey}`
+        },
+        body: JSON.stringify({
+          model: "openai/gpt-oss-120b",
+          messages: [
+            {
+              role: "system",
+              content: `You are Dagbo Brain, a trading teacher for ${name || "Oga"}. Speak in Pidgin English. Never give live prices or trade calls. Answer in 3-6 sentences. Use <b>bold</b> for key terms.`
+            },
+            { role: "user", content: question.trim() }
+          ],
+          temperature: 0.3,
+          max_tokens: 400
+        })
+      });
+
+      const groqData = await groqRes.json();
+      if (!groqRes.ok) {
+        console.error("DAGBO GROQ ERROR:", groqData.error && groqData.error.message);
+        return res.status(502).json({ error: "The AI service could not answer right now" });
+      }
+
+      const rawAnswer = groqData.choices && groqData.choices[0] &&
+        groqData.choices[0].message && groqData.choices[0].message.content;
+      if (typeof rawAnswer !== "string" || !rawAnswer.trim()) {
+        return res.status(502).json({ error: "The AI returned an empty answer" });
+      }
+
+      // Notify only the device that asked the question, never every app subscriber.
+      if (validSubscription(subscription)) {
+        configureVapid();
+        try {
+          await webpush.sendNotification(subscription, JSON.stringify({
+            title: "🤖 Dagbo AI Answer",
+            body: "Your AI answer is ready. Tap to read it.",
+            url: "/ai.html",
+            tag: "dagbo-ai"
+          }), { TTL: 60, urgency: "normal" });
+        } catch (error) {
+          if ([404, 410].includes(error.statusCode)) {
+            const redis = getRedis();
+            const id = getId(subscription.endpoint);
+            await redis.del("dagbo:push:sub:" + id);
+            await redis.srem(SUBSCRIPTIONS, id);
+          } else {
+            console.error("DAGBO AI push delivery error:", error.message);
+          }
+        }
+      }
+
+      // Return plain text; let the page render it safely rather than injecting HTML.
+      return res.status(200).json({ success: true, answer: rawAnswer.trim() });
+    }
+
     return res.status(404).json({ error: "Unknown push action" });
   } catch (error) {
     console.error("DAGBO PUSH ERROR:", error.message);
