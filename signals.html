@@ -590,48 +590,5 @@
 
 })();
 </script>
-<style>
-.dg-menu-trigger{position:fixed!important;top:calc(7px + env(safe-area-inset-top,0px));right:8px;z-index:120;width:34px;height:34px;border:1px solid rgba(150,170,200,.3);border-radius:10px;background:rgba(15,25,40,.96);color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;box-shadow:0 3px 12px rgba(0,0,0,.22);cursor:pointer;padding:0}
-.dg-menu-trigger span{display:block;width:15px;height:1.8px;border-radius:2px;background:currentColor}
-.dg-menu-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.52);z-index:121;opacity:0;visibility:hidden;transition:opacity .22s,visibility .22s}
-.dg-menu-panel{position:fixed;top:0;right:0;bottom:0;z-index:122;width:min(310px,86vw);padding:calc(22px + env(safe-area-inset-top,0px)) 18px calc(22px + env(safe-area-inset-bottom,0px));background:#0d1725;color:#eef4ff;border-left:1px solid #26384f;box-shadow:-16px 0 40px rgba(0,0,0,.32);transform:translateX(105%);transition:transform .25s ease;overflow-y:auto}
-.dg-menu-open .dg-menu-backdrop{opacity:1;visibility:visible}.dg-menu-open .dg-menu-panel{transform:translateX(0)}
-.dg-menu-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;font-weight:900;letter-spacing:.8px}
-.dg-menu-close{width:38px;height:38px;border:1px solid #31445d;border-radius:11px;background:#17263a;color:#fff;font-size:23px;cursor:pointer}
-.dg-menu-links{display:grid;gap:8px}.dg-menu-links a{display:flex;align-items:center;gap:13px;padding:14px 12px;border:1px solid #26384f;border-radius:13px;background:#111e2e;color:#edf3fc;text-decoration:none;font-size:15px;font-weight:750}
-.dg-menu-links a:active,.dg-menu-links a[aria-current=page]{background:#20344d;border-color:#e4b94e}
-.dg-menu-icon{width:25px;text-align:center;font-size:20px}.dg-menu-note{margin-top:18px;color:#9eafc5;font-size:12px;line-height:1.5}
-@media(prefers-reduced-motion:reduce){.dg-menu-panel,.dg-menu-backdrop{transition:none}}
-</style>
-<button class="dg-menu-trigger" id="dgMenuOpen" type="button" aria-label="Open page menu" aria-expanded="false" aria-controls="dgPageMenu"><span></span><span></span><span></span></button>
-<div class="dg-menu-backdrop" id="dgMenuBackdrop" aria-hidden="true"></div>
-<aside class="dg-menu-panel" id="dgPageMenu" aria-label="DAGBO SIGNAL pages" aria-hidden="true">
- <div class="dg-menu-head"><span>◈ DAGBO SIGNAL</span><button class="dg-menu-close" id="dgMenuClose" type="button" aria-label="Close menu">×</button></div>
- <nav class="dg-menu-links">
-  <a href="index.html"><span class="dg-menu-icon">◈</span>Home</a>
-  <a href="signals.html"><span class="dg-menu-icon">⚡</span>Signals</a>
-  <a href="chart.html"><span class="dg-menu-icon">📈</span>Chart</a>
-  <a href="news.html"><span class="dg-menu-icon">📰</span>Market News</a>
-  <a href="boss1.html"><span class="dg-menu-icon">👑</span>BOSS1</a>
-  <a href="ai.html"><span class="dg-menu-icon">✦</span>AI Commander</a>
-  <a href="journal.html"><span class="dg-menu-icon">✎</span>Journal</a>
-  <a href="trader-score.html"><span class="dg-menu-icon">🏆</span>Trader Score</a>
-  <a href="strategy-lab.html"><span class="dg-menu-icon">🧪</span>Strategy Lab</a>
- </nav>
- <p class="dg-menu-note">Tap any page to open it. Tap outside this panel or × to close.</p>
-</aside>
-<script>
-(function(){
- var openBtn=document.getElementById('dgMenuOpen'),closeBtn=document.getElementById('dgMenuClose'),backdrop=document.getElementById('dgMenuBackdrop'),panel=document.getElementById('dgPageMenu');
- if(!openBtn||!closeBtn||!backdrop||!panel)return;
- function setOpen(open){document.body.classList.toggle('dg-menu-open',open);openBtn.setAttribute('aria-expanded',String(open));panel.setAttribute('aria-hidden',String(!open));backdrop.setAttribute('aria-hidden',String(!open));}
- openBtn.addEventListener('click',function(){setOpen(true);});
- closeBtn.addEventListener('click',function(){setOpen(false);});
- backdrop.addEventListener('click',function(){setOpen(false);});
- document.addEventListener('keydown',function(e){if(e.key==='Escape')setOpen(false);});
- var current=location.pathname.split('/').pop()||'index.html';
- panel.querySelectorAll('a').forEach(function(a){if(a.getAttribute('href')===current)a.setAttribute('aria-current','page');});
-})();
-</script>
 </body>
   </html>
