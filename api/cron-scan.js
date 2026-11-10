@@ -203,6 +203,29 @@ async function monitorTrades(marketData) {
         closed++;
         continue;
       }
+      const current = num(market.entry);
+      const riskDistance = Math.abs(trade.entry - sl);
+      const rewardDistance = Math.abs(tp - trade.entry);
+      if (current !== null && riskDistance > 0 && rewardDistance > 0) {
+        const adverseRemaining = buy ? current - sl : sl - current;
+        const targetRemaining = buy ? tp - current : current - tp;
+        if (adverseRemaining > 0 && adverseRemaining / riskDistance <= 0.20 && !trade.nearSlAlerted) {
+          trade.nearSlAlerted = true;
+          await redis.set(key, JSON.stringify(trade));
+          await sendToDevice(deviceId, "⚠️ PRICE NEAR STOP LOSS",
+            trade.pair + " is within about 20% of the remaining distance to your Stop Loss. Review risk and your broker position.",
+            "trade-near-sl-" + tradeId, "/journal.html");
+          warnings++;
+        }
+        if (targetRemaining > 0 && targetRemaining / rewardDistance <= 0.20 && !trade.nearTpAlerted) {
+          trade.nearTpAlerted = true;
+          await redis.set(key, JSON.stringify(trade));
+          await sendToDevice(deviceId, "🎯 PRICE NEAR TAKE PROFIT",
+            trade.pair + " is within about 20% of your Take Profit distance. Consider your trade-management plan.",
+            "trade-near-tp-" + tradeId, "/journal.html");
+          warnings++;
+        }
+      }
       const opposite = market.signal && market.signal !== "NO TRADE" &&
         ((buy && market.signal.includes("SELL")) || (!buy && market.signal.includes("BUY")));
       if (opposite) {
@@ -274,6 +297,27 @@ module.exports = async function handler(req, res) {
     }
 
     const tradeSummary = await monitorTrades(results);
+    const errorKey = "dagbo:scan:error:last";
+    const previousErrorRaw = await redis.get(errorKey);
+    if (errors.length) {
+      const signature = errors.map(x => x.pair).sort().join(",");
+      let previousError = null;
+      try { previousError = previousErrorRaw ? (typeof previousErrorRaw === "string" ? JSON.parse(previousErrorRaw) : previousErrorRaw) : null; } catch(e) {}
+      const shouldNotify = !previousError || previousError.signature !== signature ||
+        Date.now() - Number(previousError.at || 0) >= 60 * 60 * 1000;
+      if (shouldNotify) {
+        await broadcast("⚠️ MARKET SCANNER DATA WARNING",
+          "DAGBO could not get fresh data for: " + errors.map(x => x.pair).join(", ") +
+          ". Other available markets were scanned. Check your Twelve Data key or API limits.",
+          "scanner-data-warning");
+      }
+      await redis.set(errorKey, JSON.stringify({signature,at:Date.now()}), {ex:60*60*24});
+    } else if (previousErrorRaw) {
+      await broadcast("✅ MARKET SCANNER RECOVERED",
+        "DAGBO has successfully received fresh market data again for all selected markets.",
+        "scanner-data-recovered");
+      await redis.del(errorKey);
+    }
     const responseBody = {
       success: true, scannedAt: new Date().toISOString(),
       scanned: Object.keys(results), errors, signals: results,
