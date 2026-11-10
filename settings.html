@@ -187,7 +187,7 @@
     if (state.defaultPair === undefined) state.defaultPair = 'XAUUSD';
     if (state.language === undefined) state.language = 'en';
     if (state.theme === undefined) state.theme = 'light';
-    if (state.notify === undefined) state.notify = true;
+    if (state.notify === undefined) state.notify = false;
   }
 
   function save() {
@@ -263,40 +263,56 @@
     alert('Language set to: ' + (state.language === 'pidgin' ? 'Pidgin' : 'English'));
   });
   
-  document.getElementById('tgNotify').addEventListener('click', function(e){
-    if (window.DagboPWA && window.DagboPWA.enableNotifications) {
-      window.DagboPWA.enableNotifications().then(function(res){
-        if (res.status === 'granted') {
-          state.notify = true; save(); alert('Notifications enabled! ✅');
-          document.getElementById('testPushRow').style.display = 'flex';
-        } else {
-          state.notify = false; save(); alert(res.message || 'Permission denied');
-          e.target.checked = false;
-          document.getElementById('testPushRow').style.display = 'none';
-        }
-      });
+  document.getElementById('tgNotify').addEventListener('change', function(e) {
+    var toggle = e.target;
+    toggle.disabled = true;
+    if (toggle.checked) {
+      if (!window.DagboPWA) {
+        toggle.checked = false;
+        toggle.disabled = false;
+        alert("Notification module is not ready. Refresh and try again.");
+        return;
+      }
+      window.DagboPWA.enableNotifications().then(function(res) {
+        state.notify = true;
+        save();
+        alert("Push notifications enabled on this device.");
+      }).catch(function(err) {
+        state.notify = false;
+        toggle.checked = false;
+        save();
+        alert(err.message || "Could not enable notifications.");
+      }).finally(function() { toggle.disabled = false; });
     } else {
-      alert("Notification module not loaded yet.");
-      e.target.checked = false;
+      if (!window.DagboPWA) {
+        toggle.disabled = false;
+        return;
+      }
+      window.DagboPWA.disableNotifications().then(function() {
+        state.notify = false;
+        save();
+      }).catch(function(err) {
+        toggle.checked = true;
+        alert(err.message || "Could not disable notifications.");
+      }).finally(function() { toggle.disabled = false; });
     }
   });
 
   document.getElementById('btnTestPush').addEventListener('click', function() {
     var btn = this;
-    var secret = "dagbo-secret-123"; // Matches your Vercel Environment Variable
-    btn.textContent = 'Sending...';
-    
-    fetch('/api/push?action=send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + secret },
-      body: JSON.stringify({ pair: 'TEST', signal: 'STRONG BUY' })
-    }).then(res => res.json()).then(data => {
-      btn.textContent = 'Send Test';
-      if (data.success) { alert('Test sent! Check your lock screen.'); } 
-      else { alert('Error: ' + (data.error || 'Unknown')); }
-    }).catch(err => {
-      btn.textContent = 'Send Test';
-      alert('Network error: ' + err.message);
+    if (!window.DagboPWA || !state.notify) {
+      alert("Enable push notifications first.");
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+    window.DagboPWA.sendTest().then(function() {
+      alert("Test notification sent. Check your notification shade.");
+    }).catch(function(err) {
+      alert(err.message || "Test notification failed.");
+    }).finally(function() {
+      btn.disabled = false;
+      btn.textContent = "Send Test";
     });
   });
 
