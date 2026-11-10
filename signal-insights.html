@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080d15"><title>Opportunity & Trend Intelligence · DAGBO SIGNAL</title>
+<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="dagbo.css">
+<style>
+body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 14px 40px}
+.intel-card{background:#111c2b;border:1px solid #293b52;border-radius:17px;padding:16px;margin:14px 0}
+.intel-muted{color:#9eafc5;font-size:13px;line-height:1.5}.intel-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-top:1px solid #293b52}
+.intel-pill{font-size:12px;font-weight:850;border-radius:99px;padding:7px 10px;background:#1b3b31;color:#70e2ad}.intel-pill.sell{background:#42252c;color:#ff9ba5}
+.intel-trigger{position:fixed!important;top:calc(7px + env(safe-area-inset-top,0px));right:8px;z-index:120;width:34px;height:34px;border:1px solid rgba(150,170,200,.3);border-radius:10px;background:rgba(15,25,40,.96);color:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;padding:0}
+.intel-trigger span{width:15px;height:1.8px;background:#fff;border-radius:2px}
+.intel-backdrop{position:fixed;inset:0;background:#0008;z-index:121;opacity:0;visibility:hidden}
+.intel-panel{position:fixed;top:0;right:0;bottom:0;z-index:122;width:min(310px,86vw);padding:calc(22px + env(safe-area-inset-top,0px)) 18px 24px;background:#0d1725;transform:translateX(105%);transition:transform .25s;overflow:auto}
+.intel-open .intel-backdrop{opacity:1;visibility:visible}.intel-open .intel-panel{transform:translateX(0)}
+.intel-panel a{display:block;padding:13px;margin:7px 0;border:1px solid #293b52;border-radius:12px;background:#111e2e;color:#eef4ff;text-decoration:none;font-weight:750}
+</style>
+</head>
+<body>
+<main class="intel-page">
+ <div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">SIGNAL INTELLIGENCE</div></div>
+ <h1 class="dg-title">Opportunity & Trend Intelligence</h1>
+ <p class="dg-subtitle">Confluence ranking and 5m / 15m direction alignment, based on the latest scans saved on this device.</p>
+ <section class="intel-card">
+  <div class="dg-card__head"><h2 class="dg-card__title">Best Opportunity Finder</h2><span id="bestTf" class="dg-pill">Waiting</span></div>
+  <p class="intel-muted">Ranks the top three pairs where at least two of the three signal systems agree. This is a rule-confluence score, not a probability of profit.</p>
+  <div id="bestList" class="intel-muted">No saved scan yet. Return to Signals and wait for the scan to finish.</div>
+ </section>
+ <section class="intel-card">
+  <div class="dg-card__head"><h2 class="dg-card__title">Trend Agreement Monitor</h2><span class="dg-pill">5m / 15m</span></div>
+  <p class="intel-muted">Compares the latest saved 5-minute and 15-minute signal directions. Both scans must have run on this device. 1H / 4H confirmation is not connected.</p>
+  <div id="trendList" class="intel-muted">No saved timeframe comparison yet.</div>
+ </section>
+ <p class="intel-muted">These tools read the existing DAGBO signal engine. They do not create a trade or guarantee a winning result. Refresh the Signals page to update the source scan.</p>
+ <button id="refreshIntel" class="dg-btn dg-btn--primary dg-btn--block">Refresh saved results</button>
+ <a class="dg-row dg-row--link" href="signals.html" style="margin-top:12px"><span class="dg-row__body"><span class="dg-row__title">← Back to Signals</span></span></a>
+</main>
+<button class="intel-trigger" id="menuOpen" aria-label="Open page menu"><span></span><span></span><span></span></button>
+<div class="intel-backdrop" id="menuBackdrop"></div>
+<aside class="intel-panel" id="menuPanel"><h2>DAGBO SIGNAL <button id="menuClose" style="float:right">×</button></h2>
+<a href="index.html">Home</a><a href="signals.html">Signals</a><a href="chart.html">Chart</a><a href="news.html">Market News</a><a href="boss1.html">BOSS1</a><a href="ai.html">AI Commander</a><a href="journal.html">Journal</a><a href="trader-score.html">Trader Score</a><a href="strategy-lab.html">Strategy Lab</a></aside>
+<script>
+(function(){
+ function read(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch(e){return fallback}}
+ function render(){
+  var saved=read('dagbo_best_opportunities',null),best=document.getElementById('bestList');
+  best.textContent='';
+  if(saved&&Array.isArray(saved.items)){
+   document.getElementById('bestTf').textContent=saved.timeframe+'m scan';
+   if(!saved.items.length){best.textContent='No setup currently meets the 2-of-3 confluence rule. Wait for confirmation.'}
+   saved.items.forEach(function(item,index){
+    var row=document.createElement('div');row.className='intel-row';
+    var left=document.createElement('div');var name=document.createElement('strong');name.textContent=(index+1)+'. '+item.pair;
+    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent=item.score+'/3 systems agree';
+    left.appendChild(name);left.appendChild(detail);
+    var pill=document.createElement('span');pill.className='intel-pill'+(item.direction==='SELL'?' sell':'');pill.textContent=item.signal;
+    row.appendChild(left);row.appendChild(pill);best.appendChild(row);
+   });
+  }else{best.textContent='No saved scan yet. Return to Signals and wait for the scan to finish.'}
+  var snaps=read('dagbo_signal_tf_snapshots',{}),five=snaps['5']||{},fifteen=snaps['15']||{},pairs=Array.from(new Set(Object.keys(five).concat(Object.keys(fifteen)))),trend=document.getElementById('trendList');
+  trend.textContent='';
+  if(!pairs.length){trend.textContent='No saved timeframe comparison yet. Run both 5m and 15m scans on the Signals page.';return;}
+  pairs.forEach(function(pair){
+   var a=String(five[pair]||'').indexOf('BUY')>=0?'BUY':String(five[pair]||'').indexOf('SELL')>=0?'SELL':'WAIT';
+   var b=String(fifteen[pair]||'').indexOf('BUY')>=0?'BUY':String(fifteen[pair]||'').indexOf('SELL')>=0?'SELL':'WAIT';
+   var status=a===b&&a!=='WAIT'?'ALIGNED':a==='WAIT'||b==='WAIT'?'INCOMPLETE':'CONFLICT';
+   var row=document.createElement('div');row.className='intel-row';
+   var name=document.createElement('strong');name.textContent=pair;
+   var value=document.createElement('span');value.className='intel-muted';value.textContent='5m '+a+' · 15m '+b+' · '+status;
+   row.appendChild(name);row.appendChild(value);trend.appendChild(row);
+  });
+ }
+ document.getElementById('refreshIntel').addEventListener('click',render);render();
+ var open=document.getElementById('menuOpen'),close=document.getElementById('menuClose'),back=document.getElementById('menuBackdrop');
+ function setOpen(v){document.body.classList.toggle('intel-open',v)}
+ open.addEventListener('click',function(){setOpen(true)});close.addEventListener('click',function(){setOpen(false)});back.addEventListener('click',function(){setOpen(false)});
+})();
+</script>
+</body></html>
