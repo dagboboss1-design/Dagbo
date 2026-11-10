@@ -298,11 +298,12 @@ module.exports = async function handler(req, res) {
             (previous.signal.includes("BUY") !== analysis.signal.includes("BUY") ? "🔄 SIGNAL DIRECTION CHANGED" : "📈 SIGNAL STRENGTH CHANGED");
           const body = pair + " · " + analysis.signal + " · Entry " + analysis.entry.toFixed(5) +
             " · SL " + analysis.stopLoss.toFixed(5) + " · TP " + analysis.takeProfit.toFixed(5) +
-            " · 15m scan. Confirm on your chart before acting.";
+            " · " + analysis.buyScore + " BUY / " + analysis.sellScore + " SELL votes. Sources: " +
+            analysis.evidence.slice(0, 3).join("; ") + ". Confirm on chart.";
           await broadcast(title, body, "signal-" + pair);
         }
       } else if (previous && previous.signal !== "NO TRADE") {
-        await broadcast("ℹ️ SIGNAL NO LONGER ACTIVE", pair + " no longer meets the 2-of-3 confluence rule. Review any pending setup.", "signal-ended-" + pair);
+        await broadcast("ℹ️ SIGNAL NO LONGER ACTIVE", pair + " no longer meets the multi-method confirmation rule. Review any pending setup.", "signal-ended-" + pair);
       }
       await redis.set(stateKey, JSON.stringify({ signal: analysis.signal, candleTime: analysis.candleTime, scannedAt: new Date().toISOString() }), { ex: 60 * 60 * 24 * 7 });
     }
