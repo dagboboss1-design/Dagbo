@@ -12,85 +12,63 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY
 );
 
-// --- THE MATH ENGINES ---
-function calculateRSI(closes, period) {
-  if (closes.length <= period) return 50;
-  let gains = 0, losses = 0;
-  for (let i = 1; i <= period; i++) {
-    let diff = closes[i] - closes[i-1];
-    if (diff >= 0) gains += diff; else losses -= diff;
+// --- HELPERS ---
+function firstFriday(year, mIdx){
+  var d = new Date(year, mIdx, 1);
+  var offset = (5 - d.getDay() + 7) % 7;
+  return new Date(year, mIdx, 1 + offset, 13, 30, 0); // 13:30 WAT
+}
+
+function getHighNewsEvents() {
+  var now = new Date();
+  var year = now.getFullYear();
+  var month = now.getMonth();
+  var events = [];
+
+  // Look ahead 3 months
+  for (var i = 0; i < 3; i++) {
+    // NFP (First Friday)
+    var nfp = firstFriday(year, month);
+    events.push({ name: 'NFP', date: nfp });
+
+    // CPI (12th of month)
+    var cpi = new Date(year, month, 12, 13, 30, 0);
+    events.push({ name: 'CPI', date: cpi });
+
+    // FOMC (18th of Jan, Mar, May, Jul, Sep, Nov)
+    if ([0,2,4,6,8,10].includes(month)) {
+      var fomc = new Date(year, month, 18, 19, 0, 0);
+      events.push({ name: 'FOMC', date: fomc });
+    }
+    
+    month++;
+    if (month > 11) { month = 0; year++; }
   }
-  let avgGain = gains / period, avgLoss = losses / period;
-  if (avgLoss === 0) return 100;
-  let rs = avgGain / avgLoss;
-  return 100 - (100 / (1 + rs));
+  return events;
 }
 
-function calculateEMA(closes, period) {
-  if (closes.length < period) return closes[closes.length-1];
-  let k = 2 / (period + 1);
-  let ema = closes[0];
-  for (let i = 1; i < closes.length; i++) {
-    ema = closes[i] * k + ema * (1 - k);
+async function sendPush(title, body, tag) {
+  const payload = JSON.stringify({ title, body, url: "/boss1.html", tag });
+  const ids = await redis.smembers("dagbo:push:subscriptions");
+  for (const id of ids) {
+    const stored = await redis.get(`dagbo:push:sub:${id}`);
+    if (stored) {
+      const sub = typeof stored === "string" ? JSON.parse(stored) : stored;
+      try {
+        await webpush.sendNotification(sub, payload);
+      } catch (err) {
+        if ([404, 410].includes(err.statusCode)) {
+          await redis.del(`dagbo:push:sub:${id}`);
+          await redis.srem("dagbo:push:subscriptions", id);
+        }
+      }
+    }
   }
-  return ema;
 }
 
-function getSystem1(candles) {
-  let closes = candles.map(c => parseFloat(c.close));
-  let lastClose = closes[closes.length-1];
-  let rsi = calculateRSI(closes, 14);
-  let ema20 = calculateEMA(closes, 20);
-  let ema50 = calculateEMA(closes, 50);
-  let score = 0;
-  if (rsi < 35) score++; 
-  if (rsi > 65) score--;
-  if (lastClose > ema20 && ema20 > ema50) score++;
-  if (lastClose < ema20 && ema20 < ema50) score--;
-  return score >= 1 ? 'BUY' : (score <= -1 ? 'SELL' : 'WAIT');
-}
-
-function getSystem2(candles) {
-  let last = candles[candles.length-1];
-  let prev = candles[candles.length-2];
-  let o = parseFloat(last.open), c = parseFloat(last.close), h = parseFloat(last.high), l = parseFloat(last.low);
-  let po = parseFloat(prev.open), pc = parseFloat(prev.close);
-  let score = 0;
-  let body = Math.abs(c - o);
-  let lowerWick = Math.min(o, c) - l;
-  let upperWick = h - Math.max(o, c);
-  if (lowerWick > body * 2) score++;
-  if (upperWick > body * 2) score--;
-  if (c > o && pc < po && c > po && o < pc) score++;
-  if (c < o && pc > po && c < po && o > pc) score--;
-  return score >= 1 ? 'BUY' : (score <= -1 ? 'SELL' : 'WAIT');
-}
-
-function getSystem3(candles) {
-  let last = candles[candles.length-1];
-  let lastClose = parseFloat(last.close);
-  let highs = candles.slice(-20).map(c => parseFloat(c.high));
-  let lows = candles.slice(-20).map(c => parseFloat(c.low));
-  let recentHigh = Math.max(...highs);
-  let recentLow = Math.min(...lows);
-  if (lastClose < recentLow + (recentHigh - recentLow) * 0.2) return 'BUY';
-  if (lastClose > recentHigh - (recentHigh - recentLow) * 0.2) return 'SELL';
-  return 'WAIT';
-}
-
-function getFinalSignal(s1, s2, s3) {
-  let dirs = [s1, s2, s3];
-  if (dirs.includes('WAIT')) return 'NO TRADE';
-  let buys = dirs.filter(d => d === 'BUY').length;
-  if (buys === 3) return 'STRONG BUY';
-  if (buys === 2) return 'WEAK BUY';
-  if (buys === 1) return 'WEAK SELL';
-  return 'STRONG SELL';
-}
-
-// --- MAIN ROBOT FUNCTION ---
+// --- MAIN CRON ROBOT ---
 module.exports = async function handler(req, res) {
-  // 1. Check secret so only you can run this
+  // 1. SECURITY CHECK
   const supplied = req.headers.authorization || "";
   const expected = `Bearer ${process.env.SIGNAL_PUSH_SECRET || ""}`;
   if (!process.env.SIGNAL_PUSH_SECRET || supplied !== expected) {
@@ -98,60 +76,83 @@ module.exports = async function handler(req, res) {
   }
 
   const API_KEY = process.env.TWELVE_DATA_API_KEY;
-  if (!API_KEY) return res.status(500).json({ error: "No Twelve Data Key in Vercel" });
+  const now = new Date();
+  const events = getHighNewsEvents();
+  
+  // Find the closest UPCOMING event
+  let nextEvent = null;
+  let minDiff = Infinity;
+  
+  events.forEach(e => {
+    let diff = e.date - now; // milliseconds
+    if (diff > -300000 && diff < minDiff) { // Allow -5 mins for post-news
+      minDiff = diff;
+      nextEvent = e;
+    }
+  });
 
-  // Pairs to check (You can add more, but be careful of Twelve Data 800/day limit)
-  // 4 pairs x 96 times a day = 384 requests. Safe!
-  const pairsToCheck = ['XAU/USD', 'EUR/USD', 'GBP/USD', 'BTC/USD'];
-  let signalsFound = [];
+  if (!nextEvent) return res.status(200).json({ message: "No upcoming news" });
 
-  for (let pair of pairsToCheck) {
-    try {
-      let url = `https://api.twelvedata.com/time_series?symbol=${pair}&interval=15min&outputsize=60&apikey=${API_KEY}`;
-      let response = await fetch(url);
-      let data = await response.json();
+  const minsToNews = minDiff / 60000; // Convert ms to minutes
+  let actionTaken = "None";
 
-      if (data.values && data.values.length > 20) {
-        let candles = data.values.reverse();
-        let s1 = getSystem1(candles);
-        let s2 = getSystem2(candles);
-        let s3 = getSystem3(candles);
-        let final = getFinalSignal(s1, s2, s3);
-
-        // Only notify for STRONG signals
-        if (final === 'STRONG BUY' || final === 'STRONG SELL') {
-          signalsFound.push({ pair, final });
-        }
-      }
-    } catch (e) { console.error("Fetch error:", e); }
+  // --- TRIGGER 1: NEWS ALERT (30 Mins Before) ---
+  if (minsToNews > 29 && minsToNews <= 31) {
+    await sendPush("⚠️ NEWS ALERT", `${nextEvent.name} drops in 30 minutes! Close all trades.`, "dagbo-news-alert");
+    actionTaken = "Sent 30m News Alert";
   }
 
-  // Send the push notifications
-  if (signalsFound.length > 0) {
-    const payloadBase = {
-      title: `DAGBO SIGNAL ALERT`,
-      body: signalsFound.map(s => `${s.pair}: ${s.final}`).join(" | "),
-      url: "/signals.html",
-      tag: "dagbo-alert"
-    };
+  // --- TRIGGER 2: PRE-NEWS BIAS (15 Mins Before) ---
+  else if (minsToNews > 14 && minsToNews <= 16) {
+    if (!API_KEY) return res.status(500).json({ error: "No Twelve Data Key" });
+    
+    // Fetch EUR/USD (DXY proxy) and Gold
+    let resEur = await fetch(`https://api.twelvedata.com/quote?symbol=EUR/USD&apikey=${API_KEY}`).then(r=>r.json());
+    let resGold = await fetch(`https://api.twelvedata.com/quote?symbol=XAU/USD&apikey=${API_KEY}`).then(r=>r.json());
 
-    // Get all subscribed phones from Redis
-    const ids = await redis.smembers("dagbo:push:subscriptions");
-    for (const id of ids) {
-      const stored = await redis.get(`dagbo:push:sub:${id}`);
-      if (stored) {
-        const sub = typeof stored === "string" ? JSON.parse(stored) : stored;
-        try {
-          await webpush.sendNotification(sub, JSON.stringify(payloadBase));
-        } catch (err) {
-          if ([404, 410].includes(err.statusCode)) {
-            await redis.del(`dagbo:push:sub:${id}`);
-            await redis.srem("dagbo:push:subscriptions", id);
-          }
-        }
+    if (resEur.close && resGold.close) {
+      let dxyChange = ((parseFloat(resEur.close) - parseFloat(resEur.open)) / parseFloat(resEur.open)) * 100;
+      let goldChange = ((parseFloat(resGold.close) - parseFloat(resGold.open)) / parseFloat(resGold.open)) * 100;
+      
+      // Calculate bias score (Base 50, DXY down = Gold Up)
+      let score = Math.round(50 + (dxyChange * -10) + (goldChange * 5));
+      if (score > 70) score = 70;
+      if (score < 30) score = 30;
+
+      let biasText = score >= 58 ? `BUY GOLD (${score}%)` : (score <= 42 ? `SELL GOLD (${score}%)` : `WAIT (${score}%)`);
+      
+      await sendPush("🎯 PRE-NEWS BIAS", `${nextEvent.name} in 15 mins. Bias: ${biasText}`, "dagbo-bias");
+      actionTaken = "Sent Pre-News Bias";
+    }
+  }
+
+  // --- TRIGGER 3: SPIKE SIGNAL (1 Min AFTER News) ---
+  else if (minsToNews < -0.5 && minsToNews > -3) { // 30 secs to 3 mins after
+    if (!API_KEY) return res.status(500).json({ error: "No Twelve Data Key" });
+    
+    // Fetch 1-min Gold candle
+    let resGold = await fetch(`https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1min&outputsize=2&apikey=${API_KEY}`).then(r=>r.json());
+    
+    if (resGold.values && resGold.values.length > 0) {
+      let candle = resGold.values[0]; // Latest 1m candle
+      let open = parseFloat(candle.open);
+      let close = parseFloat(candle.close);
+      let changePct = ((close - open) / open) * 100;
+
+      if (changePct >= 0.30) {
+        await sendPush("🚀 SPIKE DETECTED", `GOLD jumped +${changePct.toFixed(2)}%! STRONG BUY SPIKE.`, "dagbo-spike");
+        actionTaken = "Sent BUY Spike";
+      } else if (changePct <= -0.30) {
+        await sendPush("🔻 SPIKE DETECTED", `GOLD dropped ${changePct.toFixed(2)}%! STRONG SELL SPIKE.`, "dagbo-spike");
+        actionTaken = "Sent SELL Spike";
       }
     }
   }
 
-  return res.status(200).json({ success: true, checked: pairsToCheck.length, signals: signalsFound });
+  return res.status(200).json({ 
+    success: true, 
+    nextEvent: nextEvent.name, 
+    timeToNews: minsToNews.toFixed(1) + " mins", 
+    action: actionTaken 
+  });
 };
