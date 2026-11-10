@@ -12,9 +12,9 @@
   /* THE FIX: Force the container height and position */
   #tv-chart-container {
     width: 100%;
-    height: 75vh;
-    min-height: 560px;
-    max-height: 900px;
+    height: 88vh;
+    min-height: 640px;
+    max-height: 1100px;
     border-radius: 16px;
     overflow: hidden;
     background: #000;
@@ -44,10 +44,15 @@
     text-align: center; margin-bottom: 12px;
   }
   #tv-chart-container{position:relative;touch-action:pan-y;overflow:hidden}
-  #chartOverlayTools{position:absolute;z-index:12;top:10px;left:10px;max-width:calc(100% - 20px);display:flex;flex-wrap:wrap;gap:5px;padding:7px;background:rgba(9,17,29,.94);border:1px solid rgba(180,195,215,.25);border-radius:12px;box-shadow:0 5px 18px rgba(0,0,0,.3)}
-  #chartOverlayTools button{border:1px solid #34445a;background:#172538;color:#eef4ff;border-radius:8px;padding:7px 9px;font-size:11px;font-weight:750;min-height:32px}
-  #chartOverlayTools .tool-row{display:flex;gap:5px;flex-wrap:wrap;width:100%}
-  #drawingStatus{width:100%;font-size:10px;color:#aabbd0;margin:0;padding:0 2px}
+  #chartOverlayTools{position:absolute;z-index:12;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:6px;background:rgba(12,20,32,.94);border:1px solid rgba(180,195,215,.22);border-radius:13px;box-shadow:0 5px 18px rgba(0,0,0,.28);backdrop-filter:blur(12px)}
+  #chartOverlayTools .tool-label{font-size:9px;font-weight:900;letter-spacing:.7px;color:#91a5bd;padding:0 5px}
+  #chartOverlayTools button{border:1px solid rgba(130,155,184,.25);background:rgba(30,45,64,.82);color:#e9f0fa;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;min-height:34px;white-space:nowrap}
+  #chartOverlayTools button[data-tool="long"]{border-color:rgba(47,202,133,.5);color:#73e2ad}
+  #chartOverlayTools button[data-tool="short"]{border-color:rgba(240,91,104,.5);color:#ff9da6}
+  #chartOverlayTools button[data-tool="line"],#chartOverlayTools button[data-tool="rect"],#chartOverlayTools button[data-tool="triangle"],#chartOverlayTools button[data-tool="fib"],#chartOverlayTools button[data-tool="hline"]{background:rgba(22,36,53,.78)}
+  #chartOverlayTools button.is-active{background:#d9ad43!important;color:#101722!important;border-color:#f0cb69!important}
+  #chartOverlayTools #drawingStatus{flex:1 0 100%;font-size:10px;color:#aabbd0;margin:0;padding:1px 4px}
+  @media(max-width:420px){#chartOverlayTools{gap:4px;padding:5px}#chartOverlayTools button{padding:6px 8px;font-size:10px;min-height:31px}#chartOverlayTools .tool-label{display:none}}
   #dagboDrawingLayer{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none;touch-action:none}
   #tv-chart-container.drawing-active iframe{pointer-events:none}
   #tv-chart-container.drawing-active #dagboDrawingLayer{pointer-events:auto;cursor:crosshair}
@@ -163,8 +168,8 @@
 
     // Give TradingView the actual chart height
     var chartHeight = Math.max(
-      560,
-      Math.min(900, Math.floor(window.innerHeight * 0.75))
+      640,
+      Math.min(1100, Math.floor(window.innerHeight * 0.88))
     );
 
     container.style.height = chartHeight + 'px';
@@ -196,7 +201,7 @@
     container.appendChild(layer);
     var toolbar=document.createElement('div');
     toolbar.id='chartOverlayTools';
-    toolbar.innerHTML='<button type="button" data-tool="off">↖ Move</button><button type="button" data-tool="long">Long</button><button type="button" data-tool="short">Short</button><button type="button" data-tool="line">Trendline</button><button type="button" data-tool="rect">Rectangle</button><button type="button" data-tool="triangle">Triangle</button><button type="button" data-tool="fib">Fibonacci</button><button type="button" data-tool="hline">H-Line</button><button type="button" id="undoDrawing">Undo</button><button type="button" id="clearDrawings">Clear</button><span id="drawingStatus">Move chart is active</span>';
+    toolbar.innerHTML='<span class="tool-label">CHART TOOLS</span><button type="button" data-tool="off">↖ Move</button><button type="button" data-tool="long">↗ Long Position</button><button type="button" data-tool="short">↘ Short Position</button><button type="button" data-tool="line">╱ Trendline</button><button type="button" data-tool="rect">▭ Rectangle</button><button type="button" data-tool="triangle">△ Triangle</button><button type="button" data-tool="fib">Fibonacci</button><button type="button" data-tool="hline">— Horizontal</button><button type="button" id="undoDrawing">Undo</button><button type="button" id="clearDrawings">Clear</button><span id="drawingStatus">Choose a chart tool, then drag on the chart.</span>';
     container.appendChild(toolbar);
     initDrawingLayer(layer,container);
   }
