@@ -10,47 +10,46 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 
-<!-- THE NEW DESIGN SYSTEM -->
+<!-- Design System -->
 <link rel="stylesheet" href="dagbo.css">
 
 <style>
-  /* Specific styles for the Chart page */
+  /* Make the chart BIG */
   #tv-chart-container {
-  height: 700px;
-  width: 100%;
-  border-radius: var(--dg-r-card);
-  overflow: hidden;
-  box-shadow: var(--dg-shadow);
-  background: #000;
-  margin-bottom: 16px;
+    height: 650px; /* This is the size fix */
+    width: 100%;
+    border-radius: var(--dg-r-card);
+    overflow: hidden;
+    box-shadow: var(--dg-shadow);
+    background: #000;
+    margin-bottom: 16px;
   }
-  /* Make the pair dropdown look like an Apple picker */
+  
+  /* Apple-style dropdown */
   .chart-pair-select {
     appearance: none;
     -webkit-appearance: none;
     background: var(--dg-card);
-    border: none;
+    border: 1px solid var(--dg-line);
     color: var(--dg-text);
     font-size: 16px;
-    font-weight: 600;
-    padding: 10px 16px;
-    border-radius: var(--dg-r-pill);
+    font-weight: 700;
+    padding: 14px 16px;
+    border-radius: var(--dg-r-card);
     box-shadow: var(--dg-shadow);
     cursor: pointer;
     width: 100%;
     text-align: center;
+    margin-bottom: 12px;
   }
-  .chart-pair-select:focus {
-    outline: 2px solid var(--dg-blue);
-  }
+  .chart-pair-select:focus { outline: 2px solid var(--dg-blue); }
 </style>
 
 <script>
   (function(){
     try{
       var s = JSON.parse(localStorage.getItem('dagbo_settings')) || {};
-      var follow = s.followSystem !== false;
-      var dark = follow ? window.matchMedia('(prefers-color-scheme: dark)').matches : s.theme === 'dark';
+      var dark = s.theme === 'dark';
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     }catch(e){}
   })();
@@ -69,12 +68,10 @@
   <h1 class="dg-title">Live Chart</h1>
   <p class="dg-subtitle">Real price. Real zones. Check before you enter.</p>
 
-  <!-- Pair Selector (Styled like Apple) -->
-  <div style="margin-bottom:12px">
-    <select id="pairSelect" class="chart-pair-select" onchange="changePair(this.value)">
-      <!-- Options filled by JS -->
-    </select>
-  </div>
+  <!-- Pair Selector -->
+  <select id="pairSelect" class="chart-pair-select" onchange="changePair(this.value)">
+    <!-- Options filled by JS -->
+  </select>
 
   <!-- Timeframe Toggles -->
   <div class="dg-seg" role="radiogroup" aria-label="Timeframe" style="margin-bottom:16px" id="tfContainer">
@@ -89,16 +86,6 @@
   <div id="tv-chart-container">
     <div id="tradingview_widget"></div>
   </div>
-
-  <!-- Quick Actions -->
-  <div class="dg-btn-row" style="margin-top:20px">
-    <a href="ai.html" class="dg-btn dg-btn--tinted" style="text-decoration:none">Ask AI 🤖</a>
-    <a href="journal.html" class="dg-btn dg-btn--primary" style="text-decoration:none">Go to Journal 📓</a>
-  </div>
-
-  <p class="dg-note" style="margin-top:24px">
-    Price data is provided by TradingView.<br>DAGBO never connects to your broker.
-  </p>
 
 </main>
 
@@ -119,7 +106,7 @@
 (function(){
   'use strict';
 
-  // 1. Master list of pairs with correct TradingView symbols
+  // Master list of pairs
   var PAIRS = [
     { id: 'XAUUSD', label: 'GOLD (XAUUSD)', tv: 'CAPITALCOM:XAUUSD' },
     { id: 'EURUSD', label: 'EUR/USD', tv: 'FOREXCOM:EURUSD' },
@@ -142,19 +129,17 @@
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
   
-  // Get enabled pairs from settings, or show all if none
   var enabledIds = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : PAIRS.map(function(p){ return p.id; });
   
-  // Filter master list to only show enabled ones
   var activePairs = PAIRS.filter(function(p){
-    return enabledIds.indexOf(p.id) > -1 || enabledIds.indexOf('GOLD') > -1 && p.id === 'XAUUSD';
+    return enabledIds.indexOf(p.id) > -1 || (enabledIds.indexOf('GOLD') > -1 && p.id === 'XAUUSD');
   });
 
   var currentPair = 'CAPITALCOM:XAUUSD';
   var currentTF = '15';
   var widget = null;
 
-  // 2. Build the Dropdown Options
+  // Build Dropdown
   function buildDropdown() {
     var sel = document.getElementById('pairSelect');
     sel.innerHTML = '';
@@ -165,20 +150,17 @@
       sel.appendChild(opt);
     });
 
-    // Check URL for a specific pair (e.g. from Signals page)
+    // Check URL for a specific pair (from Signals page)
     var urlParams = new URLSearchParams(window.location.search);
     var urlPair = urlParams.get('pair');
     if (urlPair) {
-      // Find the TV symbol for this pair
       var matched = PAIRS.filter(function(p){ return p.id === urlPair || (urlPair === 'GOLD' && p.id === 'XAUUSD'); })[0];
       if (matched && activePairs.indexOf(matched) > -1) {
         currentPair = matched.tv;
         sel.value = currentPair;
-        // Clean URL so refresh doesn't re-force the pair
         window.history.replaceState({}, '', window.location.pathname);
       }
     } else {
-      // Default to first available
       if (activePairs.length > 0) {
         currentPair = activePairs[0].tv;
         sel.value = currentPair;
@@ -186,10 +168,10 @@
     }
   }
 
-  // 3. Load TradingView Widget
+  // Load TradingView Widget
   function loadChart() {
     var container = document.getElementById('tradingview_widget');
-    container.innerHTML = ''; // Clear existing
+    container.innerHTML = ''; 
 
     var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
@@ -205,37 +187,15 @@
       "hide_side_toolbar": true,
       "allow_symbol_change": false,
       "container_id": "tradingview_widget",
-      "studies": [
-        "RSI@tv-basicstudies"
-      ]
+      "studies": ["RSI@tv-basicstudies"]
     });
   }
 
-  // 4. Global functions for HTML onClick handlers
-  window.changePair = function(tvSymbol) {
-    currentPair = tvSymbol;
-    loadChart();
-  };
+  window.changePair = function(tvSymbol) { currentPair = tvSymbol; loadChart(); };
+  window.changeTF = function(tf) { currentTF = tf; loadChart(); };
 
-  window.changeTF = function(tf) {
-    currentTF = tf;
-    loadChart();
-  };
-
-  // 5. Initialize
   buildDropdown();
   loadChart();
-
-  // Listen for theme changes (if user changes settings while on this page)
-  var mq = window.matchMedia('(prefers-color-scheme: dark)');
-  mq.addEventListener('change', function() {
-    var follow = settings.followSystem !== false;
-    if (follow) {
-      var newDark = mq.matches;
-      document.documentElement.setAttribute('data-theme', newDark ? 'dark' : 'light');
-      loadChart();
-    }
-  });
 
 })();
 </script>
