@@ -9,52 +9,28 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
 <style>
-  /* MAKE PAGE FILL PHONE */
-  .dg-page { padding-bottom: 90px !important; }
-
-  /* BIG CHART - THIS IS THE FIX */
+  /* Force the container to have a set height */
   #tv-chart-container {
-    height: calc(100dvh - 290px); /* Full phone height minus top + bottom */
-    min-height: 580px;
-    height: calc(100vh - 290px); /* backup for old phone */
+    height: 65vh; /* Takes up 65% of your screen height */
+    min-height: 450px;
     width: 100%;
     border-radius: 16px;
     overflow: hidden;
     background: #000;
-    margin-bottom: 12px;
-    position: relative;
+    margin-bottom: 16px;
+    position: relative; /* THIS IS THE MAGIC FIX */
   }
+  
+  /* Force the iframe to fill the container exactly */
   #tv-chart-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100% !important;
     height: 100% !important;
-    min-height: 580px !important;
     border: none !important;
-    display: block;
   }
-  /* FULLSCREEN MODE */
-  body.chart-full #tv-chart-container {
-    position: fixed !important;
-    top: 0; left: 0; right: 0; bottom: 0;
-    width: 100vw !important;
-    height: 100dvh !important;
-    min-height: 100dvh !important;
-    z-index: 9999;
-    border-radius: 0;
-    margin: 0;
-  }
-  body.chart-full #tv-chart-container iframe { min-height: 100dvh !important; }
-  #btnFull {
-    position: absolute;
-    top: 10px; right: 10px;
-    z-index: 10;
-    background: rgba(0,0,0,0.7);
-    color: #fff;
-    border: 1px solid #333;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-  }
+  
   .chart-pair-select {
     appearance: none; -webkit-appearance: none;
     background: var(--dg-card);
@@ -96,12 +72,8 @@
     <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
   </div>
 
-  <!-- BIG CHART -->
-  <div id="tv-chart-container">
-    <button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button>
-  </div>
-
-  <button class="dg-btn" style="width:100%;min-height:44px;border-radius:12px;font-weight:700" onclick="toggleFull()">Make Chart Bigger ⛶</button>
+  <!-- Chart Box -->
+  <div id="tv-chart-container"></div>
 
 </main>
 
@@ -138,9 +110,11 @@
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
   var enabledIds = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : PAIRS.map(function(p){ return p.id; });
-  var activePairs = PAIRS.filter(function(p){ return enabledIds.indexOf(p.id) > -1; });
+  var activePairs = PAIRS.filter(function(p){ return enabledIds.indexOf(p.id) > -1 || (enabledIds.indexOf('GOLD') > -1 && p.id === 'XAUUSD'); });
+  
   var currentPair = 'CAPITALCOM:XAUUSD';
   var currentTF = '15';
+
   function buildDropdown() {
     var sel = document.getElementById('pairSelect');
     sel.innerHTML = '';
@@ -152,40 +126,35 @@
     var urlParams = new URLSearchParams(window.location.search);
     var urlPair = urlParams.get('pair');
     if (urlPair) {
-      var matched = PAIRS.filter(function(p){ return p.id === urlPair; })[0];
-      if (matched) { currentPair = matched.tv; sel.value = currentPair; }
+      var matched = PAIRS.filter(function(p){ return p.id === urlPair || (urlPair === 'GOLD' && p.id === 'XAUUSD'); })[0];
+      if (matched && activePairs.indexOf(matched) > -1) { currentPair = matched.tv; sel.value = currentPair; }
     } else {
       if (activePairs.length > 0) { currentPair = activePairs[0].tv; sel.value = currentPair; }
     }
   }
+
   function loadChart() {
     var container = document.getElementById('tv-chart-container');
-    var btn = document.getElementById('btnFull');
     container.innerHTML = '';
-    container.appendChild(btn);
     var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     var theme = isDark ? 'dark' : 'light';
+    
     var iframe = document.createElement('iframe');
     iframe.src = 'https://s.tradingview.com/widgetembed/?symbol=' + encodeURIComponent(currentPair) +
                  '&interval=' + currentTF + '&theme=' + theme +
                  '&style=1&locale=en&timezone=Africa%2FLagos' +
                  '&hidesidetoolbar=0&symboledit=0&saveimage=0&toolbarbg=rgba(0,0,0,0)' +
-                 '&studies=RSI%40tv-basicstudies' +
-                 '&width=100%25&height=100%25';
-    iframe.setAttribute('allowfullscreen', '');
+                 '&studies=RSI%40tv-basicstudies';
+    
     container.appendChild(iframe);
   }
+
   window.changePair = function(tvSymbol) { currentPair = tvSymbol; loadChart(); };
   window.changeTF = function(tf) { currentTF = tf; loadChart(); };
-  window.toggleFull = function() {
-    document.body.classList.toggle('chart-full');
-    var btn = document.getElementById('btnFull');
-    btn.textContent = document.body.classList.contains('chart-full') ? '✕ CLOSE' : '⛶ FULLSCREEN';
-    setTimeout(loadChart, 100);
-  };
+
   buildDropdown();
   loadChart();
 })();
 </script>
 </body>
-</html>
+  </html>
