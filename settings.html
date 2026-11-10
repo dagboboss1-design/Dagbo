@@ -14,8 +14,8 @@
   (function(){
     try{
       var s = JSON.parse(localStorage.getItem('dagbo_settings')) || {};
-      var follow = s.followSystem !== false;
-      var dark = follow ? window.matchMedia('(prefers-color-scheme: dark)').matches : s.theme === 'dark';
+      // Check if user manually set theme, otherwise use light
+      var dark = s.theme === 'dark';
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     }catch(e){}
   })();
@@ -80,20 +80,25 @@
       <button type="button" class="dg-btn" id="btnTestPush" style="min-height:32px;padding:0 12px;font-size:13px;background:var(--dg-blue);color:#fff;border-radius:20px">Send Test</button>
     </div>
 
+    <!-- DARK MODE -->
     <div class="dg-row">
       <span class="dg-row__icon dg-row__icon--grey">☾</span>
       <span class="dg-row__body">
         <span class="dg-row__title">Dark Mode</span>
-        <span class="dg-row__sub">Keep the app in dark theme</span>
+        <span class="dg-row__sub">Dark theme for night trading</span>
       </span>
-      <label class="dg-switch"><input type="checkbox" id="tgFollow" checked><span class="dg-switch__track"></span></label>
+      <label class="dg-switch"><input type="checkbox" id="tgDark"><span class="dg-switch__track"></span></label>
     </div>
 
-    <div class="dg-row dg-row--link" onclick="alert('Pidgin & English supported.')">
+    <!-- LANGUAGE -->
+    <label class="dg-row" style="cursor:default">
       <span class="dg-row__icon dg-row__icon--grey">🌐</span>
       <span class="dg-row__body"><span class="dg-row__title">Language</span></span>
-      <span class="dg-row__value">English</span>
-    </div>
+      <select id="selLang" class="dg-input" style="width:auto;min-height:36px;padding:4px 28px 4px 12px;font-size:15px;font-weight:600;background:var(--dg-fill);border:none;appearance:none;text-align:right">
+        <option value="en">English</option>
+        <option value="pidgin">Pidgin</option>
+      </select>
+    </label>
   </div>
 
   <!-- TRADING SETTINGS -->
@@ -180,7 +185,9 @@
     if (state.risk === undefined) state.risk = 1;
     if (state.accountSize === undefined) state.accountSize = 100;
     if (state.defaultPair === undefined) state.defaultPair = 'XAUUSD';
-    if (state.followSystem === undefined) state.followSystem = true;
+    if (state.language === undefined) state.language = 'en';
+    if (state.theme === undefined) state.theme = 'light';
+    if (state.notify === undefined) state.notify = true;
   }
 
   function save() {
@@ -202,10 +209,10 @@
     document.getElementById('inGroqKey').value = state.groqKey || '';
     document.getElementById('selRisk').value = state.risk;
     document.getElementById('tgNotify').checked = state.notify !== false;
-    document.getElementById('tgFollow').checked = state.followSystem !== false;
+    document.getElementById('tgDark').checked = state.theme === 'dark';
+    document.getElementById('selLang').value = state.language || 'en';
     document.getElementById('tgSound').checked = state.sound === true;
     
-    // Show test button only if notify is ON
     document.getElementById('testPushRow').style.display = (state.notify !== false) ? 'flex' : 'none';
 
     var selPair = document.getElementById('selPair');
@@ -242,8 +249,19 @@
   document.getElementById('inGroqKey').addEventListener('input', function(e){ state.groqKey = e.target.value; save(); });
   document.getElementById('selRisk').addEventListener('change', function(e){ state.risk = parseFloat(e.target.value); save(); });
   document.getElementById('selPair').addEventListener('change', function(e){ state.defaultPair = e.target.value; save(); });
-  document.getElementById('tgFollow').addEventListener('change', function(e){ state.followSystem = e.target.checked; save(); var isDark = state.followSystem ? window.matchMedia('(prefers-color-scheme: dark)').matches : state.theme === 'dark'; document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light'); });
   document.getElementById('tgSound').addEventListener('change', function(e){ state.sound = e.target.checked; save(); });
+
+  document.getElementById('tgDark').addEventListener('change', function(e){
+    state.theme = e.target.checked ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', state.theme);
+    save();
+  });
+
+  document.getElementById('selLang').addEventListener('change', function(e){
+    state.language = e.target.value;
+    save();
+    alert('Language set to: ' + (state.language === 'pidgin' ? 'Pidgin' : 'English'));
+  });
   
   document.getElementById('tgNotify').addEventListener('click', function(e){
     if (window.DagboPWA && window.DagboPWA.enableNotifications) {
@@ -263,10 +281,9 @@
     }
   });
 
-  // THE TEST PUSH BUTTON LOGIC
   document.getElementById('btnTestPush').addEventListener('click', function() {
     var btn = this;
-    var secret = "dagbo-secret-123"; // Must match Vercel Environment Variable
+    var secret = "dagbo-secret-123"; // Matches your Vercel Environment Variable
     btn.textContent = 'Sending...';
     
     fetch('/api/push?action=send', {
@@ -294,4 +311,4 @@
 })();
 </script>
 </body>
-          </html>
+    </html>
