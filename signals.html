@@ -489,6 +489,8 @@
 
     journal.push(trade);
     localStorage.setItem('dagbo_journal', JSON.stringify(journal));
+    // Open this exact saved signal trade in the Journal form so Entry/SL/TP are prefilled.
+    try { sessionStorage.setItem('dagbo_open_journal_trade', trade.id); } catch(e) {}
     window.location.href = 'journal.html';
   };
 
