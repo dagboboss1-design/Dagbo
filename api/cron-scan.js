@@ -183,9 +183,9 @@ async function monitorTrades(marketData) {
       if (hitSL && hitTP) {
         const flag = "both-hit:" + market.candleTime;
         if (trade.lastWarning !== flag) {
+          await sendToDevice(deviceId, "⚠️ TRADE REVIEW NEEDED", trade.pair + ": TP and SL both fell inside the same 15m candle. Order is unknown; check your broker/chart manually.", "trade-review-" + tradeId, "/journal.html");
           trade.lastWarning = flag;
           await redis.set(key, JSON.stringify(trade));
-          await sendToDevice(deviceId, "⚠️ TRADE REVIEW NEEDED", trade.pair + ": TP and SL both fell inside the same 15m candle. Order is unknown; check your broker/chart manually.", "trade-review-" + tradeId, "/journal.html");
           warnings++;
         }
         continue;
@@ -196,10 +196,10 @@ async function monitorTrades(marketData) {
         trade.exit = hitTP ? tp : sl;
         trade.closeReason = hitTP ? "TAKE_PROFIT" : "STOP_LOSS";
         trade.dateClosed = new Date().toISOString();
-        await redis.set(key, JSON.stringify(trade));
         await sendToDevice(deviceId, hitTP ? "🎯 TAKE PROFIT HIT" : "🛑 STOP LOSS HIT",
           trade.pair + " " + trade.direction + " reached " + (hitTP ? "Take Profit" : "Stop Loss") + " at " + trade.exit + ". Review and update your journal.",
           "trade-close-" + tradeId, "/journal.html");
+        await redis.set(key, JSON.stringify(trade));
         closed++;
         continue;
       }
@@ -210,19 +210,19 @@ async function monitorTrades(marketData) {
         const adverseRemaining = buy ? current - sl : sl - current;
         const targetRemaining = buy ? tp - current : current - tp;
         if (adverseRemaining > 0 && adverseRemaining / riskDistance <= 0.20 && !trade.nearSlAlerted) {
-          trade.nearSlAlerted = true;
-          await redis.set(key, JSON.stringify(trade));
           await sendToDevice(deviceId, "⚠️ PRICE NEAR STOP LOSS",
             trade.pair + " is within about 20% of the remaining distance to your Stop Loss. Review risk and your broker position.",
             "trade-near-sl-" + tradeId, "/journal.html");
+          trade.nearSlAlerted = true;
+          await redis.set(key, JSON.stringify(trade));
           warnings++;
         }
         if (targetRemaining > 0 && targetRemaining / rewardDistance <= 0.20 && !trade.nearTpAlerted) {
-          trade.nearTpAlerted = true;
-          await redis.set(key, JSON.stringify(trade));
           await sendToDevice(deviceId, "🎯 PRICE NEAR TAKE PROFIT",
             trade.pair + " is within about 20% of your Take Profit distance. Consider your trade-management plan.",
             "trade-near-tp-" + tradeId, "/journal.html");
+          trade.nearTpAlerted = true;
+          await redis.set(key, JSON.stringify(trade));
           warnings++;
         }
       }
@@ -231,11 +231,11 @@ async function monitorTrades(marketData) {
       if (opposite) {
         const flag = "opposite:" + market.signal;
         if (trade.lastWarning !== flag) {
-          trade.lastWarning = flag;
-          await redis.set(key, JSON.stringify(trade));
           await sendToDevice(deviceId, "⚠️ TRADE DIRECTION WARNING",
             market.signal + " signal appeared for " + trade.pair + " while your " + trade.direction + " trade is open. Review your risk; this does not close the trade.",
             "trade-opposite-" + tradeId, "/journal.html");
+          trade.lastWarning = flag;
+          await redis.set(key, JSON.stringify(trade));
           warnings++;
         }
       }
