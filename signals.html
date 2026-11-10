@@ -94,9 +94,6 @@
 (function(){
   'use strict';
 
-  // ⚠️ PASTE YOUR TWELVE DATA API KEY HERE
-  var API_KEY = 'e431976286b044d09bbac60d4d640c57';
-
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
   var enabledPairs = Array.isArray(settings.pairs) ? settings.pairs : ['XAUUSD', 'EURUSD', 'GBPUSD', 'US30', 'BTCUSD'];
@@ -200,8 +197,7 @@
 
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
-    let apiSym = API_SYMBOLS[pair] || 'XAU/USD';
-    let url = `https://api.twelvedata.com/time_series?symbol=${apiSym}&interval=${tf}min&outputsize=60&apikey=${API_KEY}`;
+    let url = `/api/market-data?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}`;
     
     try {
       let res = await fetch(url);
