@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F5F7"><title>Smart Alert Centre · DAGBO SIGNAL</title>
+<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="dagbo.css">
+<script>(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};var dark=s.theme==='dark';document.documentElement.setAttribute('data-theme',dark?'dark':'light')}catch(e){}})();</script>
+</head>
+<body>
+<main class="dg-page">
+<div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">SIGNALS</div></div>
+<h1 class="dg-title">Smart Alert Centre</h1>
+<p class="dg-subtitle">A record of signal changes detected on this device.</p>
+<section class="dg-card">
+<div class="dg-card__head"><h2 class="dg-card__title">Signal activity</h2><span class="dg-pill dg-pill--open" id="alertCount">0 alerts</span></div>
+<p class="dg-muted" style="font-size:13px">This feed records signal changes when you refresh the Signals page. Server push notifications are delivered separately and are not yet stored in this feed.</p>
+<div id="alertList" style="margin-top:14px"></div>
+</section>
+<a class="dg-btn dg-btn--primary dg-btn--block" href="signals.html">Back to Signals</a>
+<p class="dg-note">Alerts are informational. Confirm market conditions on your chart and with your broker before acting.</p>
+</main>
+<nav class="dg-tabbar" aria-label="Main">
+<a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a><a class="dg-tab" aria-current="page" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a><a class="dg-tab" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a><a class="dg-tab" href="news.html"><span class="dg-tab__icon">📰</span>News</a><a class="dg-tab" href="boss1.html"><span class="dg-tab__icon">👑</span>BOSS1</a><a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
+</nav>
+<script>
+(function(){
+var list=document.getElementById('alertList'),items=[];
+try{items=JSON.parse(localStorage.getItem('dagbo_alert_history'))||[]}catch(e){}
+if(!Array.isArray(items))items=[];
+document.getElementById('alertCount').textContent=items.length+' alerts';
+if(!items.length){var empty=document.createElement('div');empty.className='dg-muted';empty.style.cssText='text-align:center;padding:28px 8px';empty.textContent='No signal changes recorded yet. Open Signals and refresh a market scan to start building your activity history.';list.appendChild(empty);return;}
+items.slice().reverse().forEach(function(item){
+var card=document.createElement('div');card.style.cssText='padding:14px 0;border-top:1px solid var(--dg-line)';
+var head=document.createElement('div');head.style.cssText='display:flex;justify-content:space-between;gap:8px;align-items:center';
+var pair=document.createElement('strong');pair.textContent=item.pair||'Market';
+var pill=document.createElement('span');pill.className='dg-pill '+(String(item.current).includes('BUY')?'dg-pill--buy':String(item.current).includes('SELL')?'dg-pill--sell':'dg-pill--wait');pill.textContent=item.current||'WAIT';
+head.appendChild(pair);head.appendChild(pill);
+var detail=document.createElement('div');detail.className='dg-muted';detail.style.cssText='font-size:13px;margin-top:5px';detail.textContent=(item.previous||'—')+' → '+(item.current||'—')+' · '+(item.timeframe||'') ;
+var date=document.createElement('div');date.className='dg-muted';date.style.cssText='font-size:11px;margin-top:4px';date.textContent=item.at?new Date(item.at).toLocaleString():'';
+card.appendChild(head);card.appendChild(detail);card.appendChild(date);list.appendChild(card);
+});
+})();
+</script>
+</body></html>
