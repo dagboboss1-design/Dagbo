@@ -546,6 +546,18 @@ function toggleAutoRead(el) {
     var name = getName();
     addMessage('ai', "Hello " + name + "! 👋<br>I'm Dagbo AI. How can I help you today?<br><br>✅ Explain any signal<br>✅ Teach trading concepts<br>✅ Answer your questions");
   }
+
+  // Accept a headline passed from the Market News page.
+  try {
+    var newsHeadline = localStorage.getItem('dagbo_news_prefill');
+    if (newsHeadline) {
+      localStorage.removeItem('dagbo_news_prefill');
+      chatInput.value = 'Explain this market news headline in simple terms and tell me which markets may be affected: ' + newsHeadline;
+      sendMessage();
+    }
+  } catch(e) {
+    console.warn('Could not load news headline for Dagbo AI:', e);
+  }
 })();
 </script>
 </body>
