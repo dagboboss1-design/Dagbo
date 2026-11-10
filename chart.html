@@ -43,6 +43,11 @@
     cursor: pointer; width: 100%;
     text-align: center; margin-bottom: 12px;
   }
+  #tv-chart-container{position:relative;touch-action:pan-y}
+  #dagboDrawingLayer{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none;touch-action:none}
+  #tv-chart-container.drawing-active iframe{pointer-events:none}
+  #tv-chart-container.drawing-active #dagboDrawingLayer{pointer-events:auto;cursor:crosshair}
+  #drawingTools button.is-active{background:var(--dg-green);color:#fff;border-color:var(--dg-green)}
 </style>
 <script>
   (function(){
@@ -73,13 +78,34 @@
     <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
   </div>
 
+
+  <section class="dg-card" style="margin:12px 0">
+    <h2 class="dg-card__title">DAGBO Drawing Tools</h2>
+    <p class="dg-muted" style="font-size:12px">Select a tool, then drag on the chart. Drawings are saved on this device and do not place broker orders.</p>
+    <div id="drawingTools" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px">
+      <button type="button" class="dg-btn" data-tool="long">Long Position</button><button type="button" class="dg-btn" data-tool="short">Short Position</button><button type="button" class="dg-btn" data-tool="line">Trend Line</button>
+      <button type="button" class="dg-btn" data-tool="rect">Rectangle</button><button type="button" class="dg-btn" data-tool="triangle">Triangle</button><button type="button" class="dg-btn" data-tool="off">Move Chart</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" id="undoDrawing" class="dg-btn" style="flex:1">Undo last</button><button type="button" id="clearDrawings" class="dg-btn" style="flex:1">Clear drawings</button></div>
+    <p id="drawingStatus" class="dg-muted" style="font-size:12px;margin:8px 0 0">Move Chart is active.</p>
+  </section>
+  <section class="dg-card" style="margin:12px 0">
+    <h2 class="dg-card__title">Long / Short Risk Planner</h2>
+    <div class="dg-grid-2">
+      <label class="dg-field"><span class="dg-label">Direction</span><select id="chartPlanDir" class="dg-input"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select></label>
+      <label class="dg-field"><span class="dg-label">Account size ($)</span><input id="chartPlanAccount" class="dg-input" type="number" min="1" value="100"></label>
+      <label class="dg-field"><span class="dg-label">Risk (%)</span><input id="chartPlanRisk" class="dg-input" type="number" min="0.01" max="100" step="any" value="1"></label>
+      <label class="dg-field"><span class="dg-label">Entry</span><input id="chartPlanEntry" class="dg-input" type="number" step="any"></label>
+      <label class="dg-field"><span class="dg-label">Stop loss</span><input id="chartPlanSL" class="dg-input" type="number" step="any"></label>
+      <label class="dg-field"><span class="dg-label">Take profit</span><input id="chartPlanTP" class="dg-input" type="number" step="any"></label>
+    </div>
+    <button type="button" id="chartPlanCalc" class="dg-btn dg-btn--primary dg-btn--block" style="margin-top:10px">Calculate Long / Short plan</button>
+    <div id="chartPlanResult" class="dg-muted" style="margin-top:10px" aria-live="polite">Enter entry, stop and target to calculate risk and reward.</div>
+  </section>
+
   <!-- Chart Box -->
   <div id="tv-chart-container"></div>
-  <section class="dg-card" style="margin-top:12px">
-    <h2 class="dg-card__title" style="font-size:18px">Full drawing workspace</h2>
-    <p class="dg-muted" style="font-size:13px">For the complete TradingView drawing set — Long Position, Short Position, Rectangle, Triangle, Trend Line, Fibonacci and more — open the full TradingView chart. The embedded chart toolbar is controlled by TradingView and may show fewer tools on mobile.</p>
-    <a id="fullTradingView" class="dg-btn dg-btn--primary dg-btn--block" href="https://www.tradingview.com/chart/" target="_blank" rel="noopener">Open full TradingView chart ↗</a>
-  </section>
+
 
 </main>
 
@@ -176,18 +202,64 @@
       '&studies=RSI%40tv-basicstudies';
 
     container.appendChild(iframe);
+    var layer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    layer.setAttribute('id','dagboDrawingLayer');
+    layer.setAttribute('viewBox','0 0 '+container.clientWidth+' '+chartHeight);
+    layer.setAttribute('preserveAspectRatio','none');
+    container.appendChild(layer);
+    initDrawingLayer(layer,container);
   }
 
-  function updateFullChartLink() {
-    var link = document.getElementById('fullTradingView');
-    link.href = 'https://www.tradingview.com/chart/?symbol=' + encodeURIComponent(currentPair) + '&interval=' + encodeURIComponent(currentTF);
+  function initDrawingLayer(layer,container){
+    var tool='off',start=null,preview=null;
+    var key='dagbo_chart_drawings_'+currentPair+'_'+currentTF;
+    var drawings=[];try{drawings=JSON.parse(localStorage.getItem(key))||[]}catch(e){drawings=[]}
+    function el(name,attrs,parent){var node=document.createElementNS('http://www.w3.org/2000/svg',name);Object.keys(attrs||{}).forEach(function(k){node.setAttribute(k,attrs[k])});(parent||layer).appendChild(node);return node;}
+    function point(evt){var r=layer.getBoundingClientRect();return{x:Math.max(0,Math.min(r.width,evt.clientX-r.left)),y:Math.max(0,Math.min(r.height,evt.clientY-r.top))};}
+    function persist(){localStorage.setItem(key,JSON.stringify(drawings.slice(-100)));}
+    function shape(d){
+      var x1=d.x1,y1=d.y1,x2=d.x2,y2=d.y2;
+      if(d.kind==='line')el('line',{x1,y1,x2,y2,stroke:'#f4c95d','stroke-width':2});
+      if(d.kind==='rect')el('rect',{x:Math.min(x1,x2),y:Math.min(y1,y2),width:Math.max(2,Math.abs(x2-x1)),height:Math.max(2,Math.abs(y2-y1)),fill:'#f4c95d','fill-opacity':'.12',stroke:'#f4c95d','stroke-width':2});
+      if(d.kind==='triangle')el('polygon',{points:x1+','+y1+' '+x2+','+y2+' '+x1+','+y2,fill:'#f4c95d','fill-opacity':'.12',stroke:'#f4c95d','stroke-width':2});
+      if(d.kind==='long'||d.kind==='short'){
+        var top=Math.min(y1,y2),bottom=Math.max(y1,y2),mid=y1,left=Math.min(x1,x2),width=Math.max(8,Math.abs(x2-x1));
+        var rewardTop=d.kind==='long'?top:mid,rewardBottom=d.kind==='long'?mid:bottom,riskTop=d.kind==='long'?mid:top,riskBottom=d.kind==='long'?bottom:mid;
+        el('rect',{x:left,y:rewardTop,width,height:Math.max(3,rewardBottom-rewardTop),fill:'#25c982','fill-opacity':'.22',stroke:'#25c982','stroke-width':1.5});
+        el('rect',{x:left,y:riskTop,width,height:Math.max(3,riskBottom-riskTop),fill:'#f05b68','fill-opacity':'.2',stroke:'#f05b68','stroke-width':1.5});
+        el('line',{x1:left,y1:mid,x2:left+width,y2:mid,stroke:'#fff','stroke-width':1.5,'stroke-dasharray':'5 4'});
+        el('text',{x:left+5,y:Math.max(14,rewardTop+15),fill:'#fff','font-size':12,'font-weight':700}).textContent=d.kind==='long'?'LONG · reward':'SHORT · reward';
+      }
+    }
+    function render(){layer.innerHTML='';drawings.forEach(shape);if(preview)shape(preview);}
+    function selectTool(next){tool=next;container.classList.toggle('drawing-active',tool!=='off');document.querySelectorAll('#drawingTools [data-tool]').forEach(function(b){b.classList.toggle('is-active',b.getAttribute('data-tool')===tool)});document.getElementById('drawingStatus').textContent=tool==='off'?'Move Chart is active.':'Drag on the chart to place '+tool.toUpperCase()+'.';}
+    document.querySelectorAll('#drawingTools [data-tool]').forEach(function(b){b.addEventListener('click',function(){selectTool(b.getAttribute('data-tool'))})});
+    layer.addEventListener('pointerdown',function(e){if(tool==='off')return;start=point(e);preview={kind:tool,x1:start.x,y1:start.y,x2:start.x,y2:start.y};layer.setPointerCapture(e.pointerId);render();});
+    layer.addEventListener('pointermove',function(e){if(!start||!preview)return;var p=point(e);preview.x2=p.x;preview.y2=p.y;render();});
+    layer.addEventListener('pointerup',function(e){if(!start||!preview)return;var p=point(e);preview.x2=p.x;preview.y2=p.y;if(Math.abs(p.x-start.x)+Math.abs(p.y-start.y)>6){drawings.push(preview);persist()}preview=null;start=null;render();});
+    document.getElementById('undoDrawing').onclick=function(){drawings.pop();persist();render()};
+    document.getElementById('clearDrawings').onclick=function(){if(confirm('Clear drawings for this market and timeframe?')){drawings=[];persist();render()}};
+    selectTool('off');render();
   }
-  window.changePair = function(tvSymbol) { currentPair = tvSymbol; updateFullChartLink(); loadChart(); };
-  window.changeTF = function(tf) { currentTF = tf; updateFullChartLink(); loadChart(); };
 
+  window.changePair = function(tvSymbol) { currentPair = tvSymbol; loadChart(); };
+  window.changeTF = function(tf) { currentTF = tf; loadChart(); };
   buildDropdown();
-  updateFullChartLink();
   loadChart();
+  var chartSettings={};try{chartSettings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
+  document.getElementById('chartPlanAccount').value=Number(chartSettings.accountSize)||100;
+  document.getElementById('chartPlanRisk').value=Number(chartSettings.risk)||1;
+  document.getElementById('chartPlanCalc').addEventListener('click',function(){
+    var dir=document.getElementById('chartPlanDir').value,account=Number(document.getElementById('chartPlanAccount').value),risk=Number(document.getElementById('chartPlanRisk').value),entry=Number(document.getElementById('chartPlanEntry').value),sl=Number(document.getElementById('chartPlanSL').value),tp=Number(document.getElementById('chartPlanTP').value);
+    var rd=dir==='LONG'?entry-sl:sl-entry,wd=dir==='LONG'?tp-entry:entry-tp,out=document.getElementById('chartPlanResult');out.textContent='';
+    if(![account,risk,entry,sl,tp].every(Number.isFinite)||account<=0||risk<=0||risk>100||entry<=0||sl<=0||tp<=0||rd<=0||wd<=0){out.textContent='Invalid levels. LONG requires SL below entry and TP above. SHORT requires SL above entry and TP below.';return;}
+    var rr=wd/rd;out.textContent='Risk budget: 
+})();
+</script>
+</body>
+  </html>
++(account*risk/100).toFixed(2)+' · Price risk: '+rd.toPrecision(7)+' · Price reward: '+wd.toPrecision(7)+' · R:R '+rr.toFixed(2)+'R'+(rr>=1.5?' · Meets 1.5R guide':' · Below 1.5R guide');
+  });
 })();
 </script>
 </body>
