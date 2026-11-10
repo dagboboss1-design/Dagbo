@@ -14,8 +14,7 @@
   (function(){
     try{
       var s = JSON.parse(localStorage.getItem('dagbo_settings')) || {};
-      var follow = s.followSystem !== false;
-      var dark = follow ? window.matchMedia('(prefers-color-scheme: dark)').matches : s.theme === 'dark';
+      var dark = s.theme === 'dark';
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     }catch(e){}
   })();
@@ -31,7 +30,16 @@
   </div>
   
   <h1 class="dg-title">Signal Board</h1>
-  <p class="dg-subtitle">3 systems. 1 final signal.</p>
+  <p class="dg-subtitle">Real market data. 3 systems combined.</p>
+
+  <!-- TIMEFRAME TOGGLE -->
+  <div class="dg-seg" role="radiogroup" style="margin-bottom:16px">
+    <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_15" value="15" checked onchange="changeSignalTF('15')">
+    <label class="dg-seg__lb" for="tf_15">15m (Intraday)</label>
+    
+    <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_5" value="5" onchange="changeSignalTF('5')">
+    <label class="dg-seg__lb" for="tf_5">5m (Scalping)</label>
+  </div>
 
   <div class="dg-chips" id="filterChips">
     <button class="dg-chip is-active" data-filter="ALL">All Signals</button>
@@ -41,11 +49,21 @@
     <button class="dg-chip" data-filter="CRYPTO">Crypto</button>
   </div>
 
-  <div class="dg-stack" id="signals-grid" style="margin-top:12px"></div>
+  <!-- MANUAL REFRESH BUTTON -->
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; margin-top:4px;">
+    <span style="font-size:12px; color:var(--dg-text-2);" id="lastUpdated">Waiting for data...</span>
+    <button onclick="loadAllSignals()" class="dg-btn" style="min-height:32px; padding:0 14px; font-size:13px; border-radius:20px; background:var(--dg-card); border:1px solid var(--dg-line);">↻ Refresh</button>
+  </div>
+
+  <div class="dg-stack" id="signals-grid" style="margin-top:12px">
+    <div class="dg-card" style="text-align:center; padding: 30px;">
+      <p class="dg-muted" id="loadingText">Connecting to live market data...</p>
+    </div>
+  </div>
 
   <div class="dg-card" style="background:var(--dg-fill);box-shadow:none;margin-top:24px">
     <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:0">
-      <b>⚠️ DEMO SIGNALS ONLY:</b> These are randomly generated examples for learning. They do not use live market data. Always open the Chart page to see the real price before you trade.
+      <b>⚠️ API LIMIT NOTICE:</b> We use the free Twelve Data API. To save your 800 daily requests, this page does not auto-refresh. Tap "↻ Refresh" to get new signals.
     </p>
   </div>
 
@@ -64,10 +82,12 @@
 (function(){
   'use strict';
 
+  // ⚠️ PASTE YOUR TWELVE DATA API KEY HERE
+  var API_KEY = 'YOUR_TWELVE_DATA_API_KEY_HERE';
+
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
-  
-  var enabledPairs = Array.isArray(settings.pairs) ? settings.pairs : ['XAUUSD', 'EURUSD', 'GBPUSD', 'US30', 'US100', 'BTCUSD'];
+  var enabledPairs = Array.isArray(settings.pairs) ? settings.pairs : ['XAUUSD', 'EURUSD', 'GBPUSD', 'US30', 'BTCUSD'];
   
   var PAIR_TYPES = {
     XAUUSD: 'GOLD', GOLD: 'GOLD',
@@ -76,52 +96,160 @@
     BTCUSD: 'CRYPTO', BTC: 'CRYPTO', ETHUSD: 'CRYPTO', ETH: 'CRYPTO'
   };
 
+  var API_SYMBOLS = {
+    XAUUSD: 'XAU/USD', GOLD: 'XAU/USD',
+    EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', GBPJPY: 'GBP/JPY',
+    AUDUSD: 'AUD/USD', USDCHF: 'USD/CHF', USDCAD: 'USD/CAD', NZDUSD: 'NZD/USD', EURJPY: 'EUR/JPY', EURGBP: 'EUR/GBP',
+    US30: 'DJI', US100: 'NDX', NAS100: 'NDX', US500: 'SPX',
+    BTCUSD: 'BTC/USD', BTC: 'BTC/USD', ETHUSD: 'ETH/USD', ETH: 'ETH/USD'
+  };
+
   var currentFilter = 'ALL';
+  var signalsData = {};
+  var currentSignalTF = '15';
 
-  function makeSignal(pair) {
-    var seed = new Date().toDateString() + pair + Math.random();
-    var hash = 0; for (var i = 0; i < seed.length; i++) hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-    var rand = Math.abs(hash) / 2147483647;
-    
-    var finals = ['STRONG BUY', 'WEAK BUY', 'STRONG SELL', 'WEAK SELL', 'NO TRADE'];
-    var final = finals[Math.floor(rand * finals.length)];
-    
-    var isBuy = final.includes('BUY');
-    var isSell = final.includes('SELL');
-    
-    var anchor = 100, stop = 5, dp = 2;
-    var p = String(pair).toUpperCase();
-    if (p.indexOf('XAU') > -1 || p === 'GOLD') { anchor = 2350; stop = 15; dp = 2; }
-    else if (p.indexOf('JPY') > -1) { anchor = 150; stop = 0.5; dp = 3; }
-    else if (p.indexOf('BTC') > -1) { anchor = 65000; stop = 400; dp = 0; }
-    else if (p.indexOf('ETH') > -1) { anchor = 3500; stop = 45; dp = 0; }
-    else if (p.indexOf('US30') > -1) { anchor = 39500; stop = 150; dp = 0; }
-    else if (p.indexOf('US100') > -1 || p.indexOf('NAS') > -1) { anchor = 18000; stop = 100; dp = 0; }
-    else if (p.indexOf('US500') > -1) { anchor = 5000; stop = 35; dp = 0; }
-    else { anchor = 1.0850; stop = 0.0020; dp = 5; }
-    
-    var entry = anchor + (rand - 0.5) * stop;
-    var sl = isBuy ? entry - stop : entry + stop;
-    var tp1 = isBuy ? entry + stop * 1.5 : entry - stop * 1.5;
-    var tp2 = isBuy ? entry + stop * 2.5 : entry - stop * 2.5;
-    
-    function fmt(v) { return v.toFixed(dp); }
-
-    var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
-    var pillCls = isBuy ? 'dg-pill--buy' : (isSell ? 'dg-pill--sell' : 'dg-pill--wait');
-    var pillText = isBuy ? 'BUY' : (isSell ? 'SELL' : 'WAIT');
-    
-    var minsAgo = Math.floor(rand * 120);
-    var d = new Date(Date.now() - minsAgo * 60000);
-    var timeStr = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) + ' • ' + d.toLocaleDateString('en-GB', {day: 'numeric', month: 'short'});
-    
-    return { pair: pair, final: final, cls: cls, pillCls: pillCls, pillText: pillText, entry: fmt(entry), sl: fmt(sl), tp1: fmt(tp1), tp2: fmt(tp2), time: timeStr, isNoTrade: final === 'NO TRADE' };
+  // --- MATH ENGINES ---
+  function calculateRSI(closes, period) {
+    if (closes.length <= period) return 50;
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++) {
+      let diff = closes[i] - closes[i-1];
+      if (diff >= 0) gains += diff; else losses -= diff;
+    }
+    let avgGain = gains / period, avgLoss = losses / period;
+    if (avgLoss === 0) return 100;
+    let rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
   }
 
+  function calculateEMA(closes, period) {
+    if (closes.length < period) return closes[closes.length-1];
+    let k = 2 / (period + 1);
+    let ema = closes[0];
+    for (let i = 1; i < closes.length; i++) {
+      ema = closes[i] * k + ema * (1 - k);
+    }
+    return ema;
+  }
+
+  function getSystem1(candles) {
+    let closes = candles.map(c => parseFloat(c.close));
+    let lastClose = closes[closes.length-1];
+    let rsi = calculateRSI(closes, 14);
+    let ema20 = calculateEMA(closes, 20);
+    let ema50 = calculateEMA(closes, 50);
+    let score = 0;
+
+    if (rsi < 35) score++; 
+    if (rsi > 65) score--;
+    if (lastClose > ema20 && ema20 > ema50) score++;
+    if (lastClose < ema20 && ema20 < ema50) score--;
+
+    return score >= 1 ? 'BUY' : (score <= -1 ? 'SELL' : 'WAIT');
+  }
+
+  function getSystem2(candles) {
+    let last = candles[candles.length-1];
+    let prev = candles[candles.length-2];
+    let o = parseFloat(last.open), c = parseFloat(last.close), h = parseFloat(last.high), l = parseFloat(last.low);
+    let po = parseFloat(prev.open), pc = parseFloat(prev.close);
+    let score = 0;
+
+    let body = Math.abs(c - o);
+    let lowerWick = Math.min(o, c) - l;
+    let upperWick = h - Math.max(o, c);
+    if (lowerWick > body * 2) score++;
+    if (upperWick > body * 2) score--;
+
+    if (c > o && pc < po && c > po && o < pc) score++;
+    if (c < o && pc > po && c < po && o > pc) score--;
+
+    return score >= 1 ? 'BUY' : (score <= -1 ? 'SELL' : 'WAIT');
+  }
+
+  function getSystem3(candles) {
+    let last = candles[candles.length-1];
+    let lastClose = parseFloat(last.close);
+    let highs = candles.slice(-20).map(c => parseFloat(c.high));
+    let lows = candles.slice(-20).map(c => parseFloat(c.low));
+    let recentHigh = Math.max(...highs);
+    let recentLow = Math.min(...lows);
+
+    if (lastClose < recentLow + (recentHigh - recentLow) * 0.2) return 'BUY';
+    if (lastClose > recentHigh - (recentHigh - recentLow) * 0.2) return 'SELL';
+    return 'WAIT';
+  }
+
+  function getFinalSignal(s1, s2, s3) {
+    let dirs = [s1, s2, s3];
+    if (dirs.includes('WAIT')) return 'NO TRADE';
+    let buys = dirs.filter(d => d === 'BUY').length;
+    if (buys === 3) return 'STRONG BUY';
+    if (buys === 2) return 'WEAK BUY';
+    if (buys === 1) return 'WEAK SELL';
+    return 'STRONG SELL';
+  }
+
+  // --- FETCH REAL DATA ---
+  async function fetchPairData(pair, tf) {
+    let apiSym = API_SYMBOLS[pair] || 'XAU/USD';
+    let url = `https://api.twelvedata.com/time_series?symbol=${apiSym}&interval=${tf}min&outputsize=60&apikey=${API_KEY}`;
+    
+    try {
+      let res = await fetch(url);
+      let data = await res.json();
+      
+      if (data.status === 'error') {
+        console.error("API Error:", data.message);
+        return null;
+      }
+
+      let candles = data.values;
+      if (!candles || candles.length < 20) return null;
+
+      candles = candles.reverse(); 
+
+      let s1 = getSystem1(candles);
+      let s2 = getSystem2(candles);
+      let s3 = getSystem3(candles);
+      let final = getFinalSignal(s1, s2, s3);
+
+      let entry = parseFloat(candles[candles.length-1].close);
+      let isBuy = final.includes('BUY');
+      
+      let slPct = tf === '5' ? 0.0015 : 0.005;
+      let tp1Pct = tf === '5' ? 0.003 : 0.01;
+      let tp2Pct = tf === '5' ? 0.0045 : 0.015;
+
+      let sl = isBuy ? entry * (1 - slPct) : entry * (1 + slPct);
+      let tp1 = isBuy ? entry * (1 + tp1Pct) : entry * (1 - tp1Pct);
+      let tp2 = isBuy ? entry * (1 + tp2Pct) : entry * (1 - tp2Pct);
+
+      // Debug data to prove we are reading the candle
+      let lastC = candles[candles.length-1];
+      let closesArr = candles.map(c => parseFloat(c.close));
+      let currentRSI = calculateRSI(closesArr, 14);
+      let currentEMA20 = calculateEMA(closesArr, 20);
+      let currentEMA50 = calculateEMA(closesArr, 50);
+
+      return { 
+        pair, final, entry, sl, tp1, tp2, s1, s2, s3,
+        lastCandleOpen: parseFloat(lastC.open).toFixed(2),
+        lastCandleClose: parseFloat(lastC.close).toFixed(2),
+        rsiValue: currentRSI,
+        emaTrend: currentEMA20 > currentEMA50 ? 'BULLISH 📈' : 'BEARISH 📉'
+      };
+    } catch(e) {
+      console.error(e);
+      return null;
+    }
+  }
+
+  // --- RENDER UI ---
   function renderCards() {
     var grid = document.getElementById('signals-grid');
     var listHtml = '';
-    
+
     var sortedPairs = enabledPairs.slice().sort(function(a,b){
       var typeA = PAIR_TYPES[String(a).toUpperCase()] || 'FX';
       var typeB = PAIR_TYPES[String(b).toUpperCase()] || 'FX';
@@ -135,25 +263,41 @@
       var type = PAIR_TYPES[String(pair).toUpperCase()] || 'FX';
       if (currentFilter !== 'ALL' && currentFilter !== type) return;
       
-      var s = makeSignal(pair);
+      var s = signalsData[pair];
+      if (!s) return;
+
+      var isBuy = s.final.includes('BUY');
+      var isSell = s.final.includes('SELL');
+      var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
+      var pillCls = isBuy ? 'dg-pill--buy' : (isSell ? 'dg-pill--sell' : 'dg-pill--wait');
+      var pillText = isBuy ? 'BUY' : (isSell ? 'SELL' : 'WAIT');
+
+      // Visual Debug Box
+      var debugText = '<div style="font-size:10px; color:var(--dg-text-2); background:rgba(0,0,0,0.2); padding:8px; border-radius:8px; margin-bottom:10px; font-family:monospace; line-height:1.4;">' +
+        'Candle: ' + (parseFloat(s.lastCandleClose) > parseFloat(s.lastCandleOpen) ? '🟢 BULLISH' : '🔴 BEARISH') + ' (O: ' + s.lastCandleOpen + ' | C: ' + s.lastCandleClose + ')<br>' +
+        'RSI: ' + s.rsiValue.toFixed(1) + ' | EMA Trend: ' + s.emaTrend +
+        '</div>';
       
       var cardInner = '';
-      if (s.isNoTrade) {
+      if (s.final === 'NO TRADE') {
         cardInner = 
+          debugText +
           '<div style="text-align:center;padding:16px 0">' +
-            '<div class="dg-signal__word ' + s.cls + '" style="font-size:28px">NO TRADE</div>' +
-            '<div class="dg-muted" style="font-size:13px;margin-top:4px">One system says WAIT</div>' +
+            '<div class="dg-signal__word ' + cls + '" style="font-size:28px">NO TRADE</div>' +
+            '<div class="dg-muted" style="font-size:13px;margin-top:4px">Market is quiet. Systems say WAIT.</div>' +
           '</div>';
       } else {
         cardInner = 
-          '<div class="dg-signal__word ' + s.cls + '" style="font-size:28px;text-align:left">' + s.final + '</div>' +
-          '<div class="dg-muted" style="font-size:13px;margin-bottom:12px">' + (s.final.includes('BUY') ? 'Bullish Pressure' : 'Bearish Pressure') + '</div>' +
+          debugText +
+          '<div class="dg-signal__word ' + cls + '" style="font-size:28px;text-align:left">' + s.final + '</div>' +
+          '<div class="dg-muted" style="font-size:13px;margin-bottom:12px">' + (currentSignalTF === '5' ? 'Scalping Setup' : 'Intraday Setup') + '</div>' +
           '<div class="dg-grid-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + s.entry + '</strong></div>' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Stop Loss</span><strong style="font-size:15px" class="dg-neg">' + s.sl + '</strong></div>' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + s.tp1 + '</strong></div>' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + s.tp2 + '</strong></div>' +
-          '</div>';
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + s.entry.toFixed(2) + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Stop Loss</span><strong style="font-size:15px" class="dg-neg">' + s.sl.toFixed(2) + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + s.tp1.toFixed(2) + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + s.tp2.toFixed(2) + '</strong></div>' +
+          '</div>' +
+          '<div style="font-size:11px; color:var(--dg-text-2); margin-top:10px;">S1: ' + s.s1 + ' | S2: ' + s.s2 + ' | S3: ' + s.s3 + '</div>';
       }
 
       listHtml += 
@@ -161,35 +305,29 @@
           '<div class="dg-card__head" style="margin-bottom:8px">' +
             '<div style="display:flex;align-items:center;gap:8px">' +
               '<h2 class="dg-card__title" style="font-size:18px;margin:0">' + s.pair + '</h2>' +
-              '<span class="dg-pill ' + s.pillCls + '" style="min-height:22px;font-size:11px;padding:0 8px">' + s.pillText + '</span>' +
+              '<span class="dg-pill ' + pillCls + '" style="min-height:22px;font-size:11px;padding:0 8px">' + pillText + '</span>' +
             '</div>' +
-            '<span style="font-size:11px;color:var(--dg-text-2)">' + s.time + '</span>' +
+            '<span style="font-size:11px;color:var(--dg-text-2)">' + currentSignalTF + 'm</span>' +
           '</div>' +
           cardInner +
           '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;">' +
-            (s.isNoTrade ? '' : '<button onclick="executeTrade(\'' + s.pair + '\', \'' + s.final + '\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ')" style="flex:1;padding:10px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:14px;cursor:pointer;">Execute & Journal</button>') +
+            (s.final === 'NO TRADE' ? '' : '<button onclick="executeTrade(\'' + s.pair + '\', \'' + s.final + '\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ')" style="flex:1;padding:10px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:14px;cursor:pointer;">Execute & Journal</button>') +
             '<a href="chart.html?pair=' + s.pair + '" style="flex:1;text-align:center;padding:10px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:14px;">View Chart</a>' +
           '</div>' +
         '</section>';
     });
-    
+
     if (listHtml === '') {
-      listHtml = '<div class="dg-card" style="text-align:center;padding:32px 16px"><p class="dg-muted">No signals for this category.</p></div>';
+      listHtml = '<div class="dg-card" style="text-align:center;padding:32px 16px"><p class="dg-muted">No signals available. Waiting for market data...</p></div>';
     }
-    
     grid.innerHTML = listHtml;
   }
 
   window.executeTrade = function(pair, signal, entry, sl, tp) {
     var dir = signal.includes('BUY') ? 'BUY' : 'SELL';
     var trade = {
-      pair: pair,
-      direction: dir,
-      entry: entry,
-      stopLoss: sl,
-      takeProfit: tp,
-      result: 'OPEN',
-      dateOpened: new Date().toISOString()
+      pair: pair, direction: dir, entry: entry, stopLoss: sl, takeProfit: tp,
+      result: 'OPEN', dateOpened: new Date().toISOString()
     };
     sessionStorage.setItem('dagbo_pending_journal', JSON.stringify(trade));
     window.location.href = 'journal.html';
@@ -204,9 +342,31 @@
     renderCards();
   });
 
-  renderCards();
+  window.changeSignalTF = function(tf) {
+    currentSignalTF = tf;
+    loadAllSignals();
+  };
+
+  // --- INITIALIZE ---
+  async function loadAllSignals() {
+    var loading = document.getElementById('loadingText');
+    if (loading) loading.innerText = "Downloading live candles...";
+    
+    signalsData = {}; 
+    
+    for (let pair of enabledPairs) {
+      let data = await fetchPairData(pair, currentSignalTF);
+      if (data) signalsData[pair] = data;
+    }
+    
+    var now = new Date();
+    document.getElementById('lastUpdated').innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    renderCards();
+  }
+
+  loadAllSignals();
 
 })();
 </script>
 </body>
-</html>
+  </html>
