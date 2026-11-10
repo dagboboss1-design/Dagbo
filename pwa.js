@@ -113,7 +113,16 @@
     });
   }
 
+  function getSubscription() {
+    return registerSW().then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function (subscription) {
+      return subscription ? subscription.toJSON() : null;
+    });
+  }
+
   window.DagboPWA = {
+    getSubscription: getSubscription,
     enableNotifications: enableNotifications,
     disableNotifications: disableNotifications,
     sendTest: sendTest,
