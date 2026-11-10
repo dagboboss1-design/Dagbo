@@ -30,6 +30,15 @@ module.exports = async function handler(req, res) {
     const action = req.query && req.query.action;
     const setKey = "dagbo:trades:device:" + id;
 
+    if (action === "preferences") {
+      const allowed = new Set(["XAUUSD","GOLD","EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","US30","US100","NAS100","US500","BTCUSD","BTC","ETHUSD","ETH"]);
+      const pairs = Array.isArray(body.pairs) ? body.pairs.map(x => String(x).toUpperCase()).filter(x => allowed.has(x)) : [];
+      const unique = Array.from(new Set(pairs)).slice(0, 6);
+      if (!unique.length) return res.status(400).json({ error: "Choose at least one supported market." });
+      await redis.set("dagbo:scan:pairs:" + id, JSON.stringify(unique), { ex: 60 * 60 * 24 * 90 });
+      return res.status(200).json({ success: true, pairs: unique, maxPairs: 6 });
+    }
+
     if (action === "open") {
       const pair = String(body.pair || "").toUpperCase();
       const direction = String(body.direction || "").toUpperCase();
