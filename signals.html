@@ -249,24 +249,22 @@
   function renderInsights() {
     var ranked = Object.keys(signalsData).map(function(pair) {
       var item = signalsData[pair];
-      var votes = [item.s1,item.s2,item.s3];
-      var buys = votes.filter(function(v){ return v === 'BUY'; }).length;
-      var sells = votes.filter(function(v){ return v === 'SELL'; }).length;
+      var buys = Number(item.buyScore)||0, sells = Number(item.sellScore)||0;
       var score = Math.max(buys,sells);
       return { pair:pair, signal:item.final, score:score, direction:buys > sells ? 'BUY' : sells > buys ? 'SELL' : 'WAIT' };
-    }).filter(function(x){ return x.score >= 2; }).sort(function(a,b){ return b.score-a.score; }).slice(0,3);
+    }).filter(function(x){ return x.score >= 3 && x.direction !== 'WAIT'; }).sort(function(a,b){ return b.score-a.score; }).slice(0,3);
 
     try { localStorage.setItem('dagbo_best_opportunities', JSON.stringify({timeframe:currentSignalTF,updatedAt:new Date().toISOString(),items:ranked})); } catch(e) {}
     var best = document.getElementById('bestOpportunityList');
     best.textContent = '';
     if (!ranked.length) {
-      var empty = document.createElement('p'); empty.className='dg-muted'; empty.textContent='No setup currently meets the existing 2-of-3 confluence rule. Wait for confirmation.'; best.appendChild(empty);
+      var empty = document.createElement('p'); empty.className='dg-muted'; empty.textContent='No setup currently has at least 3 agreeing method votes. Wait for confirmation.'; best.appendChild(empty);
     } else ranked.forEach(function(item,index) {
       var row = document.createElement('div');
       row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--dg-line)';
       var left = document.createElement('div');
       var name = document.createElement('strong'); name.textContent=(index+1)+'. '+item.pair;
-      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/3 systems agree · '+(currentSignalTF==='5'?'Scalping scan':'Intraday scan');
+      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/9 method votes agree · '+(currentSignalTF==='5'?'Scalping scan':'Intraday scan');
       left.appendChild(name); left.appendChild(detail);
       var pill = document.createElement('span'); pill.className='dg-pill '+(item.direction==='BUY'?'dg-pill--buy':'dg-pill--sell'); pill.textContent=item.signal;
       row.appendChild(left); row.appendChild(pill); best.appendChild(row);
