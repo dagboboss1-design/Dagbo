@@ -1,0 +1,8 @@
+{
+  "name": "dagbo-signal",
+  "version": "1.0.0",
+  "dependencies": {
+    "web-push": "^3.6.7",
+    "@upstash/redis": "^1.34.3"
+  }
+}
