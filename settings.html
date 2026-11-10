@@ -54,11 +54,10 @@
       <span class="dg-label">Account Size ($)</span>
       <input class="dg-input" type="number" id="inAccount" placeholder="100">
     </label>
-    <label class="dg-field">
-      <span class="dg-label">Deep AI Key (Groq API)</span>
-      <input class="dg-input" type="password" id="inGroqKey" placeholder="gsk_...">
-      <div class="dg-help">Add a free Groq key for online AI questions.</div>
-    </label>
+    <div class="dg-field">
+      <span class="dg-label">AI Service</span>
+      <div class="dg-help">DAGBO AI uses a server-side Groq key configured in Vercel as GROQ_API_KEY. It is not entered or stored on this phone. Never paste private API keys into this page.</div>
+    </div>
   </div>
 
   <!-- APP PREFERENCES -->
@@ -206,7 +205,6 @@
     
     document.getElementById('inName').value = state.name || '';
     document.getElementById('inAccount').value = acc;
-    document.getElementById('inGroqKey').value = state.groqKey || '';
     document.getElementById('selRisk').value = state.risk;
     document.getElementById('tgNotify').checked = state.notify !== false;
     document.getElementById('tgDark').checked = state.theme === 'dark';
@@ -246,7 +244,6 @@
 
   document.getElementById('inName').addEventListener('input', function(e){ state.name = e.target.value; save(); });
   document.getElementById('inAccount').addEventListener('input', function(e){ state.accountSize = parseFloat(e.target.value) || 0; save(); });
-  document.getElementById('inGroqKey').addEventListener('input', function(e){ state.groqKey = e.target.value; save(); });
   document.getElementById('selRisk').addEventListener('change', function(e){ state.risk = parseFloat(e.target.value); save(); });
   document.getElementById('selPair').addEventListener('change', function(e){ state.defaultPair = e.target.value; save(); });
   document.getElementById('tgSound').addEventListener('change', function(e){ state.sound = e.target.checked; save(); });
