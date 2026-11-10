@@ -201,3 +201,16 @@ textarea.dg-input{min-height:110px;resize:vertical}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{transition:none!important;animation:none!important}
 }
+
+/* ---------- 15. DAGBO calm premium visual system ---------- */
+:root{--dg-blue:#74777d;--dg-blue-ink:#74777d;--dg-blue-soft:rgba(116,119,125,.12);--dg-amber:#858585;--dg-amber-ink:#777;--dg-amber-soft:rgba(130,130,130,.12);--dg-shadow:0 1px 2px rgba(0,0,0,.035)}
+:root[data-theme="dark"]{--dg-blue-ink:#c5c7ca;--dg-blue-soft:rgba(190,194,200,.12);--dg-amber-ink:#c2c2c2;--dg-amber-soft:rgba(190,190,190,.12)}
+.dg-card{border:1px solid var(--dg-line);box-shadow:none;border-radius:12px}
+.dg-card--accent{background:var(--dg-card);color:var(--dg-text);border:1px solid var(--dg-line);box-shadow:none}
+.dg-card--accent .dg-muted,.dg-card--accent .dg-card__sub{color:var(--dg-text-2)}
+.dg-badge{background:var(--dg-fill);color:var(--dg-text-2)}
+.dg-row__icon,.dg-row__icon--green,.dg-row__icon--red,.dg-row__icon--amber,.dg-row__icon--grey{background:var(--dg-fill);color:var(--dg-text-2)}
+.dg-btn--primary{background:#55585d;color:#fff;box-shadow:none}
+.dg-chip.is-active,.dg-chip[aria-pressed="true"]{background:#55585d;color:#fff;box-shadow:none}
+.dg-seg__in:checked+.dg-seg__lb{box-shadow:none}
+.dg-stat{box-shadow:none;border:1px solid var(--dg-line);border-radius:12px}
