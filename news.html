@@ -25,6 +25,46 @@
 .news-calendar-link{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;text-decoration:none;color:var(--dg-text)}
 .news-calendar-link strong{display:block;font-size:15px}
 .news-calendar-link small{display:block;color:var(--dg-text-2);margin-top:5px;line-height:1.45}
+
+/* DAGBO SIGNAL premium mobile news terminal */
+body{background:#050b14!important;color:#edf4ff!important}
+.dg-page{max-width:760px;margin:0 auto;padding:14px 12px 110px!important}
+.dg-top{padding:10px 4px 16px;border-bottom:1px solid #1c2b40;margin-bottom:16px}
+.dg-brand{font-size:24px!important;font-weight:900;letter-spacing:-.6px;color:#f4f8ff!important}
+.dg-badge{background:#102b1c!important;color:#21e66b!important;border:1px solid #176b3c;border-radius:20px;padding:6px 11px;font-weight:800}
+.dg-title{font-size:29px!important;font-weight:900;color:#fff!important;margin:14px 0 3px!important}
+.dg-subtitle{color:#9db0c8!important}
+.dg-card{background:linear-gradient(145deg,#0d1b2b,#07111e)!important;border:1px solid #28425e!important;border-radius:17px!important;color:#f1f6ff!important;box-shadow:0 8px 24px #0005}
+.dg-section{color:#eaf2ff!important;font-weight:800!important;font-size:17px!important}
+.dg-muted,.news-headline__meta{color:#9eb2cc!important}
+.news-headline{padding:14px!important;border-bottom:1px solid #23354b!important}
+.news-headline__title{color:#f5f8ff!important;font-size:15px!important}
+.news-ask,.dg-btn{background:#087c43!important;color:#fff!important;border:1px solid #17a65e!important;border-radius:11px!important;font-weight:800!important}
+.news-calendar-link{color:#f4f8ff!important}
+.news-calendar-link small{color:#9eb2cc!important}
+#newsCountdown{font-size:clamp(32px,9vw,48px)!important;color:#fff!important;text-shadow:0 0 18px #16d86a;font-weight:900;letter-spacing:2px}
+#newsCountdownStatus{display:inline-flex;margin-top:4px}
+#newsEventName,#newsEventTime{background:#081421!important;color:#f4f8ff!important;border:1px solid #29415b!important}
+.dg-tabbar{background:#050b14!important;border-top:1px solid #263c55!important}
+.dg-tab{color:#9db2ce!important}
+.dg-tab[aria-current=page]{color:#f4cf36!important}
+.news-terminal-sessions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;overflow:hidden}
+.news-session{text-align:center;padding:10px 4px;border-right:1px solid #29415b}
+.news-session:last-child{border-right:0}
+.news-session b{display:block;color:#f4f7ff;font-size:12px}
+.news-session time{display:block;color:#d6e2f2;font-size:12px;margin:5px 0}
+.news-session small{font-size:11px;font-weight:800}
+.session-open{color:#19e66b}.session-closed{color:#9aaac0}
+.news-countdown-card{border:1px solid #d51d39!important;background:linear-gradient(135deg,#200b16,#090d18)!important}
+.news-countdown-layout{display:grid;grid-template-columns:1.1fr .9fr;align-items:center;gap:12px}
+.news-impact{color:#ffd83d;font-size:13px;font-weight:900;line-height:1.5;border-left:1px solid #647084;padding-left:12px}
+.news-scanner{display:grid;grid-template-columns:1fr;gap:0}
+.news-scan-row{display:grid;grid-template-columns:minmax(0,1.2fr) auto;align-items:center;gap:8px;padding:10px 2px;border-bottom:1px solid #1d3045;font-size:13px}
+.news-scan-row:last-child{border-bottom:0}
+.news-scan-status{font-size:10px;font-weight:900;color:#ffd34c;background:#392d0c;border:1px solid #80641c;border-radius:20px;padding:5px 8px;white-space:nowrap}
+.news-ai-banner{background:linear-gradient(110deg,#210c5a,#100b32)!important;border-color:#6b32d9!important}
+@media(max-width:390px){.news-session b{font-size:10px}.news-session time{font-size:10px}.news-scan-row{font-size:12px}.news-countdown-layout{grid-template-columns:1fr}.news-impact{border-left:0;border-top:1px solid #647084;padding:8px 0 0}}
+
 </style>
 </head>
 <body>
@@ -54,14 +94,19 @@
     <p class="dg-muted" style="font-size:11px;line-height:1.5;margin-bottom:0">This timer counts down to the time you enter. It does not fetch or verify economic calendar schedules automatically, and the timer alone does not generate a BUY/SELL bias.</p>
   </section>
   <section class="dg-card" style="margin:18px 0;padding:16px">
-    <div class="dg-section" style="margin-top:0">Multi-Market Impact Scanner</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-      <div class="dg-card"><b>Forex</b><div class="dg-muted">EURUSD · GBPUSD · USDJPY · GBPJPY · AUDUSD · USDCAD</div></div>
-      <div class="dg-card"><b>Metals & Energy</b><div class="dg-muted">XAUUSD · XAGUSD · Oil</div></div>
-      <div class="dg-card"><b>Indices</b><div class="dg-muted">US30 · US100 · NAS100 · US500</div></div>
-      <div class="dg-card"><b>Crypto</b><div class="dg-muted">BTCUSD · ETHUSD</div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <div class="dg-section" style="margin-top:0">Multi-Market Impact Scanner</div>
+      <span class="news-scan-status">DATA CHECK</span>
     </div>
-    <p class="dg-muted" style="font-size:12px;line-height:1.5">Each instrument needs its own evidence-based assessment. One event does not mean every market gets the same direction.</p>
+    <div class="news-scanner">
+      <div class="news-scan-row"><b>🪙 GOLD · XAUUSD</b><span class="news-scan-status">Awaiting analysis</span></div>
+      <div class="news-scan-row"><b>💱 EURUSD · GBPUSD · USDJPY · GBPJPY</b><span class="news-scan-status">Awaiting analysis</span></div>
+      <div class="news-scan-row"><b>🌍 AUDUSD · USDCAD</b><span class="news-scan-status">Awaiting analysis</span></div>
+      <div class="news-scan-row"><b>🥈 XAGUSD · WTI Oil</b><span class="news-scan-status">Awaiting analysis</span></div>
+      <div class="news-scan-row"><b>📊 US30 · US100 · NAS100 · US500</b><span class="news-scan-status">Awaiting analysis</span></div>
+      <div class="news-scan-row"><b>₿ BTCUSD · ETHUSD</b><span class="news-scan-status">Awaiting analysis</span></div>
+    </div>
+    <p class="dg-muted" style="font-size:11px;line-height:1.5;margin-bottom:0">Market directions are not fabricated. Live per-market bias requires connected price data, an event feed and an analysis engine.</p>
   </section>
   <section class="dg-card" style="margin:18px 0;padding:16px">
     <div class="dg-section" style="margin-top:0">DAGBO AI News Analyst</div>
@@ -69,16 +114,16 @@
     <button id="openNewsAI" class="dg-btn" type="button">Ask DAGBO AI about news</button>
   </section>
 
-  <h3 class="dg-section" style="margin-top:0">Session Status</h3>
-  <div class="dg-card" style="padding:16px">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-      <div>
-        <div style="font-weight:700;font-size:16px">London &amp; New York</div>
-        <div class="dg-muted" style="font-size:13px" id="sessionTime">Checking time...</div>
-      </div>
-      <div id="sessionBadge" class="dg-pill dg-pill--wait">WAIT</div>
+  <h3 class="dg-section" style="margin-top:0">Market Sessions · Live</h3>
+  <div class="dg-card" style="padding:8px">
+    <div class="news-terminal-sessions">
+      <div class="news-session"><b>London</b><time id="clockLondon">--:--</time><small id="stateLondon" class="session-closed">Checking</small></div>
+      <div class="news-session"><b>New York</b><time id="clockNewYork">--:--</time><small id="stateNewYork" class="session-closed">Checking</small></div>
+      <div class="news-session"><b>Tokyo</b><time id="clockTokyo">--:--</time><small id="stateTokyo" class="session-closed">Checking</small></div>
+      <div class="news-session"><b>Sydney</b><time id="clockSydney">--:--</time><small id="stateSydney" class="session-closed">Checking</small></div>
     </div>
-    <div class="dg-muted" id="sessionClock" style="font-size:11px;margin-top:10px">Times shown in West Africa Time (WAT)</div>
+    <div class="dg-muted" id="sessionClock" style="font-size:11px;text-align:center;margin-top:8px">Times shown in local market time · Nigeria WAT reference</div>
+    <span id="sessionTime" hidden></span><span id="sessionBadge" hidden></span>
   </div>
 
   <h3 class="dg-section">Economic Calendar</h3>
@@ -141,34 +186,28 @@
 
   function updateSession() {
     try {
-      var london = timeParts('Europe/London');
-      var ny = timeParts('America/New_York');
-      var londonOpen = isOpen(london);
-      var nyOpen = isOpen(ny);
-      var wat = timeParts('Africa/Lagos');
-
-      if (londonOpen && nyOpen) {
-        badge.textContent = 'OVERLAP';
-        badge.className = 'dg-pill dg-pill--buy';
-        sessionText.textContent = 'London and New York are open — often a busy trading window.';
-      } else if (londonOpen) {
-        badge.textContent = 'LONDON OPEN';
-        badge.className = 'dg-pill dg-pill--buy';
-        sessionText.textContent = 'London session is active.';
-      } else if (nyOpen) {
-        badge.textContent = 'NEW YORK OPEN';
-        badge.className = 'dg-pill dg-pill--buy';
-        sessionText.textContent = 'New York session is active.';
-      } else {
-        badge.textContent = 'BOTH CLOSED';
-        badge.className = 'dg-pill dg-pill--wait';
-        sessionText.textContent = 'London and New York sessions are closed. Other markets may still be active.';
-      }
-      clockText.textContent = 'WAT ' + wat.text + ' · London ' + london.text + ' · New York ' + ny.text;
-    } catch (e) {
-      badge.textContent = 'TIME UNAVAILABLE';
-      badge.className = 'dg-pill dg-pill--wait';
-      sessionText.textContent = 'Could not read session times on this device.';
+      var sessions = [
+        {zone:'Europe/London',clock:'clockLondon',state:'stateLondon'},
+        {zone:'America/New_York',clock:'clockNewYork',state:'stateNewYork'},
+        {zone:'Asia/Tokyo',clock:'clockTokyo',state:'stateTokyo'},
+        {zone:'Australia/Sydney',clock:'clockSydney',state:'stateSydney'}
+      ];
+      sessions.forEach(function(s){
+        var t=timeParts(s.zone), open=isOpen(t);
+        document.getElementById(s.clock).textContent=t.text;
+        var el=document.getElementById(s.state);
+        el.textContent=open?'● Active':'● Closed';
+        el.className=open?'session-open':'session-closed';
+      });
+      var london=timeParts('Europe/London'), ny=timeParts('America/New_York');
+      var londonOpen=isOpen(london), nyOpen=isOpen(ny), wat=timeParts('Africa/Lagos');
+      badge.textContent=londonOpen&&nyOpen?'OVERLAP':(londonOpen?'LONDON OPEN':(nyOpen?'NEW YORK OPEN':'BOTH CLOSED'));
+      badge.className='dg-pill '+(londonOpen||nyOpen?'dg-pill--buy':'dg-pill--wait');
+      sessionText.textContent=londonOpen&&nyOpen?'London and New York are open.':(londonOpen?'London session is active.':(nyOpen?'New York session is active.':'London and New York are closed.'));
+      clockText.textContent='WAT '+wat.text+' · London '+london.text+' · New York '+ny.text;
+    } catch(e) {
+      badge.textContent='TIME UNAVAILABLE'; badge.className='dg-pill dg-pill--wait';
+      sessionText.textContent='Could not read session times on this device.';
     }
   }
 
