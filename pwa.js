@@ -1,10 +1,12 @@
 (function () {
   "use strict";
-  var SW_URL = "service-worker.js";
+  var SW_URL = "./service-worker.js";
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  var deferred = null;
+  var registrationPromise = null;
 
-  function isStandalone() { return window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches; }
+  function isStandalone() {
+    return window.navigator.standalone === true || window.matchMedia("(display-mode: standalone)").matches;
+  }
 
   function notifState() {
     if (isIOS && !isStandalone()) return "needs-install";
@@ -12,69 +14,111 @@
     return Notification.permission;
   }
 
-  function askPermission() {
-    return new Promise(function (resolve) {
-      try {
-        var r = Notification.requestPermission(resolve);
-        if (r && typeof r.then === "function") r.then(resolve, function () { resolve("default"); });
-      } catch (e) { resolve("default"); }
-    });
+  function registerSW() {
+    if (!("serviceWorker" in navigator)) return Promise.reject(new Error("Service workers are not supported"));
+    if (!registrationPromise) {
+      registrationPromise = navigator.serviceWorker.register(SW_URL).then(function () {
+        return navigator.serviceWorker.ready;
+      });
+    }
+    return registrationPromise;
   }
 
-  function enableNotifications() {
-    var st = notifState();
-    if (st === "needs-install") return Promise.resolve({ status: st, message: "Add DAGBO to your Home Screen first." });
-    if (st === "unsupported") return Promise.resolve({ status: st, message: "This browser no support alerts." });
-    if (st === "granted") return Promise.resolve({ status: st, message: "Alerts are on." });
-    if (st === "denied") return Promise.resolve({ status: st, message: "Alerts are blocked. Allow them in settings." });
-    return askPermission().then(function (p) {
-      if (p === "granted") return { status: "granted", message: "Alerts on." };
-      return { status: "default", message: "You no allow am yet." };
-    });
+  function urlBase64ToUint8Array(value) {
+    var padding = "=".repeat((4 - value.length % 4) % 4);
+    var raw = window.atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
+    var result = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) result[i] = raw.charCodeAt(i);
+    return result;
   }
 
   function subscribePush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return Promise.resolve({ status: 'unsupported' });
-    return fetch('/api/push?action=public-key')
-      .then(function(res) { return res.json(); })
-      .then(function(data) {
-        if (!data.publicKey) throw new Error('No key');
-        function urlBase64ToUint8Array(base64String) {
-          const padding = '='.repeat((4 - base64String.length % 4) % 4);
-          const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-          const rawData = window.atob(base64);
-          const outputArray = new Uint8Array(rawData.length);
-          for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
-          return outputArray;
-        }
-        return navigator.serviceWorker.ready.then(function(registration) {
-          return registration.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(data.publicKey)
+    if (!("PushManager" in window)) return Promise.reject(new Error("Push notifications are not supported by this browser"));
+    return fetch("/api/push?action=public-key", { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) return res.json().then(function (d) { throw new Error(d.error || "Could not load push key"); });
+        return res.json();
+      })
+      .then(function (data) {
+        if (!data.publicKey) throw new Error("Push public key is missing on the server");
+        return registerSW().then(function (reg) {
+          return reg.pushManager.getSubscription().then(function (existing) {
+            if (existing) return existing;
+            return reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(data.publicKey)
+            });
           });
         });
       })
-      .then(function(subscription) {
-        return fetch('/api/push?action=subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+      .then(function (subscription) {
+        return fetch("/api/push?action=subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(subscription)
+        }).then(function (res) {
+          if (!res.ok) return res.json().then(function (d) { throw new Error(d.error || "Could not save subscription"); });
+          return subscription;
         });
-      })
-      .then(function() { return { status: 'granted', message: 'Push notifications enabled!' }; })
-      .catch(function(err) { console.error(err); return { status: 'error', message: 'Failed to subscribe' }; });
+      });
   }
 
-  function registerSW() {
-    if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register(SW_URL).catch(function () {});
+  function enableNotifications() {
+    var state = notifState();
+    if (state === "needs-install") return Promise.reject(new Error("Add DAGBO SIGNAL to your Home Screen first, then enable notifications."));
+    if (state === "unsupported") return Promise.reject(new Error("This browser does not support notifications."));
+    if (state === "denied") return Promise.reject(new Error("Notifications are blocked. Allow them in your browser settings."));
+    var permission = state === "granted" ? Promise.resolve("granted") : Notification.requestPermission();
+    return permission.then(function (result) {
+      if (result !== "granted") throw new Error("Notification permission was not granted.");
+      return subscribePush();
+    }).then(function () {
+      return { status: "granted", message: "Push notifications are enabled on this device." };
+    });
+  }
+
+  function disableNotifications() {
+    return registerSW().then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function (subscription) {
+      if (!subscription) return { status: "disabled" };
+      return fetch("/api/push?action=unsubscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: subscription.endpoint })
+      }).then(function (res) {
+        if (!res.ok) throw new Error("Could not remove notification subscription from server");
+        return subscription.unsubscribe();
+      }).then(function () {
+        return { status: "disabled" };
+      });
+    });
+  }
+
+  function sendTest() {
+    return registerSW().then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function (subscription) {
+      if (!subscription) throw new Error("Enable notifications first.");
+      return fetch("/api/push?action=test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription)
+      });
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        if (!res.ok) throw new Error(data.error || "Test notification failed");
+        return data;
+      });
+    });
   }
 
   window.DagboPWA = {
     enableNotifications: enableNotifications,
-    subscribePush: subscribePush,
+    disableNotifications: disableNotifications,
+    sendTest: sendTest,
     notifState: notifState
   };
-  
-  registerSW();
+
+  registerSW().catch(function (error) { console.error("DAGBO service worker:", error); });
 })();
