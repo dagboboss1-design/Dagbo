@@ -174,8 +174,9 @@ module.exports = async function handler(req, res) {
 
       // Notify only the device that asked the question, never every app subscriber.
       if (validSubscription(subscription)) {
-        configureVapid();
         try {
+          // Push is optional: a missing VAPID setup must not block the AI answer.
+          configureVapid();
           await webpush.sendNotification(subscription, JSON.stringify({
             title: "🤖 Dagbo AI Answer",
             body: "Your AI answer is ready. Tap to read it.",
@@ -184,10 +185,14 @@ module.exports = async function handler(req, res) {
           }), { TTL: 60, urgency: "normal" });
         } catch (error) {
           if ([404, 410].includes(error.statusCode)) {
-            const redis = getRedis();
-            const id = getId(subscription.endpoint);
-            await redis.del("dagbo:push:sub:" + id);
-            await redis.srem(SUBSCRIPTIONS, id);
+            try {
+              const redis = getRedis();
+              const id = getId(subscription.endpoint);
+              await redis.del("dagbo:push:sub:" + id);
+              await redis.srem(SUBSCRIPTIONS, id);
+            } catch (cleanupError) {
+              console.error("DAGBO AI subscription cleanup error:", cleanupError.message);
+            }
           } else {
             console.error("DAGBO AI push delivery error:", error.message);
           }
