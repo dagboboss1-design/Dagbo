@@ -3,38 +3,63 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F5F5F7">
+<meta name="theme-color" content="#F5F5F7" id="themeColor">
 <title>Chart · DAGBO SIGNAL</title>
+
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
+
 <style>
-  .chart-indicator-legend{display:flex;gap:7px;overflow-x:auto;padding:9px 2px 12px;margin:0 0 4px;scrollbar-width:none}
-  .chart-indicator-legend span{flex:none;border:1px solid var(--dg-line);border-radius:4px;padding:6px 8px;color:var(--dg-text-2);font-size:10px;font-weight:750;letter-spacing:.35px;white-space:nowrap}
-  #chartOverlayTools{background:rgba(12,14,17,.94);border:1px solid rgba(180,195,215,.18);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
-  #chartOverlayTools button{border-radius:5px;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);padding:6px 9px}
-  #chartOverlayTools #drawingStatus{display:none}
-  /* THE FIX: Force the container height and position */
+  /* THE CHART CONTAINER */
   #tv-chart-container {
+    height: calc(100vh - 280px); /* Fills screen perfectly */
+    min-height: 550px;
     width: 100%;
-    height: 88vh;
-    min-height: 640px;
-    max-height: 1100px;
     border-radius: 16px;
     overflow: hidden;
     background: #000;
     margin-bottom: 16px;
     position: relative;
   }
-
-  /* Force the iframe to fill the absolute space */
+  
   #tv-chart-container iframe {
-    position: absolute;
-    inset: 0;
     width: 100% !important;
     height: 100% !important;
-    display: block;
     border: none !important;
+    display: block;
+  }
+
+  /* FULLSCREEN MODE (For drawing tools) */
+  body.chart-full #tv-chart-container {
+    position: fixed !important;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100vw !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    z-index: 9999;
+    border-radius: 0;
+    margin: 0;
+  }
+  
+  body.chart-full #tv-chart-container iframe {
+    height: 100dvh !important;
+  }
+
+  /* FULLSCREEN BUTTON */
+  #btnFull {
+    position: absolute;
+    top: 10px; right: 10px;
+    z-index: 10;
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    border: 1px solid #555;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
   }
   
   .chart-pair-select {
@@ -47,22 +72,10 @@
     border-radius: 16px;
     cursor: pointer; width: 100%;
     text-align: center; margin-bottom: 12px;
+    box-shadow: var(--dg-shadow);
   }
-  #tv-chart-container{position:relative;touch-action:pan-y;overflow:hidden}
-  #chartOverlayTools{position:absolute;z-index:12;top:auto;bottom:10px;left:10px;right:10px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:6px;background:rgba(12,20,32,.94);border:1px solid rgba(180,195,215,.22);border-radius:13px;box-shadow:0 5px 18px rgba(0,0,0,.28);backdrop-filter:blur(12px)}
-  #chartOverlayTools .tool-label{font-size:9px;font-weight:900;letter-spacing:.7px;color:#91a5bd;padding:0 5px}
-  #chartOverlayTools button{border:1px solid rgba(130,155,184,.25);background:rgba(30,45,64,.82);color:#e9f0fa;border-radius:9px;padding:7px 10px;font-size:11px;font-weight:800;min-height:34px;white-space:nowrap}
-  #chartOverlayTools button[data-tool="long"]{border-color:rgba(47,202,133,.5);color:#73e2ad}
-  #chartOverlayTools button[data-tool="short"]{border-color:rgba(240,91,104,.5);color:#ff9da6}
-  #chartOverlayTools button[data-tool="line"],#chartOverlayTools button[data-tool="rect"],#chartOverlayTools button[data-tool="triangle"],#chartOverlayTools button[data-tool="fib"],#chartOverlayTools button[data-tool="hline"]{background:rgba(22,36,53,.78)}
-  #chartOverlayTools button.is-active{background:#d9ad43!important;color:#101722!important;border-color:#f0cb69!important}
-  #chartOverlayTools #drawingStatus{flex:1 0 100%;font-size:10px;color:#aabbd0;margin:0;padding:1px 4px}
-  @media(max-width:420px){#chartOverlayTools{gap:4px;padding:5px}#chartOverlayTools button{padding:6px 8px;font-size:10px;min-height:31px}#chartOverlayTools .tool-label{display:none}}
-  #dagboDrawingLayer{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none;touch-action:none}
-  #tv-chart-container.drawing-active iframe{pointer-events:none}
-  #tv-chart-container.drawing-active #dagboDrawingLayer{pointer-events:auto;cursor:crosshair}
-  #chartOverlayTools [data-tool].is-active{background:#d9ad43;color:#101722;border-color:#f0cb69}
 </style>
+
 <script>
   (function(){
     try{
@@ -74,11 +87,13 @@
 </script>
 </head>
 <body>
+
 <main class="dg-page">
   <div class="dg-top">
     <div class="dg-brand">◈ DAGBO SIGNAL</div>
     <div class="dg-badge">CHART</div>
   </div>
+  
   <h1 class="dg-title">Live Chart</h1>
   <p class="dg-subtitle">Real price. Real zones. Check before you enter.</p>
 
@@ -92,38 +107,29 @@
     <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
   </div>
 
+  <div id="tv-chart-container">
+    <button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button>
+  </div>
 
-  <div class="chart-indicator-legend" aria-label="Chart indicators"><span>VOL · VOLUME</span><span>RSI · 14</span><span>MACD · 12 / 26 / 9</span><span>PRICE STRUCTURE · BOS / CHoCH</span></div>
-
-
-
-  <!-- Chart Box -->
-  <div id="tv-chart-container"></div>
-  <section class="dg-card" id="chartRiskPlanner" style="margin:12px 0">
-    <h2 class="dg-card__title">Long / Short Risk Planner</h2>
-    <div class="dg-grid-2">
-      <label class="dg-field"><span class="dg-label">Direction</span><select id="chartPlanDir" class="dg-input"><option value="LONG">LONG</option><option value="SHORT">SHORT</option></select></label>
-      <label class="dg-field"><span class="dg-label">Account size ($)</span><input id="chartPlanAccount" class="dg-input" type="number" min="1" value="100"></label>
-      <label class="dg-field"><span class="dg-label">Risk (%)</span><input id="chartPlanRisk" class="dg-input" type="number" min="0.01" max="100" step="any" value="1"></label>
-      <label class="dg-field"><span class="dg-label">Entry</span><input id="chartPlanEntry" class="dg-input" type="number" step="any"></label>
-      <label class="dg-field"><span class="dg-label">Stop loss</span><input id="chartPlanSL" class="dg-input" type="number" step="any"></label>
-      <label class="dg-field"><span class="dg-label">Take profit</span><input id="chartPlanTP" class="dg-input" type="number" step="any"></label>
-    </div>
-    <button type="button" id="chartPlanCalc" class="dg-btn dg-btn--primary dg-btn--block" style="margin-top:10px">Calculate Long / Short plan</button>
-    <div id="chartPlanResult" class="dg-muted" style="margin-top:10px" aria-live="polite">Enter entry, stop and target to calculate risk and reward.</div>
-  </section>
-
-  <section class="dg-card" style="margin:12px 0"><h2 class="dg-card__title">Indicator key</h2><p class="dg-muted" style="font-size:12px;line-height:1.6;margin:8px 0 0">Volume, RSI and MACD are loaded as TradingView studies. The BOS / CHoCH label is a structure-analysis category; the embedded TradingView chart cannot load private or account-only Pine indicators from your TradingView app. Long / Short and drawing tools here are visual planning overlays, not broker orders.</p></section>
-
+  <button class="dg-btn" style="width:100%;min-height:44px;border-radius:12px;font-weight:700;background:var(--dg-fill);color:var(--dg-text)" onclick="toggleFull()">Make Chart Bigger / Draw Tools ⛶</button>
 
 </main>
 
-
+<nav class="dg-tabbar" aria-label="Main">
+  <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
+  <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
+  <a class="dg-tab" aria-current="page" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
+  <a class="dg-tab" href="news.html"><span class="dg-tab__icon">📰</span>News</a>
+  <a class="dg-tab" href="boss1.html"><span class="dg-tab__icon">👑</span>BOSS1</a>
+  <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
+  <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
+</nav>
 
 <script src="pwa.js" defer></script>
 <script>
 (function(){
   'use strict';
+
   var PAIRS = [
     { id: 'XAUUSD', label: 'GOLD (XAUUSD)', tv: 'CAPITALCOM:XAUUSD' },
     { id: 'EURUSD', label: 'EUR/USD', tv: 'FOREXCOM:EURUSD' },
@@ -142,11 +148,13 @@
     { id: 'EURJPY', label: 'EUR/JPY', tv: 'FOREXCOM:EURJPY' },
     { id: 'EURGBP', label: 'EUR/GBP', tv: 'FOREXCOM:EURGBP' }
   ];
+
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
+  
   var enabledIds = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : PAIRS.map(function(p){ return p.id; });
   var activePairs = PAIRS.filter(function(p){ return enabledIds.indexOf(p.id) > -1 || (enabledIds.indexOf('GOLD') > -1 && p.id === 'XAUUSD'); });
-  
+
   var currentPair = 'CAPITALCOM:XAUUSD';
   var currentTF = '15';
 
@@ -155,161 +163,70 @@
     sel.innerHTML = '';
     activePairs.forEach(function(p) {
       var opt = document.createElement('option');
-      opt.value = p.tv; opt.textContent = p.label;
+      opt.value = p.tv;
+      opt.textContent = p.label;
       sel.appendChild(opt);
     });
+
+    // Check URL for a specific pair
     var urlParams = new URLSearchParams(window.location.search);
     var urlPair = urlParams.get('pair');
     if (urlPair) {
       var matched = PAIRS.filter(function(p){ return p.id === urlPair || (urlPair === 'GOLD' && p.id === 'XAUUSD'); })[0];
-      if (matched && activePairs.indexOf(matched) > -1) { currentPair = matched.tv; sel.value = currentPair; }
+      if (matched && activePairs.indexOf(matched) > -1) {
+        currentPair = matched.tv;
+        sel.value = currentPair;
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     } else {
-      if (activePairs.length > 0) { currentPair = activePairs[0].tv; sel.value = currentPair; }
+      if (activePairs.length > 0) {
+        currentPair = activePairs[0].tv;
+        sel.value = currentPair;
+      }
     }
   }
 
-  // THE MAGIC FIX FROM YOUR CODE
   function loadChart() {
     var container = document.getElementById('tv-chart-container');
+    var btn = document.getElementById('btnFull');
     container.innerHTML = '';
+    container.appendChild(btn); // Keep the fullscreen button
 
     var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     var theme = isDark ? 'dark' : 'light';
 
-    // Give TradingView the actual chart height
-    var chartHeight = Math.max(
-      640,
-      Math.min(1100, Math.floor(window.innerHeight * 0.88))
-    );
-
-    container.style.height = chartHeight + 'px';
-
     var iframe = document.createElement('iframe');
-    iframe.title = 'DAGBO SIGNAL Live Trading Chart';
-
-    iframe.src = 'https://s.tradingview.com/widgetembed/?symbol=' +
-      encodeURIComponent(currentPair) +
-      '&interval=' + currentTF +
+    
+    // THE MAGIC URL: 
+    // hidesidetoolbar=0 (Shows Drawing Tools)
+    // hide_volume=true (Stops the volume error)
+    iframe.src = 'https://s.tradingview.com/widgetembed/?symbol=' + encodeURIComponent(currentPair) +
+      '&interval=' + currentTF + 
       '&theme=' + theme +
-      '&style=1' +
-      '&locale=en' +
-      '&timezone=Africa%2FLagos' +
-      '&width=100%25' +
-      '&height=' + chartHeight +
-      '&hidesidetoolbar=0' +
-      '&symboledit=0' +
-      '&saveimage=0' +
-      '&toolbarbg=rgba(0,0,0,0)' +
-      '&hide_volume=false' +
-      '&studies=Volume%40tv-basicstudies;RSI%40tv-basicstudies;MACD%40tv-basicstudies';
-
+      '&style=1&locale=en&timezone=Africa%2FLagos' +
+      '&hidesidetoolbar=0' + 
+      '&symboledit=0&saveimage=0&toolbarbg=rgba(0,0,0,0)' +
+      '&hide_volume=true' +
+      '&studies=RSI%40tv-basicstudies';
+    
+    iframe.setAttribute('allowfullscreen', '');
     container.appendChild(iframe);
-    var layer=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    layer.setAttribute('id','dagboDrawingLayer');
-    layer.setAttribute('viewBox','0 0 '+container.clientWidth+' '+chartHeight);
-    layer.setAttribute('preserveAspectRatio','none');
-    container.appendChild(layer);
-    var toolbar=document.createElement('div');
-    toolbar.id='chartOverlayTools';
-    toolbar.innerHTML='<span class="tool-label">DRAW</span><button type="button" data-tool="off" aria-label="Move chart">↖</button><button type="button" data-tool="long">↗ Long</button><button type="button" data-tool="short">↘ Short</button><button type="button" data-tool="line">╱</button><button type="button" data-tool="rect">▭</button><button type="button" data-tool="triangle">△</button><button type="button" data-tool="fib">FIB</button><button type="button" data-tool="hline">—</button><button type="button" id="undoDrawing">↶</button><button type="button" id="clearDrawings">×</button><span id="drawingStatus">Select a tool and drag on the chart.</span>';
-    container.appendChild(toolbar);
-    initDrawingLayer(layer,container);
-  }
-
-  function initDrawingLayer(layer,container){
-    var tool='off',start=null,preview=null;
-    var key='dagbo_chart_drawings_'+currentPair+'_'+currentTF;
-    var drawings=[];try{drawings=JSON.parse(localStorage.getItem(key))||[]}catch(e){drawings=[]}
-    function el(name,attrs,parent){var node=document.createElementNS('http://www.w3.org/2000/svg',name);Object.keys(attrs||{}).forEach(function(k){node.setAttribute(k,attrs[k])});(parent||layer).appendChild(node);return node;}
-    function point(evt){var r=layer.getBoundingClientRect();return{x:Math.max(0,Math.min(r.width,evt.clientX-r.left)),y:Math.max(0,Math.min(r.height,evt.clientY-r.top))};}
-    function persist(){localStorage.setItem(key,JSON.stringify(drawings.slice(-100)));}
-    function shape(d){
-      var x1=d.x1,y1=d.y1,x2=d.x2,y2=d.y2;
-      if(d.kind==='line')el('line',{x1,y1,x2,y2,stroke:'#f4c95d','stroke-width':2});
-      if(d.kind==='hline')el('line',{x1:0,y1:y1,x2:layer.clientWidth,y2:y1,stroke:'#f4c95d','stroke-width':2,'stroke-dasharray':'6 4'});
-      if(d.kind==='rect')el('rect',{x:Math.min(x1,x2),y:Math.min(y1,y2),width:Math.max(2,Math.abs(x2-x1)),height:Math.max(2,Math.abs(y2-y1)),fill:'#f4c95d','fill-opacity':'.12',stroke:'#f4c95d','stroke-width':2});
-      if(d.kind==='triangle')el('polygon',{points:x1+','+y1+' '+x2+','+y2+' '+x1+','+y2,fill:'#f4c95d','fill-opacity':'.12',stroke:'#f4c95d','stroke-width':2});
-      if(d.kind==='fib'){
-        var top=Math.min(y1,y2),bottom=Math.max(y1,y2),height=Math.max(2,bottom-top),left=Math.min(x1,x2),right=Math.max(x1,x2);
-        [0,0.236,0.382,0.5,0.618,0.786,1].forEach(function(level){var y=top+height*level;el('line',{x1:left,y1:y,x2:Math.max(left+12,right),y2:y,stroke:'#f4c95d','stroke-width':1,'stroke-dasharray':'4 3'});el('text',{x:left+4,y:Math.max(12,y-3),fill:'#f4c95d','font-size':10}).textContent=(level*100).toFixed(1)+'%';});
-      }
-      if(d.kind==='long'||d.kind==='short'){
-        var distance=Math.max(8,Math.abs(y2-y1)),entry=y1,left=Math.min(x1,x2),width=Math.max(90,Math.abs(x2-x1));
-        var target=d.kind==='long'?entry-distance:entry+distance;
-        var stop=d.kind==='long'?entry+distance:entry-distance;
-        var rewardTop=Math.min(entry,target),riskTop=Math.min(entry,stop);
-        var right=Math.min(layer.clientWidth-4,left+width);
-        left=Math.max(4,Math.min(left,layer.clientWidth-12));
-        width=Math.max(8,right-left);
-        var green='#27c987',red='#ef6672',labelBg='#101b29';
-        el('rect',{x:left,y:rewardTop,width,height:distance,fill:green,'fill-opacity':'.20',stroke:green,'stroke-width':1.5,rx:2});
-        el('rect',{x:left,y:riskTop,width,height:distance,fill:red,'fill-opacity':'.17',stroke:red,'stroke-width':1.5,rx:2});
-        el('line',{x1:left-4,y1:entry,x2:left+width+4,y2:entry,stroke:'#f4f7fb','stroke-width':1.7,'stroke-dasharray':'5 3'});
-        el('line',{x1:left,y1:target,x2:left+width,y2:target,stroke:green,'stroke-width':1.2});
-        el('line',{x1:left,y1:stop,x2:left+width,y2:stop,stroke:red,'stroke-width':1.2});
-        function tag(text,x,y,color){
-          var w=Math.max(54,text.length*6.2+12),yy=Math.max(13,Math.min(layer.clientHeight-4,y));
-          el('rect',{x:x,y:yy-12,width:w,height:17,rx:4,fill:labelBg,stroke:color,'stroke-width':.8});
-          el('text',{x:x+6,y:yy,fill:color,'font-size':10,'font-weight':800}).textContent=text;
-        }
-        tag(d.kind==='long'?'LONG · TARGET':'SHORT · TARGET',left+3,target,green);
-        tag('ENTRY',left+3,entry,'#f4f7fb');
-        tag('STOP LOSS',left+3,stop,red);
-        tag('R:R 1:1',left+width-57,entry,'#f4c95d');
-      }
-    }
-    function render(){layer.innerHTML='';drawings.forEach(shape);if(preview)shape(preview);}
-    function selectTool(next){tool=next;container.classList.toggle('drawing-active',tool!=='off');document.querySelectorAll('#chartOverlayTools [data-tool]').forEach(function(b){b.classList.toggle('is-active',b.getAttribute('data-tool')===tool)});document.getElementById('drawingStatus').textContent=tool==='off'?'Move Chart is active.':'Drag on the chart to place '+tool.toUpperCase()+'.';}
-    document.querySelectorAll('#chartOverlayTools [data-tool]').forEach(function(b){b.addEventListener('click',function(){selectTool(b.getAttribute('data-tool'))})});
-    layer.addEventListener('pointerdown',function(e){if(tool==='off')return;start=point(e);preview={kind:tool,x1:start.x,y1:start.y,x2:start.x,y2:start.y};layer.setPointerCapture(e.pointerId);render();});
-    layer.addEventListener('pointermove',function(e){if(!start||!preview)return;var p=point(e);preview.x2=p.x;preview.y2=p.y;render();});
-    layer.addEventListener('pointerup',function(e){if(!start||!preview)return;var p=point(e);preview.x2=p.x;preview.y2=p.y;if(Math.abs(p.x-start.x)+Math.abs(p.y-start.y)>6){drawings.push(preview);persist()}preview=null;start=null;render();});
-    document.getElementById('undoDrawing').onclick=function(){drawings.pop();persist();render()};
-    document.getElementById('clearDrawings').onclick=function(){if(confirm('Clear drawings for this market and timeframe?')){drawings=[];persist();render()}};
-    selectTool('off');render();
-    if(window.ResizeObserver){
-      var resizeObserver=new ResizeObserver(function(){
-        var w=container.clientWidth,h=container.clientHeight;
-        layer.setAttribute('viewBox','0 0 '+w+' '+h);
-        render();
-      });
-      resizeObserver.observe(container);
-    }
   }
 
   window.changePair = function(tvSymbol) { currentPair = tvSymbol; loadChart(); };
   window.changeTF = function(tf) { currentTF = tf; loadChart(); };
+  
+  window.toggleFull = function() {
+    document.body.classList.toggle('chart-full');
+    var btn = document.getElementById('btnFull');
+    btn.textContent = document.body.classList.contains('chart-full') ? '✕ CLOSE' : '⛶ FULLSCREEN';
+    setTimeout(loadChart, 100);
+  };
+
   buildDropdown();
   loadChart();
-  var chartSettings={};
-  try { chartSettings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}; } catch(e) {}
-  document.getElementById('chartPlanAccount').value=Number(chartSettings.accountSize)||100;
-  document.getElementById('chartPlanRisk').value=Number(chartSettings.risk)||1;
-  document.getElementById('chartPlanCalc').addEventListener('click',function(){
-    var dir=document.getElementById('chartPlanDir').value;
-    var account=Number(document.getElementById('chartPlanAccount').value);
-    var risk=Number(document.getElementById('chartPlanRisk').value);
-    var entry=Number(document.getElementById('chartPlanEntry').value);
-    var sl=Number(document.getElementById('chartPlanSL').value);
-    var tp=Number(document.getElementById('chartPlanTP').value);
-    var riskDistance=dir==='LONG'?entry-sl:sl-entry;
-    var rewardDistance=dir==='LONG'?tp-entry:entry-tp;
-    var out=document.getElementById('chartPlanResult');
-    if(![account,risk,entry,sl,tp].every(Number.isFinite)||account<=0||risk<=0||risk>100||entry<=0||sl<=0||tp<=0||riskDistance<=0||rewardDistance<=0){
-      out.textContent='Invalid levels. LONG needs SL below entry and TP above. SHORT needs SL above entry and TP below.';
-      return;
-    }
-    var rr=rewardDistance/riskDistance;
-    out.textContent=[
-      'Risk budget: $', (account*risk/100).toFixed(2),
-      ' | Price risk: ', riskDistance.toPrecision(7),
-      ' | Price reward: ', rewardDistance.toPrecision(7),
-      ' | R:R ', rr.toFixed(2), 'R',
-      rr>=1.5?' · Meets 1.5R guide':' · Below 1.5R guide'
-    ].join('');
-  });
+
 })();
 </script>
-<script src="navigation.js" defer></script>
 </body>
 </html>
