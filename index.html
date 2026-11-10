@@ -6,20 +6,15 @@
 <meta name="theme-color" content="#F5F5F7" id="themeColor">
 <title>DAGBO SIGNAL · Home</title>
 
-<!-- PWA Links -->
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-
-<!-- THE NEW DESIGN SYSTEM -->
 <link rel="stylesheet" href="dagbo.css">
 
 <script>
-  // Set dark mode based on settings before page loads
   (function(){
     try{
       var s = JSON.parse(localStorage.getItem('dagbo_settings')) || {};
-      var follow = s.followSystem !== false;
-      var dark = follow ? window.matchMedia('(prefers-color-scheme: dark)').matches : s.theme === 'dark';
+      var dark = s.theme === 'dark';
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     }catch(e){}
   })();
@@ -29,7 +24,7 @@
 
 <main class="dg-page">
 
-  <!-- Top Header -->
+  <!-- Header -->
   <div class="dg-top">
     <div class="dg-brand">◈ DAGBO SIGNAL</div>
     <div class="dg-badge">HOME</div>
@@ -55,18 +50,27 @@
     </div>
   </div>
 
-  <!-- TODAY'S SIGNAL PREVIEW -->
-  <h3 class="dg-section" style="margin-top:0">Today's Signal</h3>
-  <section class="dg-card" id="previewCard" style="cursor:pointer" onclick="location.href='signals.html'">
-    <div id="previewBody">
-      <div class="dg-muted" style="text-align:center;padding:20px 0">Loading signal...</div>
+  <!-- LIVE CHART PRICE PREVIEW -->
+  <h3 class="dg-section" style="margin-top:0">Live Market</h3>
+  <section class="dg-card" id="previewCard" style="cursor:pointer; padding: 20px 16px;" onclick="location.href='chart.html'">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h2 style="font-size:20px; font-weight:800; margin:0;" id="livePairName">GOLD (XAUUSD)</h2>
+      <span class="dg-pill dg-pill--open" style="font-size:11px;">LIVE</span>
+    </div>
+    
+    <!-- TradingView Live Ticker goes here -->
+    <div class="tradingview-widget-container" style="background:transparent;">
+      <div class="tradingview-widget-container__widget" id="tv-live-price"></div>
+    </div>
+    
+    <div style="text-align:center; margin-top:16px; font-size:12px; color:var(--dg-blue-ink); font-weight:600;">
+      Tap to open full chart →
     </div>
   </section>
 
-  <!-- NAVIGATION CARDS (Apple Style Rows) -->
+  <!-- NAVIGATION CARDS -->
   <h3 class="dg-section">Your Desk</h3>
   <div class="dg-card dg-card--flush">
-    
     <a class="dg-row dg-row--link" href="signals.html">
       <span class="dg-row__icon dg-row__icon--green">⚡︎</span>
       <span class="dg-row__body">
@@ -74,7 +78,6 @@
         <span class="dg-row__sub">3 systems combine into 1 final signal</span>
       </span>
     </a>
-
     <a class="dg-row dg-row--link" href="chart.html">
       <span class="dg-row__icon">▥</span>
       <span class="dg-row__body">
@@ -82,7 +85,6 @@
         <span class="dg-row__sub">16 pairs · TradingView live</span>
       </span>
     </a>
-
     <a class="dg-row dg-row--link" href="ai.html">
       <span class="dg-row__icon dg-row__icon--amber">✦</span>
       <span class="dg-row__body">
@@ -90,7 +92,6 @@
         <span class="dg-row__sub">200 pillars · voice in Pidgin</span>
       </span>
     </a>
-
     <a class="dg-row dg-row--link" href="journal.html">
       <span class="dg-row__icon dg-row__icon--red">✎</span>
       <span class="dg-row__body">
@@ -98,7 +99,6 @@
         <span class="dg-row__sub">Write every trade. Grow from data.</span>
       </span>
     </a>
-
     <a class="dg-row dg-row--link" href="settings.html">
       <span class="dg-row__icon dg-row__icon--grey">⚙︎</span>
       <span class="dg-row__body">
@@ -106,39 +106,26 @@
         <span class="dg-row__sub">Account, risk, pairs, theme</span>
       </span>
     </a>
-
   </div>
 
   <p class="dg-note">
     <b>Honest truth:</b> Dagbo is a trading teacher + chart + journal.<br>
-    It does NOT connect to any broker or place trades. Demo signals are for learning only.
+    It does NOT connect to any broker. Demo signals are for learning only.
   </p>
 
 </main>
 
-<!-- BOTTOM TAB BAR -->
 <nav class="dg-tabbar" aria-label="Main">
-  <a class="dg-tab" aria-current="page" href="index.html">
-    <span class="dg-tab__icon">◈</span>Home
-  </a>
-  <a class="dg-tab" href="signals.html">
-    <span class="dg-tab__icon">⚡︎</span>Signals
-  </a>
-  <a class="dg-tab" href="chart.html">
-    <span class="dg-tab__icon">▥</span>Chart
-  </a>
-  <a class="dg-tab" href="ai.html">
-    <span class="dg-tab__icon">✦</span>AI
-  </a>
-  <a class="dg-tab" href="journal.html">
-    <span class="dg-tab__icon">✎</span>Journal
-  </a>
+  <a class="dg-tab" aria-current="page" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
+  <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
+  <a class="dg-tab" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
+  <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
+  <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
 </nav>
 
 <script src="pwa.js" defer></script>
 <script>
 (function(){
-  // Read Settings
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
 
@@ -169,60 +156,40 @@
     }
   } catch(e){}
 
-  // Today's Signal Preview (Demo data)
-  var pairs = Array.isArray(settings.pairs) ? settings.pairs : ['XAUUSD','EURUSD','GBPUSD'];
+  // Load Live Price Ticker
+  var pairs = Array.isArray(settings.pairs) ? settings.pairs : ['XAUUSD'];
   var pair = pairs[0] || 'XAUUSD';
   if (pair === 'GOLD') pair = 'XAUUSD';
-  
-  // Fake random signal based on day
-  var seed = new Date().toDateString() + pair;
-  var hash = 0; for (var i = 0; i < seed.length; i++) hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-  var rand = Math.abs(hash) / 2147483647;
-  var finals = ['STRONG BUY', 'WEAK BUY', 'STRONG SELL', 'WEAK SELL', 'NO TRADE'];
-  var final = finals[Math.floor(rand * finals.length)];
-  
-  var isBuy = final.includes('BUY');
-  var isSell = final.includes('SELL');
-  var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
-  var pillCls = isBuy ? 'dg-pill--buy' : (isSell ? 'dg-pill--sell' : 'dg-pill--wait');
-  var pillText = isBuy ? 'BUY' : (isSell ? 'SELL' : 'WAIT');
 
-  var bodyHtml = '';
-  if (final === 'NO TRADE') {
-    bodyHtml = 
-      '<div class="dg-card__head"><h2 class="dg-card__title">' + pair + '</h2><span class="dg-pill ' + pillCls + '">' + pillText + '</span></div>' +
-      '<div class="dg-signal" style="margin-top:20px"><div class="dg-signal__word ' + cls + '">NO TRADE</div><div class="dg-signal__meta">One of the 3 systems says WAIT.</div></div>';
-  } else {
-    // Generate fake levels
-    var anchor = pair === 'XAUUSD' ? 2350 : (pair === 'EURUSD' ? 1.0850 : 1.27);
-    var stop = pair === 'XAUUSD' ? 15 : 0.0020;
-    var entry = anchor + (rand - 0.5) * stop;
-    var sl = isBuy ? entry - stop : entry + stop;
-    var tp1 = isBuy ? entry + stop * 1.5 : entry - stop * 1.5;
-    var tp2 = isBuy ? entry + stop * 2.5 : entry - stop * 2.5;
-    var dp = pair === 'XAUUSD' ? 2 : 5;
-    
-    function fmt(v) { return v.toFixed(dp); }
+  document.getElementById('livePairName').textContent = pair === 'XAUUSD' ? 'GOLD (XAUUSD)' : pair;
 
-    bodyHtml = 
-      '<div class="dg-card__head"><h2 class="dg-card__title">' + pair + '</h2><span class="dg-pill ' + pillCls + '">' + pillText + '</span></div>' +
-      '<div class="dg-signal">' +
-        '<div class="dg-signal__label">Final Signal</div>' +
-        '<div class="dg-signal__word ' + cls + '">' + final + '</div>' +
-        '<div class="dg-signal__meta">Demo Preview</div>' +
-        '<div class="dg-levels">' +
-          '<div class="dg-level"><span>Entry</span><strong>' + fmt(entry) + '</strong></div>' +
-          '<div class="dg-level"><span>Stop Loss</span><strong class="dg-neg">' + fmt(sl) + '</strong></div>' +
-          '<div class="dg-level"><span>Take Profit 1</span><strong class="dg-pos">' + fmt(tp1) + '</strong></div>' +
-          '<div class="dg-level"><span>Take Profit 2</span><strong class="dg-pos">' + fmt(tp2) + '</strong></div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="dg-card__foot" style="text-align:center;margin-top:16px">Tap to see full breakdown on Signals page</div>';
-  }
-  
-  document.getElementById('previewBody').innerHTML = bodyHtml;
+  // Map to TradingView symbols
+  var tvSymbols = {
+    'XAUUSD': 'CAPITALCOM:XAUUSD', 'EURUSD': 'FOREXCOM:EURUSD', 'GBPUSD': 'FOREXCOM:GBPUSD',
+    'USDJPY': 'FOREXCOM:USDJPY', 'GBPJPY': 'FOREXCOM:GBPJPY', 'AUDUSD': 'FOREXCOM:AUDUSD',
+    'USDCHF': 'FOREXCOM:USDCHF', 'USDCAD': 'FOREXCOM:USDCAD', 'NZDUSD': 'FOREXCOM:NZDUSD',
+    'US30': 'CAPITALCOM:US30', 'US100': 'CAPITALCOM:US100', 'NAS100': 'CAPITALCOM:US100',
+    'US500': 'CAPITALCOM:US500', 'BTCUSD': 'BINANCE:BTCUSDT', 'BTC': 'BINANCE:BTCUSDT',
+    'ETHUSD': 'BINANCE:ETHUSDT', 'ETH': 'BINANCE:ETHUSDT', 'EURJPY': 'FOREXCOM:EURJPY', 'EURGBP': 'FOREXCOM:EURGBP'
+  };
+  var tvSymbol = tvSymbols[pair] || 'CAPITALCOM:XAUUSD';
+
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  // Initialize TradingView Ticker Tape (Single)
+  var script = document.createElement('script');
+  script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js';
+  script.async = true;
+  script.innerHTML = JSON.stringify({
+    "symbol": tvSymbol,
+    "width": "100%",
+    "colorTheme": isDark ? "dark" : "light",
+    "isTransparent": true,
+    "locale": "en"
+  });
+  document.getElementById('tv-live-price').appendChild(script);
 
 })();
 </script>
 </body>
-</html>
+  </html>
