@@ -49,6 +49,22 @@
     <span class="dg-row__body"><span class="dg-row__title">Smart Alert Centre</span><span class="dg-row__sub">Review signal changes recorded on this device</span></span>
   </a>
 
+
+  <section class="dg-card" style="margin:14px 0">
+    <div class="dg-card__head"><h2 class="dg-card__title">👑 BOSS1 Strategy Desk</h2><span class="dg-pill dg-pill--open">Signals</span></div>
+    <div class="dg-grid-2">
+      <label class="dg-field"><span class="dg-label">Trading style</span><select id="b1Style" class="dg-input"><option value="both">Scalping + Intraday</option><option value="scalp">Scalping</option><option value="intraday">Intraday</option></select></label>
+      <label class="dg-field"><span class="dg-label">Decision mode</span><select id="b1Mode" class="dg-input"><option value="hybrid">Hybrid · recommend</option><option value="manual">Manual · choose playbook</option><option value="auto">Automatic · rank setups</option></select></label>
+    </div>
+    <label class="dg-field" style="margin-top:10px"><span class="dg-label">Strategy playbook to focus on</span>
+      <select id="b1Strategy" class="dg-input">
+        <option>Liquidity Sweep &amp; Reversal</option><option>Session Breakout &amp; Retest</option><option>VWAP Pullback</option><option>Trend Pullback Sniper</option><option>Range Reversal Hunter</option><option>Momentum Expansion</option>
+      </select>
+    </label>
+    <p class="dg-muted" id="b1StrategyInfo" style="font-size:12px;margin:8px 0 0">Focus selection is a study filter. Each signal card will show the actual system strategy that generated its direction.</p>
+    <p class="dg-muted" id="b1ModeInfo" style="font-size:12px;margin:6px 0 0">Hybrid: review the engine scan and decide whether to add a trade to your journal.</p>
+  </section>
+
   <!-- TIMEFRAME TOGGLE -->
   <div class="dg-seg" role="radiogroup" style="margin-bottom:16px">
     <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_15" value="15" checked onchange="changeSignalTF('15')">
@@ -405,7 +421,8 @@
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + s.tp1.toFixed(2) + '</strong></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + s.tp2.toFixed(2) + '</strong></div>' +
           '</div>' +
-          '<div style="font-size:11px; color:var(--dg-text-2); margin-top:10px;">S1: ' + s.s1 + ' | S2: ' + s.s2 + ' | S3: ' + s.s3 + '</div>';
+          '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Strategy used:</b> ' + s.strategy + '</div>' +
+          '<div style="font-size:11px;color:var(--dg-text-2);margin-top:5px;">System votes — S1: ' + s.s1 + ' | S2: ' + s.s2 + ' | S3: ' + s.s3 + '</div>';
       }
 
       listHtml += 
@@ -419,7 +436,7 @@
           '</div>' +
           cardInner +
           '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;">' +
-            (s.final === 'NO TRADE' ? '' : '<button onclick="executeTrade(\'' + s.pair + '\', \'' + s.final + '\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ', ' + JSON.stringify(s.strategy) + ')" style="flex:1;padding:10px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:14px;cursor:pointer;">Track Trade</button>') +
+            (s.final === 'NO TRADE' ? '' : '<button onclick="executeTrade(\'' + s.pair + '\', \'' + s.final + '\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ', ' + JSON.stringify(s.strategy) + ')" style="flex:1;padding:10px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:14px;cursor:pointer;">Add to Journal</button>') +
             '<a href="chart.html?pair=' + s.pair + '" style="flex:1;text-align:center;padding:10px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:14px;">View Chart</a>' +
           '</div>' +
         '</section>';
@@ -486,18 +503,19 @@
           })
         });
         var result = await response.json();
-        if (!response.ok) {
-          alert(result.error || 'Could not register this trade for automatic monitoring.');
-          return;
+        if (response.ok) {
+          trade.id = result.trade.id;
+          trade.serverTracked = true;
+        } else {
+          trade.monitoringPending = true;
+          console.warn('Cloud trade monitoring unavailable:', result.error);
         }
-        trade.id = result.trade.id;
-        trade.serverTracked = true;
       } catch(e) {
-        alert('Trade was not registered for automatic monitoring because the server could not be reached. Please try again.');
-        return;
+        trade.monitoringPending = true;
+        console.warn('Cloud trade monitoring unavailable; saving locally.', e);
       }
     } else {
-      alert('Enable push notifications in Settings first so DAGBO can monitor this trade and alert you. This trade will still be saved locally.');
+      trade.monitoringPending = true;
     }
 
     journal.push(trade);
@@ -518,7 +536,19 @@
 
   window.changeSignalTF = function(tf) {
     currentSignalTF = tf;
-    loadAllSignals();
+    var strategyHelp={
+    'Liquidity Sweep & Reversal':'Wait for price to sweep a prior swing high/low and reclaim the level with confirmation.',
+    'Session Breakout & Retest':'Wait for a session-range breakout candle close and a controlled retest.',
+    'VWAP Pullback':'Look for a pullback to session VWAP with renewed momentum; VWAP feed availability varies.',
+    'Trend Pullback Sniper':'Trade with the higher-timeframe trend after a confirmed pullback.',
+    'Range Reversal Hunter':'Look for rejection at a clear range edge; avoid the middle of the range.',
+    'Momentum Expansion':'Wait for volatility expansion and a confirmed close through structure.'
+  };
+  var b1Strategy=document.getElementById('b1Strategy');
+  if(b1Strategy) b1Strategy.addEventListener('change',function(){document.getElementById('b1StrategyInfo').textContent=strategyHelp[b1Strategy.value]+' Signal cards still identify the strategy actually used by the signal systems.';});
+  var b1Mode=document.getElementById('b1Mode');
+  if(b1Mode) b1Mode.addEventListener('change',function(){document.getElementById('b1ModeInfo').textContent=b1Mode.value==='hybrid'?'Hybrid: review the scan and decide whether to add a trade to your journal.':b1Mode.value==='manual'?'Manual: use the selected playbook as a study focus; signals remain generated by the existing three systems.':'Automatic: sort available confluence signals; this does not place broker orders.';});
+  loadAllSignals();
   };
 
   // --- INITIALIZE ---
