@@ -9,25 +9,26 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
 <style>
-  /* Force the container to have a set height */
+  /* THE FIX: Force the container height and position */
   #tv-chart-container {
-    height: 65vh; /* Takes up 65% of your screen height */
-    min-height: 450px;
     width: 100%;
+    height: 75vh;
+    min-height: 560px;
+    max-height: 900px;
     border-radius: 16px;
     overflow: hidden;
     background: #000;
     margin-bottom: 16px;
-    position: relative; /* THIS IS THE MAGIC FIX */
+    position: relative;
   }
-  
-  /* Force the iframe to fill the container exactly */
+
+  /* Force the iframe to fill the absolute space */
   #tv-chart-container iframe {
     position: absolute;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100% !important;
     height: 100% !important;
+    display: block;
     border: none !important;
   }
   
@@ -133,19 +134,40 @@
     }
   }
 
+  // THE MAGIC FIX FROM YOUR CODE
   function loadChart() {
     var container = document.getElementById('tv-chart-container');
     container.innerHTML = '';
+
     var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     var theme = isDark ? 'dark' : 'light';
-    
+
+    // Give TradingView the actual chart height
+    var chartHeight = Math.max(
+      560,
+      Math.min(900, Math.floor(window.innerHeight * 0.75))
+    );
+
+    container.style.height = chartHeight + 'px';
+
     var iframe = document.createElement('iframe');
-    iframe.src = 'https://s.tradingview.com/widgetembed/?symbol=' + encodeURIComponent(currentPair) +
-                 '&interval=' + currentTF + '&theme=' + theme +
-                 '&style=1&locale=en&timezone=Africa%2FLagos' +
-                 '&hidesidetoolbar=0&symboledit=0&saveimage=0&toolbarbg=rgba(0,0,0,0)' +
-                 '&studies=RSI%40tv-basicstudies';
-    
+    iframe.title = 'DAGBO SIGNAL Live Trading Chart';
+
+    iframe.src = 'https://s.tradingview.com/widgetembed/?symbol=' +
+      encodeURIComponent(currentPair) +
+      '&interval=' + currentTF +
+      '&theme=' + theme +
+      '&style=1' +
+      '&locale=en' +
+      '&timezone=Africa%2FLagos' +
+      '&width=100%25' +
+      '&height=' + chartHeight +
+      '&hidesidetoolbar=0' +
+      '&symboledit=0' +
+      '&saveimage=0' +
+      '&toolbarbg=rgba(0,0,0,0)' +
+      '&studies=RSI%40tv-basicstudies';
+
     container.appendChild(iframe);
   }
 
