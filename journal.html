@@ -52,21 +52,21 @@
       <span class="dg-stat__value dg-key" id="statWinRate">—</span>
     </div>
     <div class="dg-stat" style="text-align:left;padding:16px">
-      <span class="dg-stat__label">Net Profit</span>
+      <span class="dg-stat__label">Net P&L</span>
       <span class="dg-stat__value" id="statPnl">—</span>
     </div>
     <div class="dg-stat" style="text-align:left;padding:16px">
-      <span class="dg-stat__label">Avg R/R</span>
-      <span class="dg-stat__value" id="statRR">—</span>
+      <span class="dg-stat__label">Account Balance</span>
+      <span class="dg-stat__value" id="statBalance">$100.00</span>
     </div>
   </div>
 
   <!-- Filter Pills -->
   <div class="dg-seg" role="radiogroup" aria-label="Filter" style="margin-bottom:16px" id="filterGroup">
     <input class="dg-seg__in" type="radio" name="filter" id="f1" checked onchange="filterTrades('ALL')"><label class="dg-seg__lb" for="f1">All</label>
-    <input class="dg-seg__in" type="radio" name="filter" id="f2" onchange="filterTrades('WIN')"><label class="dg-seg__lb" for="f2">Wins</label>
-    <input class="dg-seg__in" type="radio" name="filter" id="f3" onchange="filterTrades('LOSS')"><label class="dg-seg__lb" for="f3">Losses</label>
-    <input class="dg-seg__in" type="radio" name="filter" id="f4" onchange="filterTrades('OPEN')"><label class="dg-seg__lb" for="f4">Open</label>
+    <input class="dg-seg__in" type="radio" name="filter" id="f2" onchange="filterTrades('OPEN')"><label class="dg-seg__lb" for="f2">Open</label>
+    <input class="dg-seg__in" type="radio" name="filter" id="f3" onchange="filterTrades('WIN')"><label class="dg-seg__lb" for="f3">Wins</label>
+    <input class="dg-seg__in" type="radio" name="filter" id="f4" onchange="filterTrades('LOSS')"><label class="dg-seg__lb" for="f4">Losses</label>
   </div>
 
   <!-- Trade List -->
@@ -120,8 +120,9 @@
     </div>
     
     <div class="dg-grid-2" style="margin-top:14px">
-      <label class="dg-field" style="margin:0"><span class="dg-label">Lot Size</span><input type="number" id="fLot" class="dg-input" step="any" value="0.01"></label>
+      <label class="dg-field" style="margin:0"><span class="dg-label">Take Profit</span><input type="number" id="fTp" class="dg-input" step="any"></label>
       <label class="dg-field" style="margin:0"><span class="dg-label">P&L ($)</span><input type="number" id="fPnl" class="dg-input" step="any" placeholder="0.00"></label>
+      <label class="dg-field" style="margin:0"><span class="dg-label">Lot Size</span><input type="number" id="fLot" class="dg-input" step="any" value="0.01"></label>
     </div>
 
     <div style="margin-top:24px">
@@ -144,6 +145,7 @@
 
   var currentFilter = 'ALL';
   var editingId = null;
+  var initialBalance = Number(settings.accountSize) || 100;
 
   // --- FORMATTING HELPERS ---
   function fmtMoney(n) {
@@ -160,8 +162,6 @@
     var closed = trades.filter(function(t){ return t.result === 'WIN' || t.result === 'LOSS'; });
     var wins = closed.filter(function(t){ return t.result === 'WIN'; }).length;
     var totalPnl = trades.reduce(function(sum, t){ return sum + (Number(t.pnl) || 0); }, 0);
-    var totalR = closed.reduce(function(sum, t){ return sum + (Number(t.rMultiple) || 0); }, 0);
-    var avgR = closed.length ? totalR / closed.length : 0;
     var winRate = closed.length ? Math.round((wins / closed.length) * 100) : null;
 
     document.getElementById('statTotal').textContent = trades.length;
@@ -179,7 +179,189 @@
     pnlEl.textContent = trades.length ? fmtMoney(totalPnl) : '—';
     pnlEl.className = 'dg-stat__value ' + (totalPnl > 0 ? 'dg-pos' : (totalPnl < 0 ? 'dg-neg' : ''));
 
-    document.getElementById('statRR').textContent = closed.length ? fmtR(avgR) : '—';
+    var balanceEl = document.getElementById('statBalance');
+    var balance = initialBalance + totalPnl;
+    balanceEl.textContent = '
+  }
+
+  // --- RENDER LIST ---
+  function renderList() {
+    var list = document.getElementById('tradeList');
+    var filtered = trades.slice().reverse().filter(function(t){
+      if (currentFilter === 'ALL') return true;
+      return t.result === currentFilter;
+    });
+
+    if (!filtered.length) {
+      list.innerHTML = '<div class="dg-card" style="text-align:center;padding:32px 16px"><p class="dg-muted">No trades found. Add one above!</p></div>';
+      return;
+    }
+
+    var html = '';
+    filtered.forEach(function(t) {
+      var isWin = t.result === 'WIN';
+      var isLoss = t.result === 'LOSS';
+      var isOpen = t.result === 'OPEN';
+      
+      var badgeClass = isWin ? 'dg-pill--win' : (isLoss ? 'dg-pill--loss' : 'dg-pill--open');
+      var badgeText = isWin ? 'Win' : (isLoss ? 'Loss' : 'Open');
+      
+      var pnlClass = (t.pnl > 0) ? 'dg-pos' : ((t.pnl < 0) ? 'dg-neg' : 'dg-muted');
+      
+      // Format date
+      var d = new Date(t.dateOpened || Date.now());
+      var dateStr = d.toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+
+      html += 
+        '<div class="dg-card" style="padding:16px;margin-bottom:12px;position:relative" onclick="editTrade(\'' + t.id + '\')">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">' +
+            '<div>' +
+              '<div style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px">' +
+                t.pair + 
+                '<span style="font-size:13px;font-weight:600;color:' + (t.direction === 'BUY' ? 'var(--dg-green-ink)' : 'var(--dg-red-ink)') + '">' +
+                  (t.direction === 'BUY' ? '↗ Buy' : '↘ Sell') +
+                '</span>' +
+              '</div>' +
+              '<div class="dg-muted" style="font-size:12px;margin-top:2px">' + dateStr + '</div>' +
+            '</div>' +
+            '<span class="dg-pill ' + badgeClass + '">' + badgeText + '</span>' +
+          '</div>' +
+          
+          '<div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px">' +
+            '<span class="dg-muted">Entry: <span style="color:var(--dg-text);font-weight:600">' + (t.entry || '—') + '</span></span>' +
+            '<span class="dg-muted">SL: <span style="color:var(--dg-text);font-weight:600">' + (t.stopLoss || '—') + '</span></span>' +
+            '<span class="dg-muted">TP: <span style="color:var(--dg-text);font-weight:600">' + (t.takeProfit || '—') + '</span></span>' +
+          '</div>' +
+          
+          '<div class="' + pnlClass + '" style="font-weight:700;font-size:15px">' +
+            (isOpen ? 'Running...' : fmtMoney(t.pnl) + ' (' + fmtR(t.rMultiple) + ')') +
+          '</div>' +
+          
+        '</div>';
+    });
+
+    list.innerHTML = html;
+  }
+
+  // --- FORM LOGIC ---
+  window.openForm = function() {
+    editingId = null;
+    document.getElementById('formTitle').textContent = 'New Trade';
+    
+    // Fill pairs
+    var sel = document.getElementById('fPair');
+    sel.innerHTML = '';
+    enabledPairs.forEach(function(p) {
+      var opt = document.createElement('option');
+      opt.value = p === 'GOLD' ? 'XAUUSD' : p;
+      opt.textContent = p;
+      sel.appendChild(opt);
+    });
+
+    document.getElementById('fEntry').value = '';
+    document.getElementById('fSl').value = '';
+    document.getElementById('fTp').value = '';
+    document.getElementById('fLot').value = '0.01';
+    document.getElementById('fPnl').value = '';
+    document.getElementById('fResult').value = 'OPEN';
+    document.getElementById('fDir').value = 'BUY';
+    
+    document.getElementById('tradeModal').style.display = 'flex';
+  };
+
+  window.closeForm = function() {
+    document.getElementById('tradeModal').style.display = 'none';
+  };
+
+  window.editTrade = function(id) {
+    var t = trades.filter(function(x){ return x.id === id; })[0];
+    if (!t) return;
+    
+    editingId = id;
+    document.getElementById('formTitle').textContent = 'Edit Trade';
+    
+    var sel = document.getElementById('fPair');
+    sel.innerHTML = '';
+    enabledPairs.forEach(function(p) {
+      var opt = document.createElement('option');
+      opt.value = p === 'GOLD' ? 'XAUUSD' : p;
+      opt.textContent = p;
+      sel.appendChild(opt);
+    });
+    
+    sel.value = t.pair === 'GOLD' ? 'XAUUSD' : t.pair;
+    document.getElementById('fDir').value = t.direction;
+    document.getElementById('fResult').value = t.result;
+    document.getElementById('fEntry').value = t.entry;
+    document.getElementById('fSl').value = t.stopLoss;
+    document.getElementById('fTp').value = t.takeProfit || '';
+    document.getElementById('fLot').value = t.lotSize;
+    document.getElementById('fPnl').value = t.pnl || '';
+
+    document.getElementById('tradeModal').style.display = 'flex';
+  };
+
+  window.saveTrade = function() {
+    var pair = document.getElementById('fPair').value;
+    var dir = document.getElementById('fDir').value;
+    var result = document.getElementById('fResult').value;
+    var entry = parseFloat(document.getElementById('fEntry').value);
+    var sl = parseFloat(document.getElementById('fSl').value);
+    var tp = parseFloat(document.getElementById('fTp').value);
+    var lot = parseFloat(document.getElementById('fLot').value);
+    var pnl = parseFloat(document.getElementById('fPnl').value) || 0;
+
+    if (isNaN(entry) || isNaN(sl) || isNaN(tp) || isNaN(lot)) {
+      alert("Please fill in Entry, Stop Loss, Take Profit, and Lot Size.");
+      return;
+    }
+
+    // Calculate R-Multiple based on risk
+    var riskAmount = Number(settings.accountSize) * (Number(settings.risk) || 1) / 100;
+    var rMult = result === 'OPEN' ? 0 : (pnl / (riskAmount || 1));
+
+    var newTrade = {
+      id: editingId || String(Date.now()),
+      pair: pair,
+      direction: dir,
+      result: result,
+      entry: entry,
+      stopLoss: sl,
+      takeProfit: tp,
+      lotSize: lot,
+      pnl: result === 'OPEN' ? 0 : pnl,
+      rMultiple: Math.round(rMult * 10) / 10,
+      dateOpened: editingId ? (trades.filter(function(x){return x.id===editingId})[0].dateOpened) : new Date().toISOString(),
+      dateClosed: result === 'OPEN' ? null : new Date().toISOString()
+    };
+
+    if (editingId) {
+      trades = trades.map(function(t){ return t.id === editingId ? newTrade : t; });
+    } else {
+      trades.push(newTrade);
+    }
+
+    localStorage.setItem('dagbo_journal', JSON.stringify(trades));
+    closeForm();
+    renderStats();
+    renderList();
+  };
+
+  window.filterTrades = function(type) {
+    currentFilter = type;
+    renderList();
+  };
+
+  // INIT
+  renderStats();
+  renderList();
+
+})();
+</script>
+</body>
+</html>
+ + balance.toFixed(2);
+    balanceEl.className = 'dg-stat__value ' + (balance >= initialBalance ? 'dg-pos' : 'dg-neg');
   }
 
   // --- RENDER LIST ---
