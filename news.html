@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F5F5F7" id="themeColor">
-<title>Market News · DAGBO SIGNAL</title>
+<title>News · DAGBO SIGNAL</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
@@ -17,16 +17,14 @@
 })();
 </script>
 <style>
-.news-intro{margin:10px 4px 20px}
-.news-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 12px}
-.news-refresh{border:1px solid var(--dg-line);background:var(--dg-card);color:var(--dg-text);border-radius:20px;padding:9px 14px;font-weight:700;font-size:12px;cursor:pointer}
-.news-frame{width:100%;min-height:650px;border:0;border-radius:16px;background:var(--dg-card)}
-.news-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.news-link{display:block;padding:15px;border:1px solid var(--dg-line);border-radius:15px;background:var(--dg-card);color:var(--dg-text);text-decoration:none}
-.news-link strong{display:block;font-size:14px;margin-bottom:5px}
-.news-link span{font-size:12px;color:var(--dg-text-2);line-height:1.4}
-.news-disclaimer{font-size:12px;line-height:1.6;color:var(--dg-text-2)}
-@media(max-width:380px){.news-links{grid-template-columns:1fr}}
+.news-headline{display:block;text-decoration:none;padding:16px;margin-bottom:10px}
+.news-headline__title{font-weight:700;font-size:15px;color:var(--dg-text);line-height:1.45;margin:7px 0}
+.news-headline__meta{font-size:12px;color:var(--dg-text-2)}
+.news-headline__actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+.news-ask{background:var(--dg-green);color:#fff;border:0;padding:8px 12px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer}
+.news-calendar-link{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;text-decoration:none;color:var(--dg-text)}
+.news-calendar-link strong{display:block;font-size:15px}
+.news-calendar-link small{display:block;color:var(--dg-text-2);margin-top:5px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -36,51 +34,46 @@
     <div class="dg-badge">NEWS</div>
   </div>
 
-  <div class="news-intro">
-    <h1 class="dg-title">Market News</h1>
-    <p class="dg-subtitle">Stay informed about the stories moving forex and global markets.</p>
-  </div>
+  <h1 class="dg-title">Market News</h1>
+  <p class="dg-subtitle">Stay awake. Don't let news catch you.</p>
 
-  <div class="dg-card" style="padding:16px;margin-bottom:18px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-      <span class="dg-pill dg-pill--open">LIVE FEED</span>
-      <span class="dg-muted" style="font-size:12px">Powered by TradingView</span>
-    </div>
-    <p class="news-disclaimer" style="margin:0">Latest market headlines and analysis. Tap a story in the feed to read the publisher's report.</p>
-  </div>
-
-  <div class="news-toolbar">
-    <h2 class="dg-section" style="margin:0">Latest headlines</h2>
-    <button class="news-refresh" type="button" onclick="reloadNews()">↻ Refresh</button>
-  </div>
-
-  <section class="dg-card" style="padding:10px;overflow:hidden">
-    <div class="tradingview-widget-container" style="width:100%">
-      <div class="tradingview-widget-container__widget"></div>
-      <div class="tradingview-widget-copyright" style="font-size:10px;text-align:center;padding:8px;color:var(--dg-text-2)">
-        News feed by <a href="https://www.tradingview.com/" rel="noopener noreferrer" target="_blank">TradingView</a>
+  <h3 class="dg-section" style="margin-top:0">Session Status</h3>
+  <div class="dg-card" style="padding:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div>
+        <div style="font-weight:700;font-size:16px">London &amp; New York</div>
+        <div class="dg-muted" style="font-size:13px" id="sessionTime">Checking time...</div>
       </div>
+      <div id="sessionBadge" class="dg-pill dg-pill--wait">WAIT</div>
     </div>
-  </section>
+    <div class="dg-muted" id="sessionClock" style="font-size:11px;margin-top:10px">Times shown in West Africa Time (WAT)</div>
+  </div>
 
-  <h2 class="dg-section" style="margin-top:24px">More market resources</h2>
-  <div class="news-links">
-    <a class="news-link" href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener noreferrer">
-      <strong>Economic Calendar</strong><span>Upcoming events and high-impact releases</span>
-    </a>
-    <a class="news-link" href="https://www.reuters.com/markets/" target="_blank" rel="noopener noreferrer">
-      <strong>Reuters Markets</strong><span>Global business and financial reporting</span>
-    </a>
-    <a class="news-link" href="https://www.investing.com/news/forex-news" target="_blank" rel="noopener noreferrer">
-      <strong>Forex News</strong><span>Currency-market headlines and analysis</span>
-    </a>
-    <a class="news-link" href="https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html" target="_blank" rel="noopener noreferrer">
-      <strong>FedWatch</strong><span>Market expectations for US rate decisions</span>
+  <h3 class="dg-section">Economic Calendar</h3>
+  <div class="dg-card dg-card--flush">
+    <a class="news-calendar-link" href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener noreferrer">
+      <span>
+        <strong>High-impact events &amp; NFP</strong>
+        <small>Open the live calendar for confirmed release dates, times and impact levels. Event schedules can change.</small>
+      </span>
+      <span aria-hidden="true" style="font-size:20px;color:var(--dg-blue-ink)">↗</span>
     </a>
   </div>
 
-  <div class="dg-card" style="margin-top:20px;background:var(--dg-fill);box-shadow:none">
-    <p class="news-disclaimer" style="margin:0"><b>Trade smart:</b> News can cause sudden volatility and spreads to widen. Headlines are not buy or sell signals. Check the source, release time and price reaction before taking a trade.</p>
+  <h3 class="dg-section">Live Headlines</h3>
+  <div class="dg-stack" id="newsHeadlines" aria-live="polite">
+    <div class="dg-card" style="text-align:center;padding:20px">
+      <span class="dg-muted">Fetching latest market news...</span>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:center;margin-top:8px">
+    <button class="dg-btn" id="refreshNews" type="button" style="min-height:38px;padding:0 16px">↻ Refresh headlines</button>
+  </div>
+
+  <div class="dg-card" style="background:var(--dg-fill);box-shadow:none;margin-top:24px">
+    <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:0">
+      <b>⚠️ DAGBO RULE:</b> High-impact releases such as NFP, CPI and central-bank decisions can cause sharp price moves and wider spreads. Consider reducing risk or staying out around major releases. Check your broker's conditions and the live calendar.
+    </p>
   </div>
 </main>
 
@@ -88,36 +81,141 @@
   <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
   <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
   <a class="dg-tab" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
+  <a class="dg-tab" aria-current="page" href="news.html"><span class="dg-tab__icon">📰</span>News</a>
   <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
-  <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
 </nav>
 
 <script src="pwa.js" defer></script>
 <script>
 (function(){
-  var container = document.querySelector('.tradingview-widget-container');
-  var config = {
-    "feedMode": "market",
-    "market": "forex",
-    "isTransparent": true,
-    "displayMode": "regular",
-    "width": "100%",
-    "height": 650,
-    "colorTheme": document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
-    "locale": "en"
-  };
-  function loadNews(){
-    var old = container.querySelector('script[data-news-widget]');
-    if (old) old.remove();
-    var script = document.createElement('script');
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-timeline.js';
-    script.async = true;
-    script.dataset.newsWidget = 'true';
-    script.text = JSON.stringify(config);
-    container.appendChild(script);
+  'use strict';
+  var badge = document.getElementById('sessionBadge');
+  var sessionText = document.getElementById('sessionTime');
+  var clockText = document.getElementById('sessionClock');
+
+  function timeParts(zone) {
+    var parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: zone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+    }).formatToParts(new Date());
+    var out = {};
+    parts.forEach(function(p){ out[p.type] = p.value; });
+    return { hour: Number(out.hour), minute: Number(out.minute), text: out.hour + ':' + out.minute };
   }
-  window.reloadNews = loadNews;
-  loadNews();
+
+  function isOpen(t) {
+    var mins = t.hour * 60 + t.minute;
+    return mins >= 8 * 60 && mins < 17 * 60;
+  }
+
+  function updateSession() {
+    try {
+      var london = timeParts('Europe/London');
+      var ny = timeParts('America/New_York');
+      var londonOpen = isOpen(london);
+      var nyOpen = isOpen(ny);
+      var wat = timeParts('Africa/Lagos');
+
+      if (londonOpen && nyOpen) {
+        badge.textContent = 'OVERLAP';
+        badge.className = 'dg-pill dg-pill--buy';
+        sessionText.textContent = 'London and New York are open — often a busy trading window.';
+      } else if (londonOpen) {
+        badge.textContent = 'LONDON OPEN';
+        badge.className = 'dg-pill dg-pill--buy';
+        sessionText.textContent = 'London session is active.';
+      } else if (nyOpen) {
+        badge.textContent = 'NEW YORK OPEN';
+        badge.className = 'dg-pill dg-pill--buy';
+        sessionText.textContent = 'New York session is active.';
+      } else {
+        badge.textContent = 'BOTH CLOSED';
+        badge.className = 'dg-pill dg-pill--wait';
+        sessionText.textContent = 'London and New York sessions are closed. Other markets may still be active.';
+      }
+      clockText.textContent = 'WAT ' + wat.text + ' · London ' + london.text + ' · New York ' + ny.text;
+    } catch (e) {
+      badge.textContent = 'TIME UNAVAILABLE';
+      badge.className = 'dg-pill dg-pill--wait';
+      sessionText.textContent = 'Could not read session times on this device.';
+    }
+  }
+
+  function showMessage(message) {
+    var wrap = document.createElement('div');
+    wrap.className = 'dg-card';
+    wrap.style.cssText = 'text-align:center;padding:20px';
+    var span = document.createElement('span');
+    span.className = 'dg-muted';
+    span.textContent = message;
+    wrap.appendChild(span);
+    var target = document.getElementById('newsHeadlines');
+    target.replaceChildren(wrap);
+  }
+
+  function loadHeadlines() {
+    var target = document.getElementById('newsHeadlines');
+    showMessage('Fetching latest market news...');
+    var feedUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' +
+      encodeURIComponent('https://www.fxstreet.com/rss/news');
+    fetch(feedUrl, { cache: 'no-store' })
+      .then(function(res) {
+        if (!res.ok) throw new Error('News service unavailable');
+        return res.json();
+      })
+      .then(function(data) {
+        if (data.status !== 'ok' || !Array.isArray(data.items) || !data.items.length) {
+          throw new Error('No headlines are available right now.');
+        }
+        target.replaceChildren();
+        data.items.slice(0, 8).forEach(function(item) {
+          var card = document.createElement('article');
+          card.className = 'dg-card news-headline';
+
+          var meta = document.createElement('div');
+          meta.className = 'news-headline__meta';
+          var date = new Date(item.pubDate);
+          meta.textContent = (isNaN(date.getTime()) ? '' : date.toLocaleString([], { dateStyle:'medium', timeStyle:'short' }) + ' · ') + 'FXStreet';
+
+          var title = document.createElement('div');
+          title.className = 'news-headline__title';
+          title.textContent = item.title || 'Market news update';
+
+          var actions = document.createElement('div');
+          actions.className = 'news-headline__actions';
+
+          var link = document.createElement('a');
+          link.href = item.link || 'https://www.fxstreet.com/news';
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = 'Read original →';
+          link.style.cssText = 'font-size:13px;color:var(--dg-blue-ink);font-weight:600;text-decoration:none';
+
+          var ask = document.createElement('button');
+          ask.type = 'button';
+          ask.className = 'news-ask';
+          ask.textContent = '🤖 Ask AI';
+          ask.addEventListener('click', function() {
+            localStorage.setItem('dagbo_news_prefill', item.title || 'Explain this market news headline.');
+            window.location.href = 'ai.html';
+          });
+
+          actions.appendChild(link);
+          actions.appendChild(ask);
+          card.appendChild(meta);
+          card.appendChild(title);
+          card.appendChild(actions);
+          target.appendChild(card);
+        });
+      })
+      .catch(function(err) {
+        showMessage(err.message || 'Could not load news. Check your internet and try again.');
+      });
+  }
+
+  updateSession();
+  setInterval(updateSession, 60000);
+  document.getElementById('refreshNews').addEventListener('click', loadHeadlines);
+  loadHeadlines();
 })();
 </script>
 </body>
