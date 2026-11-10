@@ -350,16 +350,28 @@
             '<div class="dg-muted" style="font-size:13px;margin-top:4px">Market is quiet. Systems say WAIT.</div>' +
           '</div>';
       } else {
-        cardInner = 
-          debugText +
-          '<div class="dg-signal__word ' + cls + '" style="font-size:28px;text-align:left">' + s.final + '</div>' +
-          '<div class="dg-muted" style="font-size:13px;margin-bottom:12px">' + (currentSignalTF === '5' ? 'Scalping Setup' : 'Intraday Setup') + '</div>' +
+        // Smart Decimal Logic: format each market with its appropriate price precision.
+        var dp = 2;
+        var pUpper = String(s.pair || '').toUpperCase();
+        if (pUpper.includes('JPY')) dp = 3;
+        else if (pUpper === 'XAUUSD' || pUpper === 'GOLD') dp = 2;
+        else if (pUpper.includes('BTC') || pUpper.includes('ETH')) dp = 1;
+        else if (pUpper.includes('US30') || pUpper.includes('US100') || pUpper.includes('NAS') || pUpper.includes('US500')) dp = 1;
+        else if (pUpper.includes('USD') || pUpper.includes('EUR') || pUpper.includes('GBP') || pUpper.includes('CHF') || pUpper.includes('CAD') || pUpper.includes('AUD') || pUpper.includes('NZD')) dp = 5;
+
+        var fEntry = Number(s.entry).toFixed(dp);
+        var fSl = Number(s.sl).toFixed(dp);
+        var fTp1 = Number(s.tp1).toFixed(dp);
+        var fTp2 = Number(s.tp2).toFixed(dp);
+
+        cardInner +=
           '<div class="dg-grid-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + s.entry.toFixed(2) + '</strong></div>' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Stop Loss</span><strong style="font-size:15px" class="dg-neg">' + s.sl.toFixed(2) + '</strong></div>' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + s.tp1.toFixed(2) + '</strong></div>' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + s.tp2.toFixed(2) + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + fEntry + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Stop Loss</span><strong style="font-size:15px" class="dg-neg">' + fSl + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + fTp1 + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + fTp2 + '</strong></div>' +
           '</div>' +
+          debugText +
           '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Signal sources / evidence:</b><br>' + (s.evidence||[]).join('<br>') + '</div>';
       }
 
