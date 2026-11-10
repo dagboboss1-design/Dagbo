@@ -45,18 +45,9 @@
 
 
   <section class="dg-card" style="margin:14px 0">
-    <div class="dg-card__head"><h2 class="dg-card__title">👑 BOSS1 Strategy Desk</h2><span class="dg-pill dg-pill--open">Signals</span></div>
-    <div class="dg-grid-2">
-      <label class="dg-field"><span class="dg-label">Trading style</span><select id="b1Style" class="dg-input"><option value="both">Scalping + Intraday</option><option value="scalp">Scalping</option><option value="intraday">Intraday</option></select></label>
-      <label class="dg-field"><span class="dg-label">Decision mode</span><select id="b1Mode" class="dg-input"><option value="hybrid">Hybrid · recommend</option><option value="manual">Manual · choose playbook</option><option value="auto">Automatic · rank setups</option></select></label>
-    </div>
-    <label class="dg-field" style="margin-top:10px"><span class="dg-label">Strategy playbook to focus on</span>
-      <select id="b1Strategy" class="dg-input">
-        <option>Liquidity Sweep &amp; Reversal</option><option>Session Breakout &amp; Retest</option><option>VWAP Pullback</option><option>Trend Pullback Sniper</option><option>Range Reversal Hunter</option><option>Momentum Expansion</option>
-      </select>
-    </label>
-    <p class="dg-muted" id="b1StrategyInfo" style="font-size:12px;margin:8px 0 0">Focus selection is a study filter. Each signal card will show the actual system strategy that generated its direction.</p>
-    <p class="dg-muted" id="b1ModeInfo" style="font-size:12px;margin:6px 0 0">Hybrid: review the engine scan and decide whether to add a trade to your journal.</p>
+    <div class="dg-card__head"><h2 class="dg-card__title">DAGBO Multi-Method Engine</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
+    <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">You do not select a strategy. Every scan checks the available trend and momentum indicators, candlestick behaviour, price-action structure, liquidity sweeps, BOS / CHoCH-style breaks and fair-value-gap conditions. A signal is shown only when enough independent evidence agrees.</p>
+    <p class="dg-help" style="margin-top:8px">Each result names the evidence that actually contributed. A method is marked unavailable when its required data is not present.</p>
   </section>
 
   <!-- TIMEFRAME TOGGLE -->
@@ -153,73 +144,48 @@
     return ema;
   }
 
-  function getSystem1(candles) {
-    let closes = candles.map(c => parseFloat(c.close));
-    let lastClose = closes[closes.length-1];
-    let rsi = calculateRSI(closes, 14);
-    let ema20 = calculateEMA(closes, 20);
-    let ema50 = calculateEMA(closes, 50);
-    let score = 0;
-
-    if (rsi < 35) score++; 
-    if (rsi > 65) score--;
-    if (lastClose > ema20 && ema20 > ema50) score++;
-    if (lastClose < ema20 && ema20 < ema50) score--;
-
-    return score >= 1 ? 'BUY' : (score <= -1 ? 'SELL' : 'WAIT');
+  function emaSeries(values, period) {
+    var k=2/(period+1), out=[], prev=values[0];
+    for(var i=0;i<values.length;i++){prev=i===0?values[i]:values[i]*k+prev*(1-k);out.push(prev);}
+    return out;
   }
-
-  function getSystem2(candles) {
-    let last = candles[candles.length-1];
-    let prev = candles[candles.length-2];
-    let o = parseFloat(last.open), c = parseFloat(last.close), h = parseFloat(last.high), l = parseFloat(last.low);
-    let po = parseFloat(prev.open), pc = parseFloat(prev.close);
-    let score = 0;
-
-    let body = Math.abs(c - o);
-    let lowerWick = Math.min(o, c) - l;
-    let upperWick = h - Math.max(o, c);
-    if (lowerWick > body * 2) score++;
-    if (upperWick > body * 2) score--;
-
-    if (c > o && pc < po && c > po && o < pc) score++;
-    if (c < o && pc > po && c < po && o > pc) score--;
-
-    return score >= 1 ? 'BUY' : (score <= -1 ? 'SELL' : 'WAIT');
-  }
-
-  function getSystem3(candles) {
-    let last = candles[candles.length-1];
-    let lastClose = parseFloat(last.close);
-    let highs = candles.slice(-20).map(c => parseFloat(c.high));
-    let lows = candles.slice(-20).map(c => parseFloat(c.low));
-    let recentHigh = Math.max(...highs);
-    let recentLow = Math.min(...lows);
-
-    if (lastClose < recentLow + (recentHigh - recentLow) * 0.2) return 'BUY';
-    if (lastClose > recentHigh - (recentHigh - recentLow) * 0.2) return 'SELL';
-    return 'WAIT';
-  }
-
-  function getFinalSignal(s1, s2, s3) {
-    var dirs = [s1, s2, s3];
-    var buys = dirs.filter(function(d){ return d === 'BUY'; }).length;
-    var sells = dirs.filter(function(d){ return d === 'SELL'; }).length;
-    if (buys >= 2) return buys === 3 ? 'STRONG BUY' : 'BUY';
-    if (sells >= 2) return sells === 3 ? 'STRONG SELL' : 'SELL';
-    return 'NO TRADE';
-  }
-
-  // Attribute each trade to the methods that actually agreed on its signal.
-  function getSignalStrategy(s1, s2, s3, final) {
-    var direction = final.indexOf('BUY') >= 0 ? 'BUY' : final.indexOf('SELL') >= 0 ? 'SELL' : null;
-    if (!direction) return 'No confirmed strategy';
-    return [
-      { vote: s1, name: 'RSI + EMA Trend' },
-      { vote: s2, name: 'Candlestick Reversal' },
-      { vote: s3, name: '20-Candle Range Reversal' }
-    ].filter(function(x){ return x.vote === direction; })
-     .map(function(x){ return x.name; }).join(' + ') || '3-System Confluence';
+  function candleNumber(c, key){return Number(c[key]);}
+  function analyseAllMethods(candles) {
+    var n=candles.length, closes=candles.map(function(c){return candleNumber(c,'close')});
+    var highs=candles.map(function(c){return candleNumber(c,'high')});
+    var lows=candles.map(function(c){return candleNumber(c,'low')});
+    var last=candles[n-1], prev=candles[n-2], o=candleNumber(last,'open'), c=candleNumber(last,'close');
+    var h=candleNumber(last,'high'), l=candleNumber(last,'low'), po=candleNumber(prev,'open'), pc=candleNumber(prev,'close');
+    var votes=[], evidence=[];
+    function add(name,dir,detail){if(dir==='BUY'||dir==='SELL'){votes.push(dir);evidence.push(name+': '+detail+' ('+dir+')');}}
+    var rsi=calculateRSI(closes,14), e20=calculateEMA(closes,20), e50=calculateEMA(closes,50);
+    var trend=e20>e50&&c>e20?'BUY':e20<e50&&c<e20?'SELL':'WAIT';
+    add('EMA trend',trend,'EMA20 '+(e20>e50?'above':'below')+' EMA50');
+    var rsiDir=rsi<32?'BUY':rsi>68?'SELL':'WAIT';
+    add('RSI(14)',rsiDir,'RSI '+rsi.toFixed(1)+(rsi<32?' oversold':rsi>68?' overbought':''));
+    var e12=emaSeries(closes,12),e26=emaSeries(closes,26),macd=e12[n-1]-e26[n-1],macdPrev=e12[n-2]-e26[n-2];
+    var macdDir=macd>0&&macd>macdPrev?'BUY':macd<0&&macd<macdPrev?'SELL':'WAIT';
+    add('MACD momentum',macdDir,'MACD '+macd.toPrecision(4)+(macd>macdPrev?' rising':' falling'));
+    var body=Math.abs(c-o),range=Math.max(h-l,1e-12),lower=Math.min(o,c)-l,upper=h-Math.max(o,c);
+    var candleDir='WAIT',candleName='No clear reversal pattern';
+    if(c>o&&pc<po&&c>=po&&o<=pc){candleDir='BUY';candleName='Bullish engulfing';}
+    else if(c<o&&pc>po&&c<=po&&o>=pc){candleDir='SELL';candleName='Bearish engulfing';}
+    else if(lower>Math.max(body*2,range*.45)&&c>o){candleDir='BUY';candleName='Bullish rejection / pin bar';}
+    else if(upper>Math.max(body*2,range*.45)&&c<o){candleDir='SELL';candleName='Bearish rejection / pin bar';}
+    add('Candlestick reading',candleDir,candleName);
+    var look=candles.slice(-21,-1),sHigh=Math.max.apply(null,look.map(function(x){return candleNumber(x,'high')})),sLow=Math.min.apply(null,look.map(function(x){return candleNumber(x,'low')}));
+    var structure=c>sHigh?'BUY':c<sLow?'SELL':'WAIT';
+    add('Market structure / BOS',structure,structure==='BUY'?'close broke recent swing high':structure==='SELL'?'close broke recent swing low':'no confirmed range break');
+    var sweepDir=(h>sHigh&&c<sHigh)?'SELL':(l<sLow&&c>sLow)?'BUY':'WAIT';
+    add('ICT liquidity sweep',sweepDir,sweepDir==='SELL'?'swept prior high and closed back below':sweepDir==='BUY'?'swept prior low and closed back above':'no sweep-and-reclaim');
+    var a=candles[n-3],fvgDir='WAIT';
+    if(a&&l>candleNumber(a,'high'))fvgDir='BUY';
+    else if(a&&h<candleNumber(a,'low'))fvgDir='SELL';
+    add('ICT fair value gap',fvgDir,fvgDir==='BUY'?'bullish 3-candle imbalance':fvgDir==='SELL'?'bearish 3-candle imbalance':'no 3-candle gap');
+    var buys=votes.filter(function(v){return v==='BUY'}).length,sells=votes.filter(function(v){return v==='SELL'}).length;
+    var direction=buys>=3&&buys>sells?'BUY':sells>=3&&sells>buys?'SELL':'WAIT';
+    var final=direction==='BUY'?(buys>=5?'STRONG BUY':'BUY'):direction==='SELL'?(sells>=5?'STRONG SELL':'SELL'):'NO TRADE';
+    return {final:final,direction:direction,buyScore:buys,sellScore:sells,totalMethods:7,evidence:evidence,rsi:rsi,emaTrend:trend,macd:macd,candleName:candleName,structure:structure,sweep:sweepDir,fvg:fvgDir};
   }
 
   // --- FETCH REAL DATA ---
@@ -241,46 +207,27 @@
 
       candles = candles.reverse(); 
 
-      let s1 = getSystem1(candles);
-      let s2 = getSystem2(candles);
-      let s3 = getSystem3(candles);
-      let final = getFinalSignal(s1, s2, s3);
-
-      let entry = parseFloat(candles[candles.length-1].close);
-      let isBuy = final.includes('BUY');
-      
-      // ATR-based exits adapt to the instrument's current volatility.
-      var atrSum = 0;
-      for (var i = 1; i <= 14; i++) {
-        var candle = candles[candles.length - i];
-        var previous = candles[candles.length - i - 1];
-        var high = parseFloat(candle.high);
-        var low = parseFloat(candle.low);
-        var previousClose = parseFloat(previous.close);
-        atrSum += Math.max(high - low, Math.abs(high - previousClose), Math.abs(low - previousClose));
+      var analysis=analyseAllMethods(candles);
+      var final=analysis.final;
+      var entry=parseFloat(candles[candles.length-1].close);
+      var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
+      var atrSum=0;
+      for(var i=1;i<=14;i++){
+        var candle=candles[candles.length-i],previous=candles[candles.length-i-1];
+        var high=Number(candle.high),low=Number(candle.low),previousClose=Number(previous.close);
+        atrSum+=Math.max(high-low,Math.abs(high-previousClose),Math.abs(low-previousClose));
       }
-      var atr = atrSum / 14;
-      var slDist = atr * 1.5;
-      var tp1Dist = atr * 2.0;
-      var tp2Dist = atr * 3.5;
-      var sl = isBuy ? entry - slDist : entry + slDist;
-      var tp1 = isBuy ? entry + tp1Dist : entry - tp1Dist;
-      var tp2 = isBuy ? entry + tp2Dist : entry - tp2Dist;
-
-      // Debug data to prove we are reading the candle
-      let lastC = candles[candles.length-1];
-      let closesArr = candles.map(c => parseFloat(c.close));
-      let currentRSI = calculateRSI(closesArr, 14);
-      let currentEMA20 = calculateEMA(closesArr, 20);
-      let currentEMA50 = calculateEMA(closesArr, 50);
-
-      return { 
-        pair, final, entry, sl, tp1, tp2, s1, s2, s3,
-        strategy: getSignalStrategy(s1, s2, s3, final),
-        lastCandleOpen: parseFloat(lastC.open).toFixed(2),
-        lastCandleClose: parseFloat(lastC.close).toFixed(2),
-        rsiValue: currentRSI,
-        emaTrend: currentEMA20 > currentEMA50 ? 'BULLISH 📈' : 'BEARISH 📉'
+      var atr=atrSum/14,slDist=atr*1.5,tp1Dist=atr*2,tp2Dist=atr*3.5;
+      var sl=isBuy?entry-slDist:entry+slDist,tp1=isBuy?entry+tp1Dist:entry-tp1Dist,tp2=isBuy?entry+tp2Dist:entry-tp2Dist;
+      var lastC=candles[candles.length-1];
+      return {
+        pair:pair,final:final,entry:entry,sl:sl,tp1:tp1,tp2:tp2,
+        s1:analysis.emaTrend,s2:analysis.candleName,s3:analysis.structure,
+        strategy:analysis.evidence.length?analysis.evidence.join(' · '):'No method produced directional evidence',
+        evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
+        lastCandleOpen:Number(lastC.open).toFixed(2),lastCandleClose:Number(lastC.close).toFixed(2),
+        rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
+        macdValue:analysis.macd,structure:analysis.structure,sweep:analysis.sweep,fvg:analysis.fvg,candlePattern:analysis.candleName
       };
     } catch(e) {
       console.error(e);
@@ -385,10 +332,10 @@
       var pillText = isBuy ? 'BUY' : (isSell ? 'SELL' : 'WAIT');
 
       // Visual Debug Box
-      var debugText = '<div style="font-size:10px; color:var(--dg-text-2); background:rgba(0,0,0,0.2); padding:8px; border-radius:8px; margin-bottom:10px; font-family:monospace; line-height:1.4;">' +
-        'Candle: ' + (parseFloat(s.lastCandleClose) > parseFloat(s.lastCandleOpen) ? '🟢 BULLISH' : '🔴 BEARISH') + ' (O: ' + s.lastCandleOpen + ' | C: ' + s.lastCandleClose + ')<br>' +
-        'RSI: ' + s.rsiValue.toFixed(1) + ' | EMA Trend: ' + s.emaTrend +
-        '</div>';
+      var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
+        '<b>Automatic evidence scan</b><br>RSI: '+Number(s.rsiValue).toFixed(1)+' · EMA: '+s.emaTrend+' · MACD: '+Number(s.macdValue).toPrecision(4)+'<br>' +
+        'BOS: '+s.structure+' · Liquidity sweep: '+s.sweep+' · FVG: '+s.fvg+'<br>Candle: '+s.candlePattern+
+        '<br><b>Votes:</b> BUY '+s.buyScore+'/'+s.totalMethods+' · SELL '+s.sellScore+'/'+s.totalMethods+'</div>';
       
       var cardInner = '';
       if (s.final === 'NO TRADE') {
@@ -409,8 +356,7 @@
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + s.tp1.toFixed(2) + '</strong></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + s.tp2.toFixed(2) + '</strong></div>' +
           '</div>' +
-          '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Strategy used:</b> ' + s.strategy + '</div>' +
-          '<div style="font-size:11px;color:var(--dg-text-2);margin-top:5px;">System votes — S1: ' + s.s1 + ' | S2: ' + s.s2 + ' | S3: ' + s.s3 + '</div>';
+          '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Signal sources / evidence:</b><br>' + (s.evidence||[]).join('<br>') + '</div>';
       }
 
       listHtml += 
@@ -534,24 +480,6 @@
     currentSignalTF = tf;
     loadAllSignals();
   };
-
-  // Strategy controls are initialized once, independently of timeframe switching.
-  var strategyHelp={
-    'Liquidity Sweep & Reversal':'Wait for price to sweep a prior swing high/low and reclaim the level with confirmation.',
-    'Session Breakout & Retest':'Wait for a session-range breakout candle close and a controlled retest.',
-    'VWAP Pullback':'Look for a pullback to session VWAP with renewed momentum; VWAP feed availability varies.',
-    'Trend Pullback Sniper':'Trade with the higher-timeframe trend after a confirmed pullback.',
-    'Range Reversal Hunter':'Look for rejection at a clear range edge; avoid the middle of the range.',
-    'Momentum Expansion':'Wait for volatility expansion and a confirmed close through structure.'
-  };
-  var b1Strategy=document.getElementById('b1Strategy');
-  if(b1Strategy) b1Strategy.addEventListener('change',function(){
-    document.getElementById('b1StrategyInfo').textContent=strategyHelp[b1Strategy.value]+' Signal cards show the methods that actually agreed; this focus selector does not force a signal.';
-  });
-  var b1Mode=document.getElementById('b1Mode');
-  if(b1Mode) b1Mode.addEventListener('change',function(){
-    document.getElementById('b1ModeInfo').textContent=b1Mode.value==='hybrid'?'Hybrid: review the scan and decide whether to track a trade in your journal.':b1Mode.value==='manual'?'Manual: choose a playbook to study; the existing three systems still generate signals.':'Automatic: rank available confluence signals; this does not place broker orders.';
-  });
 
   // --- INITIALIZE ---
   async function loadAllSignals() {
