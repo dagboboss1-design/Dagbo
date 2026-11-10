@@ -2,154 +2,144 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#080d15" id="themeColor"><title>DAGBO SIGNAL · Home</title>
+<meta name="theme-color" content="#171819" id="themeColor"><title>DAGBO SIGNAL · Home</title>
 <link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="stylesheet" href="dagbo.css">
 <script>(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();</script>
 <style>
-body{background:#080d15;color:#eef4ff}.dg-page{max-width:900px;padding-bottom:48px}
-.home-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
-.home-logo{font-weight:950;letter-spacing:.6px;font-size:20px}.home-logo b{color:#efbd4c}
-.home-chip{border:1px solid #31513e;background:#10271d;color:#80e0a7;border-radius:99px;padding:7px 11px;font-size:11px;font-weight:850;white-space:nowrap}
-.home-hero{position:relative;overflow:hidden;isolation:isolate;min-height:300px;border:1px solid #66501f;border-radius:24px;padding:24px 20px;background:radial-gradient(ellipse at 78% 45%,#174a32 0,#10251f 35%,#0d1724 72%);box-shadow:0 14px 40px #0007;margin:12px 0 18px}
-.home-hero:after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#0b1421 0%,#0b1421e8 38%,#0b142150 72%,transparent)}
-.hero-copy{position:relative;z-index:2;max-width:60%}.hero-kicker{color:#e7bc53;font-size:11px;font-weight:900;letter-spacing:1.6px}
-.hero-title{font-size:clamp(32px,7vw,54px);line-height:1.02;font-weight:950;margin:13px 0}.hero-title span{color:#f2c24e}
-.hero-text{color:#c2cfdd;font-size:14px;line-height:1.55;max-width:360px}
-.hero-art{position:absolute;z-index:1;right:-10px;bottom:-4px;width:57%;height:100%;display:flex;align-items:center;justify-content:center;opacity:.95}
-.hero-art svg{width:100%;height:100%;max-height:310px}
-.home-cta{display:inline-flex;align-items:center;gap:9px;margin-top:15px;padding:12px 17px;border-radius:12px;background:linear-gradient(135deg,#f7d16c,#d89b22);color:#141a20;font-weight:900;text-decoration:none;box-shadow:0 6px 20px #dba52d40}
-.home-section{margin:26px 0 12px;display:flex;justify-content:space-between;align-items:end;gap:12px}
-.home-section h2{font-size:19px;margin:0;font-weight:900}.home-section p{font-size:11px;color:#94a6bb;margin:5px 0 0}
-.home-link{color:#edc15a;text-decoration:none;font-size:12px;font-weight:800}
-.home-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
-.home-tile{min-height:116px;padding:15px;border-radius:17px;border:1px solid #2b4058;background:linear-gradient(145deg,#142438,#0e1927);color:#eef4ff;text-decoration:none;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 6px 18px #0003}
-.home-tile:active{border-color:#e2b64b;transform:scale(.99)}.home-tile .tile-icon{font-size:25px}.home-tile strong{font-size:14px}.home-tile small{font-size:11px;color:#aabbd0;line-height:1.4}
-.home-tile.gold{border-color:#665323;background:linear-gradient(145deg,#292316,#121b27)}
-.home-tile.green{border-color:#285c45;background:linear-gradient(145deg,#102c22,#111d2b)}
-.home-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.home-stats .dg-stat{background:#111e2d;border:1px solid #283a50;border-radius:14px;padding:12px 10px}
-.home-stats .dg-stat__label{font-size:10px;color:#aabbd0}.home-stats .dg-stat__value{font-size:19px;font-weight:900}
-.home-panel{border:1px solid #2a3c52;background:linear-gradient(145deg,#142236,#0e1927);border-radius:18px;padding:16px;margin:12px 0}
-.home-panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.home-panel-head strong{font-size:16px}
-.home-panel p{color:#aabbd0;font-size:12px;line-height:1.55;margin:8px 0 0}
-.home-panel-action{display:inline-block;margin-top:12px;color:#f1c45c;font-weight:850;font-size:12px;text-decoration:none}
-.home-quote{border:1px solid #31445c;background:#101d2c;border-radius:17px;padding:14px;overflow:hidden}
-.home-quote-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.home-live{color:#6fe0a3;font-size:10px;font-weight:900}
-.home-news{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid #2b3c51}
-.home-news-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#243248;font-size:21px;flex:none}
-.home-news strong{font-size:13px}.home-news small{display:block;color:#9fb0c4;font-size:11px;margin-top:4px}
-.home-footer{margin-top:28px;padding:24px 16px;text-align:center;border:1px solid #6b5425;border-radius:20px;background:radial-gradient(ellipse at top,#342815,#101a27 72%)}
-.home-footer strong{color:#f1c45c;font-size:17px}.home-footer p{color:#aebdd0;font-size:12px;line-height:1.6}
-@media(min-width:650px){.home-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.home-hero{min-height:350px;padding:32px}.hero-art{width:54%}}
-@media(max-width:380px){.hero-copy{max-width:70%}.hero-title{font-size:31px}.hero-art{right:-50px;width:65%;opacity:.72}.home-stats .dg-stat__value{font-size:16px}}
+body{background:var(--dg-bg);color:var(--dg-text)}
+.dg-page.home-page{max-width:760px;padding-bottom:56px}
+.home-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 3px 22px}
+.home-logo{font-weight:850;letter-spacing:.4px;font-size:18px}.home-logo span{color:var(--dg-text-2)}
+.home-tag{font-size:10px;letter-spacing:1.2px;color:var(--dg-text-2);font-weight:700}
+.home-intro{margin:0 3px 20px}
+.home-intro .eyebrow{font-size:10px;letter-spacing:1.5px;color:var(--dg-text-2);font-weight:800}
+.home-intro h1{font-size:clamp(34px,8vw,52px);line-height:1.02;letter-spacing:-1.8px;margin:10px 0 12px;font-weight:780}
+.home-intro p{max-width:520px;color:var(--dg-text-2);font-size:14px;line-height:1.65;margin:0}
+.home-image{width:100%;height:220px;object-fit:cover;display:block;border-radius:5px;filter:saturate(.48) contrast(1.02);background:var(--dg-inset)}
+.home-image-caption{display:flex;justify-content:space-between;gap:10px;color:var(--dg-text-2);font-size:10px;letter-spacing:.7px;text-transform:uppercase;margin:9px 2px 0}
+.home-section{margin:34px 3px 12px}
+.home-section h2{font-size:21px;letter-spacing:-.45px;margin:0;font-weight:720}
+.home-section p{font-size:12px;color:var(--dg-text-2);margin:5px 0 0;line-height:1.5}
+.home-list{border-top:1px solid var(--dg-line)}
+.home-linkrow{display:flex;align-items:center;gap:14px;min-height:70px;padding:12px 4px;border-bottom:1px solid var(--dg-line);text-decoration:none;color:var(--dg-text)}
+.home-linkrow:active{background:var(--dg-fill)}
+.home-icon{width:34px;height:34px;display:grid;place-items:center;flex:none;border:1px solid var(--dg-line);border-radius:50%;font-size:15px;color:var(--dg-text-2)}
+.home-linkrow strong{display:block;font-size:14px;font-weight:650}
+.home-linkrow small{display:block;color:var(--dg-text-2);font-size:11px;margin-top:3px;line-height:1.4}
+.home-arrow{margin-left:auto;color:var(--dg-text-3);font-size:19px}
+.home-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--dg-line);border-bottom:1px solid var(--dg-line)}
+.home-stat{padding:15px 9px 15px 2px}
+.home-stat+.home-stat{border-left:1px solid var(--dg-line);padding-left:13px}
+.home-stat span{display:block;font-size:10px;color:var(--dg-text-2);text-transform:uppercase;letter-spacing:.6px}
+.home-stat strong{display:block;font-size:20px;font-weight:720;margin-top:5px;font-variant-numeric:tabular-nums}
+.home-photo-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.home-photo-card{min-width:0}
+.home-photo-card img{width:100%;height:135px;display:block;object-fit:cover;border-radius:4px;filter:saturate(.42)}
+.home-photo-card strong{display:block;font-size:12px;margin-top:8px}
+.home-photo-card small{display:block;color:var(--dg-text-2);font-size:10px;line-height:1.45;margin-top:4px}
+.home-feature{margin:14px 0 0}
+.home-feature img{width:100%;height:190px;object-fit:cover;display:block;border-radius:4px;filter:saturate(.45)}
+.home-feature-copy{padding:12px 2px 0}
+.home-feature-copy strong{font-size:15px}
+.home-feature-copy p{font-size:12px;color:var(--dg-text-2);line-height:1.6;margin:5px 0 0}
+.home-quote{padding:14px 0;border-top:1px solid var(--dg-line);border-bottom:1px solid var(--dg-line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.home-quote strong{font-size:14px}.home-quote span{font-size:11px;color:var(--dg-text-2)}
+.home-cta{display:inline-flex;align-items:center;gap:9px;margin-top:14px;padding:11px 15px;border:1px solid var(--dg-line);border-radius:4px;color:var(--dg-text);font-size:12px;font-weight:700;text-decoration:none}
+.home-footer{margin-top:40px;padding:22px 2px;border-top:1px solid var(--dg-line);color:var(--dg-text-2);font-size:11px;line-height:1.7}
+@media(min-width:600px){.home-image{height:300px}.home-photo-card img{height:190px}.home-feature img{height:250px}}
+@media(max-width:360px){.home-image{height:180px}.home-photo-card img{height:110px}.home-stat strong{font-size:17px}}
 </style>
 </head>
 <body>
-<main class="dg-page">
- <header class="home-head"><div class="home-logo">◈ DAGBO <b>SIGNAL</b></div><span class="home-chip">TRADING INTELLIGENCE</span></header>
- <div id="hello" style="color:#aebdd0;font-size:13px;margin:8px 3px">Welcome back</div>
- <section class="home-hero">
-  <div class="hero-copy"><div class="hero-kicker">SIGNAL WEY NO DEY LIE</div><h1 class="hero-title">Trade with<br><span>clarity.</span></h1>
-   <p class="hero-text">Your all-in-one trading workspace for Forex, Gold, Indices and Crypto. Analyse the market, understand risk and learn from every trade.</p>
-   <a class="home-cta" href="signals.html">Explore Signals <span>→</span></a>
-  </div>
-  <div class="hero-art" aria-hidden="true">
-   <svg viewBox="0 0 460 320" role="img">
-    <defs><linearGradient id="bullGold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0a6"/><stop offset=".42" stop-color="#dca52d"/><stop offset="1" stop-color="#6c3d0c"/></linearGradient><linearGradient id="candleGreen" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7dffb2"/><stop offset="1" stop-color="#08a65a"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="5"/></filter></defs>
-    <g opacity=".55" stroke="#1cbd70" stroke-width="2"><path d="M25 270V220M65 285V190M105 250V155M145 280V130M185 245V100M225 270V65M265 225V115M305 205V70M345 170V45M385 145V20"/></g>
-    <g fill="url(#candleGreen)"><rect x="20" y="230" width="12" height="38"/><rect x="60" y="210" width="12" height="60"/><rect x="100" y="175" width="12" height="55"/><rect x="140" y="150" width="12" height="85"/><rect x="180" y="120" width="12" height="70"/><rect x="220" y="92" width="12" height="100"/><rect x="260" y="145" width="12" height="54"/><rect x="300" y="100" width="12" height="80"/><rect x="340" y="72" width="12" height="78"/><rect x="380" y="50" width="12" height="72"/></g>
-    <path d="M65 120 Q15 65 80 50 Q105 42 120 76 Q135 23 176 35 Q210 44 185 94 Q163 123 130 125 Q102 145 65 120Z" fill="url(#bullGold)" stroke="#ffe59a" stroke-width="3"/>
-    <path d="M115 90 Q145 45 180 72 Q220 110 190 145 Q170 164 144 150 Q170 130 160 108 Q144 92 115 112Z" fill="#b8791d"/>
-    <path d="M115 116 Q165 84 226 125 Q270 160 255 220 Q244 270 186 277 Q140 279 110 239 Q78 197 95 153Z" fill="url(#bullGold)" stroke="#f8d777" stroke-width="3"/>
-    <path d="M116 148 Q65 130 55 95 Q83 110 104 106 Q90 80 98 62 Q132 87 140 121" fill="none" stroke="#f5d37a" stroke-width="12" stroke-linecap="round"/>
-    <path d="M222 148 Q275 120 288 87 Q263 104 244 97 Q257 70 246 53 Q214 82 205 121" fill="none" stroke="#f5d37a" stroke-width="12" stroke-linecap="round"/>
-    <path d="M116 219 L70 260 L126 250 L150 282 L173 250 L215 276 L210 225" fill="#a96c17" stroke="#f3ce6c" stroke-width="3"/>
-    <path d="M110 168 Q143 142 174 160" fill="none" stroke="#5a310c" stroke-width="8" stroke-linecap="round"/>
-    <circle cx="151" cy="177" r="7" fill="#101821"/><path d="M185 202 Q214 190 226 204" fill="none" stroke="#5a310c" stroke-width="5" stroke-linecap="round"/>
-    <path d="M250 265 L310 290 L405 290" stroke="#e7b83e" stroke-width="3" fill="none"/><circle cx="250" cy="265" r="7" fill="#ffdc75"/>
-   </svg>
-  </div>
+<main class="dg-page home-page">
+ <header class="home-head"><div class="home-logo">◈ DAGBO <span>SIGNAL</span></div><span class="home-tag">TRADING INTELLIGENCE</span></header>
+ <div id="hello" style="color:var(--dg-text-2);font-size:12px;margin:0 3px 18px">Welcome back</div>
+ <section class="home-intro">
+  <div class="eyebrow">SIGNAL WEY NO DEY LIE</div>
+  <h1>Make every<br>trade a plan.</h1>
+  <p>A calm workspace to study the markets, check trade ideas, manage risk and learn from your decisions. Built for Forex, metals, indices, commodities and crypto.</p>
+  <a class="home-cta" href="signals.html">Open signal board <span>→</span></a>
  </section>
+ <img class="home-image" src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1400&q=85" alt="Trading desk with financial market charts" loading="eager">
+ <div class="home-image-caption"><span>Market perspective</span><span>DAGBO SIGNAL · 01</span></div>
 
- <div class="home-section"><div><h2>Market at a glance</h2><p>Your selected market quote</p></div><a class="home-link" href="chart.html">Open chart →</a></div>
- <section class="home-quote"><div class="home-quote-head"><strong id="livePairName">GOLD (XAUUSD)</strong><span class="home-live">● MARKET QUOTE</span></div><div class="tradingview-widget-container"><div id="tv-live-price"></div></div></section>
+ <section class="home-section"><h2>Your trading workspace</h2><p>Everything you need, arranged simply.</p></section>
+ <nav class="home-list" aria-label="Trading workspace">
+  <a class="home-linkrow" href="signals.html"><span class="home-icon">↗</span><span><strong>Signals</strong><small>Market setups, direction and entry planning</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="chart.html"><span class="home-icon">⌁</span><span><strong>Trading Chart</strong><small>Price action, indicators and chart tools</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="news.html"><span class="home-icon">◷</span><span><strong>Market News</strong><small>Economic events and market-moving updates</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="boss1.html"><span class="home-icon">◈</span><span><strong>BOSS1 Edge Engine</strong><small>Market conditions and opportunity analysis</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="ai.html"><span class="home-icon">✳</span><span><strong>AI Commander</strong><small>Ask questions and understand trading concepts</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="journal.html"><span class="home-icon">▤</span><span><strong>Trading Journal</strong><small>Track trades and review your decisions</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="trader-score.html"><span class="home-icon">◎</span><span><strong>Trader Score</strong><small>Measure consistency and discipline</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="strategy-lab.html"><span class="home-icon">⌘</span><span><strong>Strategy Lab</strong><small>Study and compare trading strategies</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="signal-insights.html"><span class="home-icon">⌖</span><span><strong>Opportunity Intelligence</strong><small>Best Opportunity Finder and Trend Agreement</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="settings.html"><span class="home-icon">⚙</span><span><strong>Settings</strong><small>Personalise your trading workspace</small></span><span class="home-arrow">›</span></a>
+ </nav>
 
- <div class="home-section"><div><h2>Your trading workspace</h2><p>All main pages, directly on Home</p></div></div>
- <div class="home-grid">
-  <a class="home-tile gold" href="signals.html"><span class="tile-icon">⚡</span><strong>Signals</strong><small>Live setups and signal analysis</small></a>
-  <a class="home-tile" href="chart.html"><span class="tile-icon">📈</span><strong>Trading Chart</strong><small>Indicators, candle styles and drawing tools</small></a>
-  <a class="home-tile" href="news.html"><span class="tile-icon">📰</span><strong>Market News</strong><small>Economic calendar and market updates</small></a>
-  <a class="home-tile gold" href="boss1.html"><span class="tile-icon">👑</span><strong>BOSS1 Edge Engine</strong><small>Market analysis and setup planning</small></a>
-  <a class="home-tile green" href="ai.html"><span class="tile-icon">✦</span><strong>AI Commander</strong><small>Ask questions and understand the market</small></a>
-  <a class="home-tile" href="journal.html"><span class="tile-icon">📓</span><strong>Trading Journal</strong><small>Record trades and review decisions</small></a>
-  <a class="home-tile" href="trader-score.html"><span class="tile-icon">🏆</span><strong>Trader Score</strong><small>Review your trading performance</small></a>
-  <a class="home-tile" href="strategy-lab.html"><span class="tile-icon">🧪</span><strong>Strategy Lab</strong><small>Study and compare trading strategies</small></a>
-  <a class="home-tile" href="signal-insights.html"><span class="tile-icon">🎯</span><strong>Opportunity Intelligence</strong><small>Best Opportunity Finder and Trend Agreement</small></a>
-  <a class="home-tile" href="settings.html"><span class="tile-icon">⚙️</span><strong>Settings</strong><small>Account, risk, pairs and appearance</small></a>
- </div>
-
- <div class="home-section"><div><h2>Your account snapshot</h2><p>Values read from your saved settings and journal</p></div><a class="home-link" href="settings.html">Edit settings →</a></div>
+ <section class="home-section"><h2>Your account snapshot</h2><p>Personal figures from your saved settings and journal.</p></section>
  <div class="home-stats">
-  <div class="dg-stat"><span class="dg-stat__label">Account size</span><span class="dg-stat__value" id="statAccount">$100</span></div>
-  <div class="dg-stat"><span class="dg-stat__label">Risk / trade</span><span class="dg-stat__value" id="statRisk">1%</span></div>
-  <div class="dg-stat"><span class="dg-stat__label">Win rate</span><span class="dg-stat__value" id="statWinRate">—</span></div>
+  <div class="home-stat"><span>Account size</span><strong id="statAccount">$100</strong></div>
+  <div class="home-stat"><span>Risk / trade</span><strong id="statRisk">1%</strong></div>
+  <div class="home-stat"><span>Win rate</span><strong id="statWinRate">—</strong></div>
  </div>
- <div class="home-panel"><div class="home-panel-head"><strong>📒 Journal activity</strong><a class="home-link" href="journal.html">Open journal →</a></div><p><b id="statTrades">0</b> total trades recorded · <b id="statClosed">0</b> closed trades. Your stats update from your journal entries on this device.</p></div>
-
- <div class="home-section"><div><h2>BOSS1 intelligence</h2><p>Find structure before considering a trade</p></div><a class="home-link" href="boss1.html">Open BOSS1 →</a></div>
- <div class="home-grid">
-  <a class="home-tile gold" href="signal-insights.html"><span class="tile-icon">🎯</span><strong>Best Opportunity Finder</strong><small>Ranks available signals by system agreement</small></a>
-  <a class="home-tile green" href="signal-insights.html"><span class="tile-icon">🧭</span><strong>Trend Agreement</strong><small>Compare saved 5m and 15m directions</small></a>
-  <a class="home-tile" href="chart.html"><span class="tile-icon">🛡️</span><strong>Risk Planning</strong><small>Plan entry, stop loss and target levels</small></a>
+ <div class="home-list" style="margin-top:10px">
+  <a class="home-linkrow" href="journal.html"><span class="home-icon">▤</span><span><strong>Journal activity</strong><small><b id="statTrades">0</b> trades recorded · <b id="statClosed">0</b> closed</small></span><span class="home-arrow">›</span></a>
  </div>
 
- <div class="home-section"><div><h2>Market news & events</h2><p>Prepare for scheduled volatility</p></div><a class="home-link" href="news.html">View news →</a></div>
- <div class="home-panel"><div class="home-news"><span class="home-news-icon">🗓️</span><div><strong>Economic Calendar</strong><small>Review upcoming releases and event risk</small></div></div><div class="home-news"><span class="home-news-icon">🌍</span><div><strong>Multi-market coverage</strong><small>Forex, metals, indices, commodities and crypto</small></div></div><div class="home-news"><span class="home-news-icon">🔔</span><div><strong>Market alerts</strong><small>Manage notification permissions and alert settings</small></div></div><a class="home-panel-action" href="news.html">Open Market News →</a></div>
-
- <div class="home-section"><div><h2>Learn, review and improve</h2><p>Build a repeatable trading process</p></div></div>
- <div class="home-grid">
-  <a class="home-tile" href="ai.html"><span class="tile-icon">🤖</span><strong>Ask Dagbo AI</strong><small>Get explanations about trading concepts</small></a>
-  <a class="home-tile" href="strategy-lab.html"><span class="tile-icon">📚</span><strong>Strategy Lab</strong><small>Explore rules and strategy behaviour</small></a>
-  <a class="home-tile" href="trader-score.html"><span class="tile-icon">📊</span><strong>Trader Score</strong><small>Review consistency and discipline</small></a>
-  <a class="home-tile" href="journal.html"><span class="tile-icon">📝</span><strong>Trade Review</strong><small>Learn from wins, losses and mistakes</small></a>
+ <section class="home-section"><h2>Read the market, not just the chart</h2><p>Use context and confirmation before making a decision.</p></section>
+ <div class="home-photo-row">
+  <div class="home-photo-card"><img src="https://images.unsplash.com/photo-1642790106117-e829e14a795f?auto=format&fit=crop&w=800&q=80" alt="Close-up of financial market data on a screen" loading="lazy"><strong>Market structure</strong><small>Study direction, levels and changing conditions.</small></div>
+  <div class="home-photo-card"><img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80" alt="Financial analysis and data workspace" loading="lazy"><strong>Trade preparation</strong><small>Plan entry, stop loss and target before acting.</small></div>
+ </div>
+ <div class="home-feature">
+  <img src="https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=1400&q=80" alt="Professional trading and financial research workspace" loading="lazy">
+  <div class="home-feature-copy"><strong>Understand the event behind the move</strong><p>Use Market News to review scheduled economic releases and important updates. High-impact news can change volatility, spreads and market direction.</p><a class="home-cta" href="news.html">Explore market news →</a></div>
  </div>
 
- <div class="home-footer"><strong>Trade with a plan. Learn from every decision.</strong><p>DAGBO SIGNAL · Signal Wey No Dey Lie</p><p>Market analysis is educational. Signals are not guaranteed results and this app does not place broker orders.</p><a class="home-link" href="settings.html">App Settings →</a></div>
+ <section class="home-section"><h2>Build a stronger trading process</h2><p>Good trading is more than finding an entry.</p></section>
+ <div class="home-list">
+  <a class="home-linkrow" href="signal-insights.html"><span class="home-icon">01</span><span><strong>Compare opportunities</strong><small>Review system agreement and timeframe alignment.</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="chart.html"><span class="home-icon">02</span><span><strong>Plan risk first</strong><small>Know your invalidation level before entering a trade.</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="journal.html"><span class="home-icon">03</span><span><strong>Review every decision</strong><small>Record what worked, what failed and what to improve.</small></span><span class="home-arrow">›</span></a>
+ </div>
+
+ <section class="home-section"><h2>Markets in one workspace</h2><p>Explore different asset classes without losing focus.</p></section>
+ <div class="home-quote"><strong>Forex & currency pairs</strong><span>Major · Minor · Crosses</span></div>
+ <div class="home-quote"><strong>Metals & commodities</strong><span>Gold · Silver · Oil</span></div>
+ <div class="home-quote"><strong>Indices</strong><span>Global market benchmarks</span></div>
+ <div class="home-quote"><strong>Crypto assets</strong><span>Bitcoin · Ethereum</span></div>
+
+ <section class="home-section"><h2>Learn. Practise. Improve.</h2><p>Build knowledge and discipline one decision at a time.</p></section>
+ <div class="home-photo-row">
+  <div class="home-photo-card"><img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80" alt="Person studying at a desk" loading="lazy"><strong>Keep learning</strong><small>Ask AI Commander to explain unfamiliar market terms.</small></div>
+  <div class="home-photo-card"><img src="https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=800&q=80" alt="Quiet modern workspace" loading="lazy"><strong>Stay consistent</strong><small>Use your journal and Trader Score to review progress.</small></div>
+ </div>
+ <div class="home-list" style="margin-top:18px">
+  <a class="home-linkrow" href="ai.html"><span class="home-icon">✳</span><span><strong>Ask Dagbo AI</strong><small>Get plain-language explanations about trading.</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="strategy-lab.html"><span class="home-icon">⌘</span><span><strong>Explore Strategy Lab</strong><small>Understand how different approaches work.</small></span><span class="home-arrow">›</span></a>
+  <a class="home-linkrow" href="trader-score.html"><span class="home-icon">◎</span><span><strong>Review your Trader Score</strong><small>Check your habits and performance records.</small></span><span class="home-arrow">›</span></a>
+ </div>
+
+ <footer class="home-footer">DAGBO SIGNAL · SIGNAL WEY NO DEY LIE<br>Market analysis is educational. Signals are not guaranteed results. Always manage risk and verify prices with your broker. DAGBO currently records journal trades; this does not mean a broker order has been placed.</footer>
 </main>
 <script src="pwa.js" defer></script>
 <script>
 (function(){
-  var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
-  var name=(settings.name||'').replace(/^Oga\s+/i,'');
-  var account=Number(settings.accountSize)||100;
-  var risk=Number(settings.risk)||1;
-  var hour=new Date().getHours();
-  var greeting=hour<12?'Good morning':(hour<17?'Good afternoon':'Good evening');
-  document.getElementById('hello').textContent=name?greeting+', '+name+' 👋':greeting+' Oga 👋';
-  document.getElementById('statAccount').textContent='$'+account.toLocaleString();
-  document.getElementById('statRisk').textContent=risk+'%';
-  try{
-    var trades=JSON.parse(localStorage.getItem('dagbo_journal'))||[];
-    var closed=trades.filter(function(t){return t.result&&t.result!=='OPEN'});
-    if(closed.length){
-      var wins=closed.filter(function(t){return t.result==='WIN'}).length;
-      var pct=Math.round(wins/closed.length*100);
-      document.getElementById('statWinRate').textContent=pct+'%';
-      document.getElementById('statWinRate').className='dg-stat__value '+(pct>=50?'dg-pos':'dg-neg');
-    }else{document.getElementById('statWinRate').textContent='—'}
-    document.getElementById('statTrades').textContent=trades.length;
-    document.getElementById('statClosed').textContent=closed.length;
-  }catch(e){}
-  var pairs=Array.isArray(settings.pairs)?settings.pairs:['XAUUSD'];
-  var pair=pairs[0]||'XAUUSD';if(pair==='GOLD')pair='XAUUSD';
-  document.getElementById('livePairName').textContent=pair==='XAUUSD'?'GOLD (XAUUSD)':pair;
-  var tvSymbols={'XAUUSD':'CAPITALCOM:XAUUSD','EURUSD':'FOREXCOM:EURUSD','GBPUSD':'FOREXCOM:GBPUSD','USDJPY':'FOREXCOM:USDJPY','GBPJPY':'FOREXCOM:GBPJPY','AUDUSD':'FOREXCOM:AUDUSD','USDCHF':'FOREXCOM:USDCHF','USDCAD':'FOREXCOM:USDCAD','NZDUSD':'FOREXCOM:NZDUSD','US30':'CAPITALCOM:US30','US100':'CAPITALCOM:US100','NAS100':'CAPITALCOM:US100','US500':'CAPITALCOM:US500','BTCUSD':'BINANCE:BTCUSDT','BTC':'BINANCE:BTCUSDT','ETHUSD':'BINANCE:ETHUSDT','ETH':'BINANCE:ETHUSDT','EURJPY':'FOREXCOM:EURJPY','EURGBP':'FOREXCOM:EURGBP'};
-  var quote=document.getElementById('tv-live-price');
-  if(quote){
-    var s=document.createElement('script');s.src='https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js';s.async=true;
-    s.innerHTML=JSON.stringify({symbol:tvSymbols[pair]||'CAPITALCOM:XAUUSD',width:'100%',colorTheme:document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light',isTransparent:true,locale:'en'});
-    quote.appendChild(s);
-  }
+ var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
+ var name=(settings.name||'').replace(/^Oga\s+/i,'');
+ var account=Number(settings.accountSize)||100,risk=Number(settings.risk)||1,hour=new Date().getHours();
+ var greeting=hour<12?'Good morning':(hour<17?'Good afternoon':'Good evening');
+ document.getElementById('hello').textContent=name?greeting+', '+name:greeting;
+ document.getElementById('statAccount').textContent='$'+account.toLocaleString();
+ document.getElementById('statRisk').textContent=risk+'%';
+ try{
+  var trades=JSON.parse(localStorage.getItem('dagbo_journal'))||[];
+  var closed=trades.filter(function(t){return t.result&&t.result!=='OPEN'});
+  if(closed.length){var wins=closed.filter(function(t){return t.result==='WIN'}).length;document.getElementById('statWinRate').textContent=Math.round(wins/closed.length*100)+'%'}
+  document.getElementById('statTrades').textContent=trades.length;
+  document.getElementById('statClosed').textContent=closed.length;
+ }catch(e){}
 })();
 </script>
 <script src="navigation.js" defer></script>
