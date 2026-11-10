@@ -89,6 +89,7 @@
       <label class="dg-field" style="margin:0"><span class="dg-label">Stop Loss</span><input type="number" id="fSl" class="dg-input" step="any" required></label>
       <label class="dg-field" style="margin:0"><span class="dg-label">Take Profit</span><input type="number" id="fTp" class="dg-input" step="any" required></label>
       <label class="dg-field" style="margin:0"><span class="dg-label">Lot Size</span><input type="number" id="fLot" class="dg-input" step="any" min="0.01" value="0.01"></label>
+      <label class="dg-field" style="margin:0"><span class="dg-label">Planned Risk ($)</span><input type="number" id="fRiskAmount" class="dg-input" step="any" min="0.01"></label>
       <label class="dg-field" style="margin:0"><span class="dg-label">P&amp;L ($)</span><input type="number" id="fPnl" class="dg-input" step="any" placeholder="0.00"></label>
     </div>
     <div style="margin-top:24px"><button class="dg-btn dg-btn--primary dg-btn--block" onclick="saveTrade()">Save Trade</button></div>
@@ -222,6 +223,7 @@
     document.getElementById('fTimeframe').value = '';
     ['fEntry','fSl','fTp','fPnl'].forEach(function(id){document.getElementById(id).value='';});
     document.getElementById('fLot').value = '0.01';
+    document.getElementById('fRiskAmount').value = ((Number(settings.accountSize)||initialBalance)*(Number(settings.risk)||1)/100).toFixed(2);
     document.getElementById('tradeModal').style.display = 'flex';
   };
   window.closeForm = function() { document.getElementById('tradeModal').style.display = 'none'; };
@@ -235,6 +237,7 @@
     document.getElementById('fResult').value = trade.result || 'OPEN';
     document.getElementById('fStrategy').value = trade.strategy || '';
     document.getElementById('fTimeframe').value = trade.timeframe || '';
+    document.getElementById('fRiskAmount').value = trade.riskAmount || ((Number(settings.accountSize)||initialBalance)*(Number(settings.risk)||1)/100).toFixed(2);
     document.getElementById('fEntry').value = trade.entry ?? '';
     document.getElementById('fSl').value = trade.stopLoss ?? '';
     document.getElementById('fTp').value = trade.takeProfit ?? '';
@@ -251,7 +254,8 @@
     var tp = Number(document.getElementById('fTp').value);
     var lot = Number(document.getElementById('fLot').value);
     var pnl = Number(document.getElementById('fPnl').value) || 0;
-    if (![entry,sl,tp,lot].every(Number.isFinite) || entry<=0 || sl<=0 || tp<=0 || lot<=0) {
+    var riskAmount = Number(document.getElementById('fRiskAmount').value);
+    if (![entry,sl,tp,lot,riskAmount].every(Number.isFinite) || entry<=0 || sl<=0 || tp<=0 || lot<=0 || riskAmount<=0) {
       alert('Please enter valid Entry, Stop Loss, Take Profit and Lot Size values.');
       return;
     }
@@ -265,12 +269,12 @@
       alert('You already have an OPEN trade for ' + pair + '.');
       return;
     }
-    var riskAmount = (Number(settings.accountSize)||initialBalance) * (Number(settings.risk)||1) / 100;
     var trade = {
       id: editingId || String(Date.now()),
       pair: pair, direction: direction, result: result,
       strategy: document.getElementById('fStrategy').value,
       timeframe: document.getElementById('fTimeframe').value,
+      riskAmount: riskAmount,
       entry: entry, stopLoss: sl, takeProfit: tp, lotSize: lot,
       pnl: result === 'OPEN' ? 0 : pnl,
       rMultiple: result === 'OPEN' ? 0 : Math.round((pnl/(riskAmount||1))*10)/10,
