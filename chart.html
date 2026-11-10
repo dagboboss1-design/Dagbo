@@ -43,11 +43,15 @@
     cursor: pointer; width: 100%;
     text-align: center; margin-bottom: 12px;
   }
-  #tv-chart-container{position:relative;touch-action:pan-y}
+  #tv-chart-container{position:relative;touch-action:pan-y;overflow:hidden}
+  #chartOverlayTools{position:absolute;z-index:12;top:10px;left:10px;max-width:calc(100% - 20px);display:flex;flex-wrap:wrap;gap:5px;padding:7px;background:rgba(9,17,29,.94);border:1px solid rgba(180,195,215,.25);border-radius:12px;box-shadow:0 5px 18px rgba(0,0,0,.3)}
+  #chartOverlayTools button{border:1px solid #34445a;background:#172538;color:#eef4ff;border-radius:8px;padding:7px 9px;font-size:11px;font-weight:750;min-height:32px}
+  #chartOverlayTools .tool-row{display:flex;gap:5px;flex-wrap:wrap;width:100%}
+  #drawingStatus{width:100%;font-size:10px;color:#aabbd0;margin:0;padding:0 2px}
   #dagboDrawingLayer{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none;touch-action:none}
   #tv-chart-container.drawing-active iframe{pointer-events:none}
   #tv-chart-container.drawing-active #dagboDrawingLayer{pointer-events:auto;cursor:crosshair}
-  #drawingTools button.is-active{background:var(--dg-green);color:#fff;border-color:var(--dg-green)}
+  #chartOverlayTools [data-tool].is-active{background:#d9ad43;color:#101722;border-color:#f0cb69}
 </style>
 <script>
   (function(){
@@ -79,16 +83,6 @@
   </div>
 
 
-  <section class="dg-card" style="margin:12px 0">
-    <h2 class="dg-card__title">DAGBO Drawing Tools</h2>
-    <p class="dg-muted" style="font-size:12px">Select a tool, then drag on the chart. Drawings are saved on this device and do not place broker orders.</p>
-    <div id="drawingTools" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px">
-      <button type="button" class="dg-btn" data-tool="long">Long Position</button><button type="button" class="dg-btn" data-tool="short">Short Position</button><button type="button" class="dg-btn" data-tool="line">Trend Line</button>
-      <button type="button" class="dg-btn" data-tool="rect">Rectangle</button><button type="button" class="dg-btn" data-tool="triangle">Triangle</button><button type="button" class="dg-btn" data-tool="fib">Fibonacci</button><button type="button" class="dg-btn" data-tool="hline">Horizontal Line</button><button type="button" class="dg-btn" data-tool="off">Move Chart</button>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" id="undoDrawing" class="dg-btn" style="flex:1">Undo last</button><button type="button" id="clearDrawings" class="dg-btn" style="flex:1">Clear drawings</button></div>
-    <p id="drawingStatus" class="dg-muted" style="font-size:12px;margin:8px 0 0">Move Chart is active.</p>
-  </section>
   <section class="dg-card" style="margin:12px 0">
     <h2 class="dg-card__title">Long / Short Risk Planner</h2>
     <div class="dg-grid-2">
@@ -200,6 +194,10 @@
     layer.setAttribute('viewBox','0 0 '+container.clientWidth+' '+chartHeight);
     layer.setAttribute('preserveAspectRatio','none');
     container.appendChild(layer);
+    var toolbar=document.createElement('div');
+    toolbar.id='chartOverlayTools';
+    toolbar.innerHTML='<button type="button" data-tool="off">↖ Move</button><button type="button" data-tool="long">Long</button><button type="button" data-tool="short">Short</button><button type="button" data-tool="line">Trendline</button><button type="button" data-tool="rect">Rectangle</button><button type="button" data-tool="triangle">Triangle</button><button type="button" data-tool="fib">Fibonacci</button><button type="button" data-tool="hline">水平 Line</button><button type="button" id="undoDrawing">Undo</button><button type="button" id="clearDrawings">Clear</button><span id="drawingStatus">Move chart is active</span>';
+    container.appendChild(toolbar);
     initDrawingLayer(layer,container);
   }
 
@@ -231,8 +229,8 @@
       }
     }
     function render(){layer.innerHTML='';drawings.forEach(shape);if(preview)shape(preview);}
-    function selectTool(next){tool=next;container.classList.toggle('drawing-active',tool!=='off');document.querySelectorAll('#drawingTools [data-tool]').forEach(function(b){b.classList.toggle('is-active',b.getAttribute('data-tool')===tool)});document.getElementById('drawingStatus').textContent=tool==='off'?'Move Chart is active.':'Drag on the chart to place '+tool.toUpperCase()+'.';}
-    document.querySelectorAll('#drawingTools [data-tool]').forEach(function(b){b.addEventListener('click',function(){selectTool(b.getAttribute('data-tool'))})});
+    function selectTool(next){tool=next;container.classList.toggle('drawing-active',tool!=='off');document.querySelectorAll('#chartOverlayTools [data-tool]').forEach(function(b){b.classList.toggle('is-active',b.getAttribute('data-tool')===tool)});document.getElementById('drawingStatus').textContent=tool==='off'?'Move Chart is active.':'Drag on the chart to place '+tool.toUpperCase()+'.';}
+    document.querySelectorAll('#chartOverlayTools [data-tool]').forEach(function(b){b.addEventListener('click',function(){selectTool(b.getAttribute('data-tool'))})});
     layer.addEventListener('pointerdown',function(e){if(tool==='off')return;start=point(e);preview={kind:tool,x1:start.x,y1:start.y,x2:start.x,y2:start.y};layer.setPointerCapture(e.pointerId);render();});
     layer.addEventListener('pointermove',function(e){if(!start||!preview)return;var p=point(e);preview.x2=p.x;preview.y2=p.y;render();});
     layer.addEventListener('pointerup',function(e){if(!start||!preview)return;var p=point(e);preview.x2=p.x;preview.y2=p.y;if(Math.abs(p.x-start.x)+Math.abs(p.y-start.y)>6){drawings.push(preview);persist()}preview=null;start=null;render();});
