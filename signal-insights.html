@@ -18,12 +18,12 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
  <p class="dg-subtitle">Confluence ranking and 5m / 15m direction alignment, based on the latest scans saved on this device.</p>
  <section class="intel-card">
   <div class="dg-card__head"><h2 class="dg-card__title">Best Opportunity Finder</h2><span id="bestTf" class="dg-pill">Waiting</span></div>
-  <p class="intel-muted">Ranks the top three pairs where at least two of the three signal systems agree. This is a rule-confluence score, not a probability of profit.</p>
+  <p class="intel-muted">Ranks the top three pairs with at least three agreeing votes from the automatic nine-method analysis. This is a rule-confluence score, not a probability of profit.</p>
   <div id="bestList" class="intel-muted">No saved scan yet. Return to Signals and wait for the scan to finish.</div>
  </section>
  <section class="intel-card">
   <div class="dg-card__head"><h2 class="dg-card__title">Trend Agreement Monitor</h2><span class="dg-pill">5m / 15m</span></div>
-  <p class="intel-muted">Compares the latest saved 5-minute and 15-minute signal directions. Both scans must have run on this device. 1H / 4H confirmation is not connected.</p>
+  <p class="intel-muted">Compares the latest saved 5-minute and 15-minute multi-method signal directions. Both scans must have run on this device. 1H / 4H confirmation is not connected.</p>
   <div id="trendList" class="intel-muted">No saved timeframe comparison yet.</div>
  </section>
  <p class="intel-muted">These tools read the existing DAGBO signal engine. They do not create a trade or guarantee a winning result. Refresh the Signals page to update the source scan.</p>
@@ -38,11 +38,11 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
   best.textContent='';
   if(saved&&Array.isArray(saved.items)){
    document.getElementById('bestTf').textContent=saved.timeframe+'m scan';
-   if(!saved.items.length){best.textContent='No setup currently meets the 2-of-3 confluence rule. Wait for confirmation.'}
+   if(!saved.items.length){best.textContent='No setup currently has at least three agreeing method votes. Wait for confirmation.'}
    saved.items.forEach(function(item,index){
     var row=document.createElement('div');row.className='intel-row';
     var left=document.createElement('div');var name=document.createElement('strong');name.textContent=(index+1)+'. '+item.pair;
-    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent=item.score+'/3 systems agree';
+    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent=item.score+'/9 method votes agree';
     left.appendChild(name);left.appendChild(detail);
     var pill=document.createElement('span');pill.className='intel-pill'+(item.direction==='SELL'?' sell':'');pill.textContent=item.signal;
     row.appendChild(left);row.appendChild(pill);best.appendChild(row);
