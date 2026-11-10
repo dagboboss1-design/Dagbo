@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F5F7" id="themeColor">
+<title>Market News · DAGBO SIGNAL</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="dagbo.css">
+<script>
+(function(){
+  try {
+    var s = JSON.parse(localStorage.getItem('dagbo_settings')) || {};
+    document.documentElement.setAttribute('data-theme', s.theme === 'dark' ? 'dark' : 'light');
+  } catch(e) {}
+})();
+</script>
+<style>
+.news-intro{margin:10px 4px 20px}
+.news-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 12px}
+.news-refresh{border:1px solid var(--dg-line);background:var(--dg-card);color:var(--dg-text);border-radius:20px;padding:9px 14px;font-weight:700;font-size:12px;cursor:pointer}
+.news-frame{width:100%;min-height:650px;border:0;border-radius:16px;background:var(--dg-card)}
+.news-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.news-link{display:block;padding:15px;border:1px solid var(--dg-line);border-radius:15px;background:var(--dg-card);color:var(--dg-text);text-decoration:none}
+.news-link strong{display:block;font-size:14px;margin-bottom:5px}
+.news-link span{font-size:12px;color:var(--dg-text-2);line-height:1.4}
+.news-disclaimer{font-size:12px;line-height:1.6;color:var(--dg-text-2)}
+@media(max-width:380px){.news-links{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="dg-page">
+  <div class="dg-top">
+    <div class="dg-brand">◈ DAGBO SIGNAL</div>
+    <div class="dg-badge">NEWS</div>
+  </div>
+
+  <div class="news-intro">
+    <h1 class="dg-title">Market News</h1>
+    <p class="dg-subtitle">Stay informed about the stories moving forex and global markets.</p>
+  </div>
+
+  <div class="dg-card" style="padding:16px;margin-bottom:18px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span class="dg-pill dg-pill--open">LIVE FEED</span>
+      <span class="dg-muted" style="font-size:12px">Powered by TradingView</span>
+    </div>
+    <p class="news-disclaimer" style="margin:0">Latest market headlines and analysis. Tap a story in the feed to read the publisher's report.</p>
+  </div>
+
+  <div class="news-toolbar">
+    <h2 class="dg-section" style="margin:0">Latest headlines</h2>
+    <button class="news-refresh" type="button" onclick="reloadNews()">↻ Refresh</button>
+  </div>
+
+  <section class="dg-card" style="padding:10px;overflow:hidden">
+    <div class="tradingview-widget-container" style="width:100%">
+      <div class="tradingview-widget-container__widget"></div>
+      <div class="tradingview-widget-copyright" style="font-size:10px;text-align:center;padding:8px;color:var(--dg-text-2)">
+        News feed by <a href="https://www.tradingview.com/" rel="noopener noreferrer" target="_blank">TradingView</a>
+      </div>
+    </div>
+  </section>
+
+  <h2 class="dg-section" style="margin-top:24px">More market resources</h2>
+  <div class="news-links">
+    <a class="news-link" href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener noreferrer">
+      <strong>Economic Calendar</strong><span>Upcoming events and high-impact releases</span>
+    </a>
+    <a class="news-link" href="https://www.reuters.com/markets/" target="_blank" rel="noopener noreferrer">
+      <strong>Reuters Markets</strong><span>Global business and financial reporting</span>
+    </a>
+    <a class="news-link" href="https://www.investing.com/news/forex-news" target="_blank" rel="noopener noreferrer">
+      <strong>Forex News</strong><span>Currency-market headlines and analysis</span>
+    </a>
+    <a class="news-link" href="https://www.cmegroup.com/markets/interest-rates/cme-fedwatch-tool.html" target="_blank" rel="noopener noreferrer">
+      <strong>FedWatch</strong><span>Market expectations for US rate decisions</span>
+    </a>
+  </div>
+
+  <div class="dg-card" style="margin-top:20px;background:var(--dg-fill);box-shadow:none">
+    <p class="news-disclaimer" style="margin:0"><b>Trade smart:</b> News can cause sudden volatility and spreads to widen. Headlines are not buy or sell signals. Check the source, release time and price reaction before taking a trade.</p>
+  </div>
+</main>
+
+<nav class="dg-tabbar" aria-label="Main">
+  <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
+  <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
+  <a class="dg-tab" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
+  <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
+  <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
+</nav>
+
+<script src="pwa.js" defer></script>
+<script>
+(function(){
+  var container = document.querySelector('.tradingview-widget-container');
+  var config = {
+    "feedMode": "market",
+    "market": "forex",
+    "isTransparent": true,
+    "displayMode": "regular",
+    "width": "100%",
+    "height": 650,
+    "colorTheme": document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light',
+    "locale": "en"
+  };
+  function loadNews(){
+    var old = container.querySelector('script[data-news-widget]');
+    if (old) old.remove();
+    var script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-timeline.js';
+    script.async = true;
+    script.dataset.newsWidget = 'true';
+    script.text = JSON.stringify(config);
+    container.appendChild(script);
+  }
+  window.reloadNews = loadNews;
+  loadNews();
+})();
+</script>
+</body>
+</html>
