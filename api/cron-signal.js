@@ -171,40 +171,40 @@ module.exports = async function handler(req,res) {
   try {
     const now = new Date();
     const events = await getHighImpactEvents(now);
-    const released = events.filter(e => {
+    const releasedEvents = events.filter(e => {
       const mins = (now.getTime() - e.date.getTime()) / 60000;
       return mins >= 0 && mins <= 6;
-    }).sort((a,b) => b.date - a.date)[0];
-
-    if (released) {
+    }).sort((a,b) => a.date - b.date);
+    const releasedNow = [];
+    for (const released of releasedEvents) {
       const releaseKey = "dagbo:news:released:" + encodeURIComponent(released.id);
-      if (!(await redis.get(releaseKey))) {
-        let detail = released.currency + " high-impact event: " + released.name + ".";
-        if (released.actual) detail += " Actual " + released.actual + ".";
-        if (released.forecast) detail += " Forecast " + released.forecast + ".";
-        if (released.previous) detail += " Previous " + released.previous + ".";
-        let title = "🚨 " + released.currency + " NEWS RELEASED";
-        if (released.currency === "USD") {
-          try {
-            const candleUrl = "https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1min&outputsize=2&apikey=" + encodeURIComponent(apiKey);
-            const response = await fetch(candleUrl);
-            const data = await response.json();
-            if (response.ok && data.status !== "error" && Array.isArray(data.values) && data.values.length) {
-              const candle = data.values[0];
-              const open = Number(candle.open), close = Number(candle.close);
-              const pct = open > 0 ? (close-open)/open*100 : 0;
-              if (Math.abs(pct) >= 0.30) {
-                title = pct > 0 ? "🚀 POST-NEWS GOLD SPIKE UP" : "🔻 POST-NEWS GOLD SPIKE DOWN";
-                detail += " Gold's latest 1-minute candle moved " + (pct>0?"+":"") + pct.toFixed(2) + "%. Confirm price and spread before trading.";
-              }
+      if (await redis.get(releaseKey)) continue;
+      let detail = released.currency + " high-impact event: " + released.name + ".";
+      if (released.actual) detail += " Actual " + released.actual + ".";
+      if (released.forecast) detail += " Forecast " + released.forecast + ".";
+      if (released.previous) detail += " Previous " + released.previous + ".";
+      let title = "🚨 " + released.currency + " NEWS RELEASED";
+      if (released.currency === "USD") {
+        try {
+          const candleUrl = "https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1min&outputsize=2&apikey=" + encodeURIComponent(apiKey);
+          const response = await fetch(candleUrl);
+          const data = await response.json();
+          if (response.ok && data.status !== "error" && Array.isArray(data.values) && data.values.length) {
+            const candle = data.values[0];
+            const open = Number(candle.open), close = Number(candle.close);
+            const pct = open > 0 ? (close-open)/open*100 : 0;
+            if (Math.abs(pct) >= 0.30) {
+              title = pct > 0 ? "🚀 POST-NEWS GOLD SPIKE UP" : "🔻 POST-NEWS GOLD SPIKE DOWN";
+              detail += " Gold's latest 1-minute candle moved " + (pct>0?"+":"") + pct.toFixed(2) + "%. Confirm price and spread before trading.";
             }
-          } catch (e) { console.error("Post-news gold check failed:",e.message); }
-        }
-        await sendPush(title,detail,"news-release-" + released.currency,"/news.html");
-        await claim(releaseKey);
-        return res.status(200).json({sent:"economic release alert",event:released.name,currency:released.currency});
+          }
+        } catch (e) { console.error("Post-news gold check failed:",e.message); }
       }
+      await sendPush(title,detail,"news-release-" + released.currency,"/news.html");
+      await claim(releaseKey);
+      releasedNow.push({event:released.name,currency:released.currency});
     }
+    if (releasedNow.length) return res.status(200).json({sent:"economic release alerts",events:releasedNow});
 
     const next = events.find(e => e.date.getTime() > now.getTime());
     if (!next) return res.status(200).json({message:"No upcoming high-impact event in the current calendar feed."});
