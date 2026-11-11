@@ -86,7 +86,7 @@ var container=document.getElementById('tv-chart-container'),btn=document.getElem
 container.innerHTML='';container.appendChild(btn);
 var theme=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
 var iframe=document.createElement('iframe');
-iframe.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+currentTF+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hidesidetoolbar=0'&symboledit=0&saveimage=0&toolbarbg=rgba(0,0,0,0)&hide_volume=true';
+iframe.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+currentTF+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hidesidetoolbar=0&symboledit=0&saveimage=0&toolbarbg=%23000000&hide_volume=true';
 iframe.setAttribute('allowfullscreen','');container.appendChild(iframe);
 }
 window.changePair=function(tvSymbol){currentPair=tvSymbol;loadChart()};
