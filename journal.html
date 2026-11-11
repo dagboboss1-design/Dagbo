@@ -109,6 +109,7 @@
   var initialBalance = Number(settings.accountSize) || 100;
   var journalCurrency = localStorage.getItem('dagbo_journal_currency') === 'NGN' ? 'NGN' : 'USD';
   var usdNgnRate = null, usdNgnUpdated = null;
+  try { var cachedRate=JSON.parse(localStorage.getItem('dagbo_usd_ngn_rate')||'null'); if(cachedRate&&Number(cachedRate.rate)>0){usdNgnRate=Number(cachedRate.rate);usdNgnUpdated=cachedRate.updatedAt||null;} } catch(e) {}
   function money(n) {
     var v=Number(n)||0;
     if(journalCurrency==='NGN') { if(!Number.isFinite(usdNgnRate))return '₦—'; var q=v*usdNgnRate; return (q>0?'+₦':q<0?'-₦':'₦')+Math.abs(q).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -147,6 +148,7 @@
     var pnl = trades.reduce(function(sum,t){ return sum + (Number(t.pnl)||0); },0);
     var rate = closed.length ? Math.round(wins / closed.length * 100) : null;
     document.getElementById('statTotal').textContent = trades.length;
+    document.getElementById('statClosed').textContent = closed.length;
     var wr = document.getElementById('statWinRate');
     wr.textContent = rate === null ? '—' : rate + '%';
     wr.className = 'dg-stat__value ' + (rate === null ? '' : rate >= 50 ? 'dg-key' : 'dg-neg');
@@ -1072,7 +1074,7 @@
     el.textContent=Number.isFinite(usdNgnRate)?'$1 = ₦'+usdNgnRate.toLocaleString('en-NG',{maximumFractionDigits:4})+' · Updated '+(usdNgnUpdated?new Date(usdNgnUpdated).toLocaleString():'time unavailable')+' · USD ledger, display conversion only.':'Live USD/NGN rate unavailable; USD ledger is unchanged.';
   }
   async function refreshUsdNgnRate() {
-    try { var r=await fetch('/api/exchange-rate',{cache:'no-store'});if(!r.ok)throw new Error('Rate endpoint unavailable');var d=await r.json();var n=Number(d.usdNgn);if(!Number.isFinite(n)||n<=0)throw new Error('Invalid rate');usdNgnRate=n;usdNgnUpdated=d.updatedAt||(d.timestamp?new Date(d.timestamp*1000).toISOString():null);renderStats();renderList(); }
+    try { var r=await fetch('/api/exchange-rate',{cache:'no-store'});if(!r.ok)throw new Error('Rate endpoint unavailable');var d=await r.json();var n=Number(d.usdNgn);if(!Number.isFinite(n)||n<=0)throw new Error('Invalid rate');usdNgnRate=n;localStorage.setItem('dagbo_usd_ngn_rate',JSON.stringify({rate:usdNgnRate,updatedAt:d.updatedAt||(d.timestamp?new Date(d.timestamp*1000).toISOString():null)}));usdNgnUpdated=d.updatedAt||(d.timestamp?new Date(d.timestamp*1000).toISOString():null);renderStats();renderList(); }
     catch(e){console.warn('USD/NGN conversion rate unavailable:',e);}renderFxStatus();
   }
   function persist() { localStorage.setItem('dagbo_journal', JSON.stringify(trades)); }
