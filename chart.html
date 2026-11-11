@@ -3,149 +3,113 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F5F5F7" id="themeColor">
+<meta name="theme-color" content="#080b10">
 <title>Chart · DAGBO SIGNAL</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
 <style>
-.back-arrow{display:inline-flex;align-items:center;gap:6px;font-size:16px;font-weight:700;color:var(--dg-text);text-decoration:none;margin-bottom:16px;padding:8px 12px;background:var(--dg-fill);border-radius:12px}
-#tv-chart-container{height:clamp(520px, calc(100vh - 260px), 900px);min-height:520px;width:100%;border-radius:16px;overflow:hidden;background:#090d14;margin-bottom:16px;position:relative}
-#tradingview_widget{position:absolute;inset:0;width:100%;height:100%}
-#tradingview_widget iframe{width:100%!important;height:100%!important}
-body.chart-full #tv-chart-container{position:fixed!important;inset:0;width:100vw!important;height:100dvh!important;min-height:0;z-index:9999;border-radius:0;margin:0}
-#btnFull,#btnTools{position:absolute;top:10px;z-index:20;color:#fff;padding:9px 13px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.35)}
-#btnFull{right:10px;background:rgba(0,0,0,.85);border:1px solid #555}
-#btnTools{left:10px;background:rgba(0,113,227,.94);border:1px solid #0071e3}
-.chart-pair-select{appearance:none;-webkit-appearance:none;background:var(--dg-card);border:1px solid var(--dg-line);color:var(--dg-text);font-size:16px;font-weight:700;padding:14px 16px;border-radius:16px;cursor:pointer;width:100%;text-align:center;margin-bottom:12px;box-shadow:var(--dg-shadow)}
+:root{color-scheme:dark}
+body{background:#080b10!important;color:#f4f6f8!important}
+.dg-page{max-width:100%!important;padding:10px 8px 90px!important}
+.chart-head{display:flex;justify-content:space-between;align-items:center;margin:4px 4px 10px}
+.chart-title{font-size:18px;font-weight:800}
+.chart-selects{display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:8px}
+.chart-selects select{min-width:0;background:#151b24;color:#f5f7fa;border:1px solid #293342;border-radius:10px;padding:12px;font-weight:700}
+.tf-row{display:flex;gap:6px;overflow:auto;margin:0 0 8px;padding-bottom:3px}
+.tf-row button,.tool-row button{white-space:nowrap;border:1px solid #293342;border-radius:9px;background:#151b24;color:#cbd5e1;padding:9px 12px;font-weight:700}
+.tf-row button.active,.tool-row button.active{background:#0878e8;color:white;border-color:#0878e8}
+#chartWrap{height:calc(100dvh - 255px);min-height:440px;max-height:850px;background:#090d14;border:1px solid #1e2936;border-radius:12px;overflow:hidden;position:relative}
+#chart{width:100%;height:100%}
+#chartStatus{font-size:11px;color:#94a3b8;padding:7px 3px}
+.tool-row{display:flex;gap:6px;overflow-x:auto;margin:8px 0}
+.tool-row button{font-size:11px;padding:9px 10px}
+.chart-foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#94a3b8;padding:4px}
+#chartWrap.full{position:fixed;inset:0;z-index:9999;width:100vw;height:100dvh;max-height:none;border:0;border-radius:0}
+#chartWrap.full #chart{height:100%}
+#positionInfo{font-size:11px;color:#cbd5e1;padding:7px;background:#111923;border-radius:8px;margin-top:6px;display:none}
+@media(min-width:700px){.dg-page{max-width:1100px!important;margin:auto!important}#chartWrap{height:70vh}}
 </style>
-<script>
-(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();
-</script>
+<script>(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();</script>
 </head>
 <body>
 <main class="dg-page">
-<a href="index.html" class="back-arrow">← Back to Home</a>
-<div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">CHART</div></div>
-<h1 class="dg-title">Live Chart</h1>
-<p class="dg-subtitle">Real price. Real zones. Check before you enter.</p>
-<select id="pairSelect" class="chart-pair-select" onchange="changePair(this.value)"></select>
-<div class="dg-seg" role="radiogroup" aria-label="Timeframe" style="margin-bottom:12px" id="tfContainer">
-<input class="dg-seg__in" type="radio" name="tf" id="tf1" value="5" onchange="changeTF('5')"><label class="dg-seg__lb" for="tf1">5m</label>
-<input class="dg-seg__in" type="radio" name="tf" id="tf2" value="15" onchange="changeTF('15')" checked><label class="dg-seg__lb" for="tf2">15m</label>
-<input class="dg-seg__in" type="radio" name="tf" id="tf3" value="60" onchange="changeTF('60')"><label class="dg-seg__lb" for="tf3">1H</label>
-<input class="dg-seg__in" type="radio" name="tf" id="tf4" value="240" onchange="changeTF('240')"><label class="dg-seg__lb" for="tf4">4H</label>
-<input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
+<div class="chart-head"><a href="index.html" style="color:#cbd5e1;text-decoration:none;font-weight:700">← Back</a><div class="chart-title">◈ DAGBO SIGNAL · CHART</div><button id="fullBtn" style="background:#151b24;color:#fff;border:1px solid #293342;border-radius:9px;padding:8px 10px">⛶</button></div>
+<div class="chart-selects"><select id="pairSelect" aria-label="Market">
+<option value="XAUUSD">GOLD · XAUUSD</option><option value="EURUSD">EUR/USD</option><option value="GBPUSD">GBP/USD</option><option value="USDJPY">USD/JPY</option><option value="GBPJPY">GBP/JPY</option><option value="AUDUSD">AUD/USD</option><option value="USDCHF">USD/CHF</option><option value="USDCAD">USD/CAD</option><option value="NZDUSD">NZD/USD</option><option value="EURJPY">EUR/JPY</option><option value="EURGBP">EUR/GBP</option><option value="US30">US30</option><option value="US100">US100</option><option value="US500">US500</option><option value="BTCUSD">BTCUSD</option><option value="ETHUSD">ETHUSD</option>
+</select><button id="refreshBtn" style="background:#0878e8;color:#fff;border:0;border-radius:10px;padding:0 13px;font-weight:800">↻</button></div>
+<div class="tf-row" id="timeframes"><button data-tf="5">5m</button><button data-tf="15" class="active">15m</button><button data-tf="60">1H</button><button data-tf="240">4H</button><button data-tf="D">1D</button></div>
+<div id="chartWrap"><div id="chart"></div></div>
+<div id="chartStatus">Connecting to live market candles…</div>
+<div class="tool-row">
+<button id="emaBtn" class="active">EMA 20/50</button><button id="bosBtn" class="active">BOS / CHoCH</button><button id="hlineBtn">＋ Horizontal</button><button id="longBtn">↗ Long Position</button><button id="shortBtn">↘ Short Position</button><button id="clearBtn">Clear drawings</button>
 </div>
-<div id="tv-chart-container"><div id="tradingview_widget"></div><button id="btnTools" type="button" onclick="toggleTools()" aria-pressed="true">✎ DRAWING TOOLS: ON</button><button id="btnFull" type="button" onclick="toggleFull()">⛶ FULLSCREEN</button></div>
-<p class="dg-subtitle" style="font-size:12px;margin-top:-6px">Use TradingView's toolbar to add indicators, trend lines, horizontal lines, rectangles and other available drawings. Rotate your phone for more chart space.</p>
-<a href="replay.html" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;margin:8px 0 18px;border-radius:14px;background:#0878e8;color:#fff;text-decoration:none;font-weight:800">⏪ OPEN HISTORICAL REPLAY</a>
+<div id="positionInfo"></div>
+<div class="chart-foot"><span id="lastPrice">Waiting for price…</span><span>Custom DAGBO chart · UTC</span></div>
+<a href="replay.html" style="display:flex;justify-content:center;justify-content:center;padding:13px;margin:10px 0;border-radius:12px;background:#0878e8;color:#fff;text-decoration:none;font-weight:800">⏪ OPEN HISTORICAL REPLAY</a>
 </main>
 <nav class="dg-tabbar" aria-label="Main">
-<a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
-<a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
-<a class="dg-tab" aria-current="page" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
-<a class="dg-tab" href="news.html"><span class="dg-tab__icon">📰</span>News</a>
-<a class="dg-tab" href="boss1.html"><span class="dg-tab__icon">👑</span>BOSS1</a>
-<a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
-<a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
+<a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a><a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a><a class="dg-tab" aria-current="page" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a><a class="dg-tab" href="news.html"><span class="dg-tab__icon">📰</span>News</a><a class="dg-tab" href="boss1.html"><span class="dg-tab__icon">👑</span>BOSS1</a><a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a><a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
 </nav>
 <script src="pwa.js" defer></script>
-<script src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"></script>
 <script>
 (function(){
 'use strict';
-var PAIRS=[
-{id:'XAUUSD',label:'GOLD (XAUUSD)',tv:'CAPITALCOM:XAUUSD'},
-{id:'EURUSD',label:'EUR/USD',tv:'FOREXCOM:EURUSD'},
-{id:'GBPUSD',label:'GBP/USD',tv:'FOREXCOM:GBPUSD'},
-{id:'USDJPY',label:'USD/JPY',tv:'FOREXCOM:USDJPY'},
-{id:'GBPJPY',label:'GBP/JPY',tv:'FOREXCOM:GBPJPY'},
-{id:'AUDUSD',label:'AUD/USD',tv:'FOREXCOM:AUDUSD'},
-{id:'USDCHF',label:'USD/CHF',tv:'FOREXCOM:USDCHF'},
-{id:'USDCAD',label:'USD/CAD',tv:'FOREXCOM:USDCAD'},
-{id:'NZDUSD',label:'NZD/USD',tv:'FOREXCOM:NZDUSD'},
-{id:'US30',label:'US30 (Dow)',tv:'CAPITALCOM:US30'},
-{id:'US100',label:'US100 (Nasdaq)',tv:'CAPITALCOM:US100'},
-{id:'US500',label:'US500 (S&P)',tv:'CAPITALCOM:US500'},
-{id:'BTCUSD',label:'Bitcoin',tv:'BINANCE:BTCUSDT'},
-{id:'ETHUSD',label:'Ethereum',tv:'BINANCE:ETHUSDT'},
-{id:'EURJPY',label:'EUR/JPY',tv:'FOREXCOM:EURJPY'},
-{id:'EURGBP',label:'EUR/GBP',tv:'FOREXCOM:EURGBP'}
-];
-var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
-var enabledIds=Array.isArray(settings.pairs)&&settings.pairs.length?settings.pairs:PAIRS.map(function(p){return p.id});
-var activePairs=PAIRS.filter(function(p){return enabledIds.indexOf(p.id)>-1||(enabledIds.indexOf('GOLD')>-1&&p.id==='XAUUSD')});
-if(!activePairs.length)activePairs=PAIRS.slice();
-var currentPair='CAPITALCOM:XAUUSD',currentTF='15',showTools=true,widget=null,widgetReady=false;
-var resolutions={'5':'5','15':'15','60':'60','240':'240','D':'D'};
-function buildDropdown(){
-var sel=document.getElementById('pairSelect');sel.innerHTML='';
-activePairs.forEach(function(p){var opt=document.createElement('option');opt.value=p.tv;opt.textContent=p.label;sel.appendChild(opt)});
-var urlParams=new URLSearchParams(window.location.search),urlPair=urlParams.get('pair');
-if(urlPair){var matched=PAIRS.filter(function(p){return p.id===urlPair||(urlPair==='GOLD'&&p.id==='XAUUSD')})[0];if(matched&&activePairs.indexOf(matched)>-1){currentPair=matched.tv;sel.value=currentPair;window.history.replaceState({},'',window.location.pathname)}}
-else if(activePairs.length){currentPair=activePairs[0].tv;sel.value=currentPair}
-}
-function showWidgetError(message){
-var host=document.getElementById('tradingview_widget');
-if(host&&!widget){host.innerHTML='<div style="padding:24px;color:#fff;font:14px sans-serif">TradingView chart could not load. Check your internet connection and refresh this page.</div>'}
-}
-function createWidget(){
-if(!window.TradingView||!window.TradingView.widget){showWidgetError();return}
-var theme=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
-document.getElementById('tradingview_widget').innerHTML='';
-widgetReady=false;
-widget=new TradingView.widget({
-autosize:true,
-symbol:currentPair,
-interval:resolutions[currentTF],
-timezone:'Africa/Lagos',
-theme:theme,
-style:'1',
-locale:'en',
-enable_publishing:false,
-hide_top_toolbar:false,
-hide_side_toolbar:!showTools,
-allow_symbol_change:false,
-save_image:false,
-container_id:'tradingview_widget',
-studies:[],
-withdateranges:true,
-details:false,
-hotlist:false,
-calendar:false,
-support_host:'https://www.tradingview.com'
+var PAIRS=['XAUUSD','EURUSD','GBPUSD','USDJPY','GBPJPY','AUDUSD','USDCHF','USDCAD','NZDUSD','EURJPY','EURGBP','US30','US100','US500','BTCUSD','ETHUSD'];
+var pair='XAUUSD',tf='15',candles=[],chart,candleSeries,volumeSeries,ema20Series,ema50Series;
+var showEma=true,showStructure=true,drawMode='',drawings=[],priceLines=[];
+var $=function(id){return document.getElementById(id)};
+function precision(p){return p==='XAUUSD'?2:p.indexOf('JPY')>=0?3:(p.indexOf('BTC')===0||p.indexOf('ETH')===0||p.indexOf('US')===0)?1:5}
+function initChart(){
+if(!window.LightweightCharts){$('chartStatus').textContent='Chart library failed to load. Check your internet connection.';return}
+chart=LightweightCharts.createChart($('chart'),{width:$('chart').clientWidth,height:$('chart').clientHeight,layout:{background:{type:'solid',color:'#090d14'},textColor:'#cbd5e1',fontSize:12},grid:{vertLines:{color:'#1b2633',style:1},horzLines:{color:'#1b2633',style:1}},rightPriceScale:{borderColor:'#263241'},timeScale:{borderColor:'#263241',timeVisible:true,secondsVisible:false},crosshair:{mode:1},handleScroll:true,handleScale:true});
+candleSeries=chart.addCandlestickSeries({upColor:'#12b886',downColor:'#ef476f',borderUpColor:'#12b886',borderDownColor:'#ef476f',wickUpColor:'#12b886',wickDownColor:'#ef476f',priceLineVisible:true});
+volumeSeries=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'volume',scaleMargins:{top:.82,bottom:0},lastValueVisible:false,priceLineVisible:false});
+chart.priceScale('volume').applyOptions({scaleMargins:{top:.82,bottom:0},visible:false});
+ema20Series=chart.addLineSeries({color:'#f5c542',lineWidth:2,priceLineVisible:false,lastValueVisible:false});
+ema50Series=chart.addLineSeries({color:'#4da3ff',lineWidth:2,priceLineVisible:false,lastValueVisible:false});
+chart.subscribeCrosshairMove(function(param){
+if(!param||!param.seriesData)return;var c=param.seriesData.get(candleSeries);if(c)$('lastPrice').textContent='O '+c.open+'  H '+c.high+'  L '+c.low+'  C '+c.close;
 });
-if(widget&&typeof widget.onChartReady==='function'){
-widget.onChartReady(function(){widgetReady=true});
+chart.subscribeClick(function(param){
+if(!drawMode||!param||!param.point)return;
+var p=candleSeries.coordinateToPrice(param.point.y);if(!Number.isFinite(p))return;
+if(drawMode==='hline'){addLine(p,'#f5c542','Level');drawMode='';$('hlineBtn').classList.remove('active')}
+});
+window.addEventListener('resize',function(){if(chart&&!$('chartWrap').classList.contains('full'))chart.applyOptions({width:$('chart').clientWidth,height:$('chart').clientHeight})});
 }
+function ema(period){var out=[],k=2/(period+1),v=candles[0].close;for(var i=0;i<candles.length;i++){v=i===0?candles[i].close:candles[i].close*k+v*(1-k);out.push({time:candles[i].time,value:v})}return out}
+function structureMarkers(){
+var marks=[];for(var i=10;i<candles.length;i++){var prev=candles.slice(Math.max(0,i-10),i),hi=Math.max.apply(null,prev.map(x=>x.high)),lo=Math.min.apply(null,prev.map(x=>x.low)),c=candles[i];if(c.close>hi)marks.push({time:c.time,position:'belowBar',color:'#12b886',shape:'arrowUp',text:'BOS'});else if(c.close<lo)marks.push({time:c.time,position:'aboveBar',color:'#ef476f',shape:'arrowDown',text:'BOS'})}return marks.slice(-12).sort((a,b)=>a.time-b.time)
 }
-window.changePair=function(symbol){
-currentPair=symbol;
-if(widgetReady&&widget&&widget.chart){try{widget.chart().setSymbol(symbol);return}catch(e){}}
-createWidget();
-};
-window.changeTF=function(tf){
-currentTF=tf;
-if(widgetReady&&widget&&widget.chart){try{widget.chart().setResolution(resolutions[tf]);return}catch(e){}}
-createWidget();
-};
-window.toggleTools=function(){
-showTools=!showTools;
-var btn=document.getElementById('btnTools');
-btn.textContent=showTools?'✎ DRAWING TOOLS: ON':'✎ DRAWING TOOLS: OFF';
-btn.setAttribute('aria-pressed',showTools?'true':'false');
-createWidget();
-};
-window.toggleFull=function(){
-document.body.classList.toggle('chart-full');
-var btn=document.getElementById('btnFull');
-btn.textContent=document.body.classList.contains('chart-full')?'✕ CLOSE':'⛶ FULLSCREEN';
-};
-buildDropdown();
-var tvScript=document.querySelector('script[src="https://s3.tradingview.com/tv.js"]');
-if(window.TradingView&&window.TradingView.widget)createWidget();
-else if(tvScript){tvScript.addEventListener('load',createWidget);tvScript.addEventListener('error',function(){showWidgetError()})}
+function addLine(price,color,title){var line=candleSeries.createPriceLine({price:price,color:color,lineWidth:2,lineStyle:0,axisLabelVisible:true,title:title});priceLines.push(line);return line}
+function clearDrawings(){priceLines.forEach(l=>candleSeries.removePriceLine(l));priceLines=[];drawings=[];$('positionInfo').style.display='none'}
+function position(side){
+if(!candles.length)return;clearDrawings();var last=candles[candles.length-1],entry=last.close,atr=0;
+for(var i=Math.max(1,candles.length-14);i<candles.length;i++)atr+=Math.max(candles[i].high-candles[i].low,Math.abs(candles[i].high-candles[i-1].close),Math.abs(candles[i].low-candles[i-1].close));
+atr/=Math.max(1,Math.min(14,candles.length-1));var risk=Math.max(atr*1.5,entry*.0005),sl=side==='LONG'?entry-risk:entry+risk,tp=side==='LONG'?entry+risk*2:entry-risk*2;
+addLine(entry,'#e5e7eb','ENTRY');addLine(sl,'#ef476f','STOP');addLine(tp,'#12b886','TARGET');
+$('positionInfo').style.display='block';$('positionInfo').textContent=side+' POSITION DRAWING · Entry '+entry.toFixed(precision(pair))+' · SL '+sl.toFixed(precision(pair))+' · TP '+tp.toFixed(precision(pair))+' · Drawing only, no broker order.';
+}
+async function load(){
+$('chartStatus').textContent='Loading '+pair+' '+tf+' candles…';$('refreshBtn').disabled=true;
+try{var r=await fetch('/api/chart?pair='+encodeURIComponent(pair)+'&interval='+encodeURIComponent(tf));var d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load candles');candles=d.candles||[];if(!candles.length)throw new Error('No candles returned for this market.');
+candleSeries.setData(candles);volumeSeries.setData(candles.map(c=>({time:c.time,value:c.volume,color:c.close>=c.open?'rgba(18,184,134,.45)':'rgba(239,71,111,.45)'})));
+ema20Series.setData(showEma?ema(20):[]);ema50Series.setData(showEma?ema(50):[]);candleSeries.setMarkers(showStructure?structureMarkers():[]);
+chart.timeScale().fitContent();var last=candles[candles.length-1];$('lastPrice').textContent=pair+' '+last.close.toFixed(precision(pair));$('chartStatus').textContent='Live candles loaded · '+candles.length+' bars · refreshes every 30 seconds · '+d.source;
+}catch(e){$('chartStatus').textContent=e.message}
+finally{$('refreshBtn').disabled=false}
+}
+$('pairSelect').value=pair;$('pairSelect').onchange=function(){pair=this.value;load()};
+$('timeframes').onclick=function(e){var b=e.target.closest('button[data-tf]');if(!b)return;tf=b.dataset.tf;document.querySelectorAll('#timeframes button').forEach(x=>x.classList.toggle('active',x===b));load()};
+$('refreshBtn').onclick=load;
+$('emaBtn').onclick=function(){showEma=!showEma;this.classList.toggle('active',showEma);ema20Series.setData(showEma?ema(20):[]);ema50Series.setData(showEma?ema(50):[])};
+$('bosBtn').onclick=function(){showStructure=!showStructure;this.classList.toggle('active',showStructure);candleSeries.setMarkers(showStructure?structureMarkers():[])};
+$('hlineBtn').onclick=function(){drawMode=drawMode==='hline'?'':'hline';this.classList.toggle('active',!!drawMode)};
+$('longBtn').onclick=function(){position('LONG')};$('shortBtn').onclick=function(){position('SHORT')};$('clearBtn').onclick=clearDrawings;
+$('fullBtn').onclick=function(){$('chartWrap').classList.toggle('full');setTimeout(function(){chart.applyOptions({width:$('chart').clientWidth,height:$('chart').clientHeight})},80)};
+initChart();load();setInterval(load,30000);
 })();
 </script>
 <script src="navigation.js" defer></script>
