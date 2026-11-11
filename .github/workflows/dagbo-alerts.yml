@@ -3,7 +3,7 @@ name: DAGBO SIGNAL scheduled alerts
 on:
   schedule:
     # Offset from the hour to reduce GitHub Actions queue delays.
-    - cron: "7,22,37,52 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
