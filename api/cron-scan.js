@@ -8,7 +8,7 @@ const redis = new Redis({
 });
 
 const SYMBOLS = {
-  XAUUSD: "XAU/USD", GOLD: "XAU/USD",
+  XAUUSD: "XAU/USD", GOLD: "XAU/USD", DXY: "DXY",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY",
   GBPJPY: "GBP/JPY", AUDUSD: "AUD/USD", USDCHF: "USD/CHF",
   USDCAD: "USD/CAD", NZDUSD: "NZD/USD", EURJPY: "EUR/JPY", EURGBP: "EUR/GBP",
@@ -169,7 +169,38 @@ async function broadcast(title, body, tag) {
   }
   return { sent, failed, devices: ids.length };
 }
-async function sendNewsAlerts(marketData) {
+async function fetchPreNewsCandles(pair, cutoffMs, apiKey) {
+  const symbol = SYMBOLS[pair];
+  if (!symbol) throw new Error("No Twelve Data symbol mapping for " + pair);
+  const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
+    "&interval=15min&outputsize=60&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+  const response = await fetch(url);
+  const data = await response.json();
+  if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
+    throw new Error(data.message || "No candle data");
+  }
+  // Twelve Data timestamps mark candle starts. Only use candles that had
+  // fully closed by the release-minus-15-minute cutoff.
+  const completed = data.values.map(c => {
+    const t = Date.parse(String(c.datetime).replace(" ", "T") + (String(c.datetime).includes("Z") || /[+-]\\d\\d:\\d\\d$/.test(String(c.datetime)) ? "" : "Z"));
+    return { candle: c, start: t, closeTime: t + 15 * 60 * 1000 };
+  }).filter(x => Number.isFinite(x.start) && x.closeTime <= cutoffMs && x.start >= cutoffMs - 30 * 60 * 1000)
+    .sort((a,b) => a.start - b.start);
+  if (completed.length < 2) throw new Error("Need two completed 15-minute candles ending before the pre-news cutoff");
+  return completed.slice(-2).map(x => x.candle);
+}
+
+function preNewsMove(candles) {
+  if (!Array.isArray(candles) || candles.length !== 2) return null;
+  const firstOpen = num(candles[0].open);
+  const lastClose = num(candles[1].close);
+  if (firstOpen === null || lastClose === null || firstOpen === 0) return null;
+  const pct = (lastClose - firstOpen) / firstOpen * 100;
+  const direction = pct > 0 ? "BUY" : pct < 0 ? "SELL" : "WAIT";
+  return { direction, pct };
+}
+
+async function sendNewsAlerts(apiKey) {
   const now = Date.now();
   let eventsChecked = 0, newsAlerts = 0, preNewsSignals = 0;
   try {
@@ -179,6 +210,7 @@ async function sendNewsAlerts(marketData) {
     if (!response.ok) throw new Error("Economic calendar HTTP " + response.status);
     const rows = await response.json();
     if (!Array.isArray(rows)) throw new Error("Invalid economic calendar response");
+
     const upcoming = rows.map(row => ({
       name: String(row.title || "Economic event").slice(0, 120),
       currency: String(row.country || "GLOBAL").toUpperCase(),
@@ -186,48 +218,90 @@ async function sendNewsAlerts(marketData) {
       date: new Date(row.date)
     })).filter(event => event.impact.toLowerCase() === "high" &&
       Number.isFinite(event.date.getTime()) && event.date.getTime() > now &&
-      event.date.getTime() <= now + 30 * 60 * 1000);
+      event.date.getTime() <= now + 45 * 60 * 1000);
     eventsChecked = upcoming.length;
+
+    const preNewsPairs = ["DXY","XAUUSD","EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD","NZDUSD","USDCAD"];
+    const usdEvents = new Set(["USD"]);
+    const goldRelevantCurrencies = new Set(["USD"]);
+    const pairRelevant = event => event.currency === "GLOBAL" ||
+      event.currency === "USD" || event.currency === "EUR" || event.currency === "GBP" ||
+      event.currency === "JPY" || event.currency === "CHF" || event.currency === "AUD" ||
+      event.currency === "NZD" || event.currency === "CAD";
 
     for (const event of upcoming) {
       const eventId = crypto.createHash("sha256")
         .update(event.name + "|" + event.currency + "|" + event.date.toISOString()).digest("hex").slice(0, 20);
+      const minutesToEvent = (event.date.getTime() - now) / 60000;
       const newsKey = "dagbo:news:alert:" + eventId;
-      if (!(await redis.get(newsKey))) {
+      if (minutesToEvent <= 30 && !(await redis.get(newsKey))) {
         await broadcast("📰 HIGH-IMPACT NEWS COMING",
           event.currency + " · " + event.name + " is scheduled in about " +
-          Math.max(1, Math.round((event.date.getTime() - now) / 60000)) +
+          Math.max(1, Math.round(minutesToEvent)) +
           " minutes. Check spreads, volatility and your risk plan. Verify the live calendar.",
           "news-event-" + eventId);
         await redis.set(newsKey, "1", { ex: 60 * 60 * 24 * 2 });
         newsAlerts++;
       }
 
-      // Only markets with a currency link to the event are considered.
-      const currency = event.currency;
-      const affected = Object.keys(marketData).filter(pair => {
-        if (currency === "GLOBAL") return false;
-        if (pair.includes(currency)) return true;
-        if (currency === "USD" && /^(XAUUSD|GOLD|US30|US100|NAS100|US500|BTCUSD|BTC|ETHUSD|ETH)$/.test(pair)) return true;
-        return false;
-      });
-      const directional = affected.map(pair => ({ pair, analysis: marketData[pair] }))
-        .filter(item => item.analysis && (item.analysis.signal.includes("BUY") || item.analysis.signal.includes("SELL")));
-      if (!directional.length) continue;
-
+      // Run the pre-news read only after the release-minus-15m cutoff.
+      // The selected candles cover the 30 minutes ending at that cutoff.
+      const cutoffMs = event.date.getTime() - 15 * 60 * 1000;
+      if (!pairRelevant(event) || now < cutoffMs || now >= event.date.getTime()) continue;
       const signalKey = "dagbo:news:pre-signal:" + eventId;
       if (await redis.get(signalKey)) continue;
-      const strongest = directional.sort((a,b) =>
-        Math.max(b.analysis.buyScore,b.analysis.sellScore) - Math.max(a.analysis.buyScore,a.analysis.sellScore))[0];
-      const a = strongest.analysis;
-      const direction = a.signal.includes("BUY") ? "BUY" : "SELL";
-      const confidence = Math.round(Math.max(a.buyScore,a.sellScore) / a.totalMethods * 100);
-      const evidence = a.evidence.filter(x => x.includes("(" + direction + ")")).slice(0, 3).join("; ");
-      await broadcast("⚠️ PRE-NEWS SIGNAL — " + direction,
-        "15m bias for " + strongest.pair + " ahead of " + event.currency + " " + event.name +
-        ". " + direction + " bias · " + confidence + "% method-vote score. Evidence: " +
-        evidence + ". NOT A GUARANTEED TRADE. News outcome is unknown; confirm spread, chart and risk.",
-        "pre-news-" + eventId);
+
+      const fetched = await Promise.all(preNewsPairs.map(async pair => {
+        try {
+          const candles = await fetchPreNewsCandles(pair, cutoffMs, apiKey);
+          return { pair, ...preNewsMove(candles) };
+        } catch (err) {
+          return { pair, direction: "WAIT", error: err.message };
+        }
+      }));
+      const byPair = Object.fromEntries(fetched.map(x => [x.pair, x]));
+      const dxy = byPair.DXY, gold = byPair.XAUUSD;
+      const usablePairs = preNewsPairs.filter(p => p !== "DXY" && p !== "XAUUSD")
+        .map(p => byPair[p]).filter(x => x && !x.error && x.direction !== "WAIT");
+
+      // A positive vote means broad USD strength; negative means USD weakness.
+      // Gold and USD-quote pairs are normally inverse to USD; USD-base pairs
+      // are normally direct. Correlations can break around individual releases.
+      let usdVotes = [];
+      if (dxy && !dxy.error && dxy.direction !== "WAIT") usdVotes.push(dxy.direction === "BUY" ? 2 : -2);
+      if (gold && !gold.error && gold.direction !== "WAIT") usdVotes.push(gold.direction === "SELL" ? 2 : -2);
+      const inverseUsdPairs = new Set(["EURUSD","GBPUSD","AUDUSD","NZDUSD"]);
+      const directUsdPairs = new Set(["USDJPY","USDCHF","USDCAD"]);
+      for (const pair of inverseUsdPairs) {
+        const item = byPair[pair];
+        if (item && !item.error && item.direction !== "WAIT") usdVotes.push(item.direction === "SELL" ? 1 : -1);
+      }
+      for (const pair of directUsdPairs) {
+        const item = byPair[pair];
+        if (item && !item.error && item.direction !== "WAIT") usdVotes.push(item.direction === "BUY" ? 1 : -1);
+      }
+      const score = usdVotes.reduce((sum,v) => sum + v, 0);
+      const totalWeight = usdVotes.reduce((sum,v) => sum + Math.abs(v), 0);
+      const requiredPairCount = 3;
+      let direction = "WAIT";
+      if (dxy && !dxy.error && gold && !gold.error && usablePairs.length >= requiredPairCount && totalWeight >= 7) {
+        if (score >= 3) direction = "SELL";       // USD strength -> normally bearish gold
+        else if (score <= -3) direction = "BUY"; // USD weakness -> normally bullish gold
+      }
+      const confidence = totalWeight ? Math.round(Math.abs(score) / totalWeight * 100) : 0;
+      const movementLines = preNewsPairs.map(pair => {
+        const item = byPair[pair];
+        return item && !item.error
+          ? pair + " " + item.direction + " (" + item.pct.toFixed(3) + "%)"
+          : pair + " unavailable";
+      });
+      const agreement = score > 0 ? "USD-strength votes" : score < 0 ? "USD-weakness votes" : "mixed votes";
+      const body = "15m-before-news read for " + event.currency + " " + event.name +
+        ". Gold bias: " + direction + " · " + confidence + "% directional agreement (" + agreement + "). " +
+        "30-minute window ending 15m before release; two completed 15m candles per instrument. " +
+        movementLines.join(" · ") +
+        ". Correlations are not fixed and news outcomes are unknown. NOT A GUARANTEED TRADE; confirm spreads, chart and risk.";
+      await broadcast("⚠️ PRE-NEWS GOLD BIAS — " + direction, body, "pre-news-" + eventId);
       await redis.set(signalKey, "1", { ex: 60 * 60 * 24 * 2 });
       preNewsSignals++;
     }
@@ -377,7 +451,7 @@ module.exports = async function handler(req, res) {
     }
 
     const tradeSummary = await monitorTrades(results);
-    const newsSummary = await sendNewsAlerts(results);
+    const newsSummary = await sendNewsAlerts(apiKey);
     const errorKey = "dagbo:scan:error:last";
     const previousErrorRaw = await redis.get(errorKey);
     if (errors.length) {
@@ -404,7 +478,7 @@ module.exports = async function handler(req, res) {
       scanned: Object.keys(results), errors, signals: results,
       tradeMonitoring: tradeSummary,
       newsMonitoring: newsSummary,
-      note: "Scheduled 15-minute market scan; pre-news bias is a technical 15m snapshot, not a prediction of the news result or a broker order."
+      note: "Pre-news analysis compares DXY, XAUUSD and correlated USD pairs using two completed 15-minute candles from the 30-minute window ending 15 minutes before high-impact news. It is a directional bias, not a prediction of the news result or a broker order."
     };
     await redis.set("dagbo:cron:scan:last", JSON.stringify({
       scannedAt: responseBody.scannedAt, scanned: responseBody.scanned, errors
