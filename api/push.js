@@ -3,6 +3,38 @@ const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
 
 const SUBSCRIPTIONS = "dagbo:push:subscriptions";
+const aiRateFallback = new Map();
+const AI_RATE_LIMIT = 15;
+const AI_RATE_WINDOW_SECONDS = 600;
+
+async function checkAiRateLimit(req) {
+  const forwarded = req.headers["x-real-ip"] ||
+    (typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"].split(",")[0].trim() : "");
+  const ip = String(forwarded || "unknown").slice(0, 100);
+  const id = crypto.createHash("sha256").update(ip).digest("hex");
+  const key = "dagbo:ai:rate:" + id;
+
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    try {
+      const redis = getRedis();
+      const count = await redis.incr(key);
+      if (count === 1) await redis.expire(key, AI_RATE_WINDOW_SECONDS);
+      return { allowed: count <= AI_RATE_LIMIT, remaining: Math.max(0, AI_RATE_LIMIT - count) };
+    } catch (error) {
+      console.error("DAGBO AI rate-limit Redis error:", error.message);
+    }
+  }
+
+  // Fallback for deployments without Redis; serverless instances may have separate counters.
+  const now = Date.now();
+  const current = aiRateFallback.get(id);
+  if (!current || now - current.startedAt >= AI_RATE_WINDOW_SECONDS * 1000) {
+    aiRateFallback.set(id, { startedAt: now, count: 1 });
+    return { allowed: true, remaining: AI_RATE_LIMIT - 1 };
+  }
+  current.count += 1;
+  return { allowed: current.count <= AI_RATE_LIMIT, remaining: Math.max(0, AI_RATE_LIMIT - current.count) };
+}
 
 function getRedis() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -130,13 +162,26 @@ module.exports = async function handler(req, res) {
 
     // 5. AI BACKGROUND NOTIFICATION
     if (req.method === "POST" && action === "ask-ai") {
-      const { question, name, subscription, marketContext } = req.body || {};
+      const { question, name, subscription, marketContext, history } = req.body || {};
       const safeMarketContext = typeof marketContext === "string" ? marketContext.slice(0, 2500) : "";
+      const safeName = typeof name === "string" ? name.replace(/[^a-zA-Z0-9 _-]/g, "").trim().slice(0, 32) : "Oga";
+      const safeHistory = Array.isArray(history) ? history.slice(-10).filter(function(item) {
+        return item && (item.role === "user" || item.role === "assistant") &&
+          typeof item.content === "string" && item.content.trim().length > 0;
+      }).map(function(item) {
+        return { role: item.role, content: item.content.slice(0, 1200) };
+      }) : [];
       const groqKey = process.env.GROQ_API_KEY;
       if (typeof question !== "string" || !question.trim() || question.length > 2000 || !groqKey) {
         return res.status(!groqKey ? 503 : 400).json({
           error: !groqKey ? "AI service is not configured on the server" : "A valid question is required"
         });
+      }
+
+      const rate = await checkAiRateLimit(req);
+      if (!rate.allowed) {
+        res.setHeader("Retry-After", String(AI_RATE_WINDOW_SECONDS));
+        return res.status(429).json({ error: "Dagbo AI is receiving too many requests. Please wait a few minutes and try again." });
       }
 
       // Keep the Groq API key on the server; never accept it from the browser.
