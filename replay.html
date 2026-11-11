@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F5F7">
+<title>Historical Replay · DAGBO SIGNAL</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="dagbo.css">
+<style>
+.replay-card{background:var(--dg-card);border:1px solid var(--dg-line);border-radius:16px;padding:14px;margin:12px 0}
+.replay-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.replay-grid label{font-size:12px;color:var(--dg-muted);display:block;margin-bottom:5px}
+.replay-grid select,.replay-grid input{width:100%;padding:11px;border:1px solid var(--dg-line);border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-size:14px}
+#replayCanvas{display:block;width:100%;height:360px;background:#090d14;border-radius:12px;touch-action:pan-y}
+.replay-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.replay-actions button,.replay-primary{border:0;border-radius:10px;padding:11px 14px;font-weight:700;background:var(--dg-fill);color:var(--dg-text)}
+.replay-primary{background:#0878e8;color:#fff}
+#status{font-size:12px;color:var(--dg-muted);margin-top:8px}
+#progress{width:100%;margin-top:10px}
+</style>
+<script>(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();</script>
+</head>
+<body>
+<main class="dg-page">
+<a href="chart.html" style="display:inline-flex;margin-bottom:14px;padding:8px 12px;border-radius:12px;background:var(--dg-fill);color:var(--dg-text);text-decoration:none;font-weight:700">← Back to Live Chart</a>
+<div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">REPLAY</div></div>
+<h1 class="dg-title">Historical Replay</h1>
+<p class="dg-subtitle">Practice reading past price action candle by candle. This does not place trades.</p>
+<section class="replay-card">
+<div class="replay-grid">
+<div><label for="pair">Market</label><select id="pair"><option value="XAUUSD">GOLD (XAUUSD)</option><option value="EURUSD">EUR/USD</option><option value="GBPUSD">GBP/USD</option><option value="USDJPY">USD/JPY</option><option value="GBPJPY">GBP/JPY</option><option value="AUDUSD">AUD/USD</option><option value="USDCHF">USD/CHF</option><option value="USDCAD">USD/CAD</option><option value="NZDUSD">NZD/USD</option><option value="EURJPY">EUR/JPY</option><option value="EURGBP">EUR/GBP</option><option value="BTCUSD">Bitcoin</option><option value="ETHUSD">Ethereum</option><option value="US30">US30</option><option value="US100">US100</option><option value="US500">US500</option></select></div>
+<div><label for="tf">Timeframe</label><select id="tf"><option value="5">5 minutes</option><option value="15" selected>15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option><option value="D">1 day</option></select></div>
+<div><label for="start">Start date (UTC)</label><input id="start" type="date"></div>
+<div><label for="end">End date (UTC)</label><input id="end" type="date"></div>
+</div>
+<button class="replay-primary" id="load">Load historical candles</button>
+<div id="status">Choose dates, then load data. Maximum range: 31 days.</div>
+</section>
+<section class="replay-card">
+<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><strong id="marketLabel">GOLD · 15m</strong><span id="candleCount">0 candles</span></div>
+<canvas id="replayCanvas" width="900" height="520"></canvas>
+<input id="progress" type="range" min="0" max="0" value="0" aria-label="Replay candle position">
+<div id="timeLabel" style="font-size:12px;color:var(--dg-muted)">No candle selected</div>
+<div class="replay-actions">
+<button id="back">◀ Previous</button><button class="replay-primary" id="play">▶ Play</button><button id="next">Next ▶</button>
+<select id="speed" aria-label="Playback speed" style="padding:10px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);border:1px solid var(--dg-line)"><option value="1200">0.5×</option><option value="600" selected>1×</option><option value="250">2×</option><option value="100">5×</option></select>
+</div>
+</section>
+<p class="dg-subtitle" style="font-size:11px">Historical data availability depends on the market and your Twelve Data plan. Candle times are displayed in UTC. Replay is for practice, not a live signal or broker order.</p>
+</main>
+<script src="pwa.js" defer></script>
+<script>
+(function(){
+'use strict';
+var candles=[],index=0,timer=null;
+var $=function(id){return document.getElementById(id)};
+function dateISO(d){return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0')}
+var today=new Date(),week=new Date(today.getTime()-7*86400000);
+$('start').value=dateISO(week);$('end').value=dateISO(today);
+function stop(){if(timer){clearInterval(timer);timer=null}$('play').textContent='▶ Play'}
+function draw(){
+var canvas=$('replayCanvas'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+ctx.clearRect(0,0,w,h);ctx.fillStyle='#090d14';ctx.fillRect(0,0,w,h);
+if(!candles.length){ctx.fillStyle='#aab4c4';ctx.font='22px sans-serif';ctx.fillText('Load historical candles to begin',24,60);return}
+var visible=candles.slice(Math.max(0,index-69),index+1),lo=Math.min.apply(null,visible.map(c=>c.low)),hi=Math.max.apply(null,visible.map(c=>c.high));
+var pad=38,top=22,bottom=h-32,range=hi-lo||1,step=(w-pad-12)/Math.max(visible.length,1),bodyW=Math.max(3,step*.58);
+ctx.strokeStyle='#253244';ctx.lineWidth=1;
+for(var g=0;g<5;g++){var y=top+(bottom-top)*g/4;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-8,y);ctx.stroke();var price=hi-range*g/4;ctx.fillStyle='#9aa8b8';ctx.font='12px sans-serif';ctx.fillText(price.toFixed(price<10?5:2),4,y-4)}
+visible.forEach(function(c,i){var x=pad+i*step+step/2,yO=top+(hi-c.open)/range*(bottom-top),yC=top+(hi-c.close)/range*(bottom-top),yH=top+(hi-c.high)/range*(bottom-top),yL=top+(hi-c.low)/range*(bottom-top),up=c.close>=c.open,color=up?'#22c58b':'#f05252';ctx.strokeStyle=color;ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,yL);ctx.stroke();ctx.fillRect(x-bodyW/2,Math.min(yO,yC),bodyW,Math.max(2,Math.abs(yC-yO)))});
+var last=visible[visible.length-1];ctx.fillStyle='#fff';ctx.font='bold 15px sans-serif';ctx.fillText('O '+last.open+'  H '+last.high+'  L '+last.low+'  C '+last.close, pad, h-8);
+$('timeLabel').textContent='Candle: '+last.time+' UTC · '+(index+1)+' / '+candles.length;
+$('progress').max=String(candles.length-1);$('progress').value=String(index);
+}
+function move(n){index=Math.max(0,Math.min(candles.length-1,n));draw()}
+$('load').onclick=async function(){
+stop();$('status').textContent='Loading historical data…';$('load').disabled=true;
+try{
+var q=new URLSearchParams({pair:$('pair').value,interval:$('tf').value,start:$('start').value,end:$('end').value});
+var response=await fetch('/api/replay?'+q.toString()),data=await response.json();
+if(!response.ok)throw new Error(data.error||'Could not load data');
+candles=data.candles||[];if(!candles.length)throw new Error('No candles returned for this range. Try another date range or timeframe.');
+index=0;$('marketLabel').textContent=$('pair').selectedOptions[0].text+' · '+$('tf').selectedOptions[0].text;
+$('candleCount').textContent=candles.length+' candles';$('status').textContent='Loaded '+candles.length+' historical candles · Source: '+data.source+' · UTC';draw();
+}catch(e){candles=[];draw();$('status').textContent=e.message}
+finally{$('load').disabled=false}
+};
+$('play').onclick=function(){if(timer){stop();return}if(!candles.length)return;if(index>=candles.length-1)index=0;$('play').textContent='Ⅱ Pause';timer=setInterval(function(){if(index>=candles.length-1){stop();return}move(index+1)},Number($('speed').value))};
+$('back').onclick=function(){stop();move(index-1)};
+$('next').onclick=function(){stop();move(index+1)};
+$('progress').oninput=function(){stop();move(Number(this.value))};
+$('speed').onchange=function(){if(timer){stop();$('play').click()}};
+draw();
+})();
+</script>
+</body>
+</html>
