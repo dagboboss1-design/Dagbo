@@ -118,7 +118,20 @@ function tryDate(q, e){
   return null;
 }
 
-function tryMath(q, e){ var t = q.toLowerCase(), acc = e.amount || getAccount(), risk = e.percent !== null ? e.percent : getRiskPct(); if (/(risk|percent|%|loss)/.test(t) && (e.percent !== null || e.amount !== null)){ return 'Oga, <b>Risk math:</b><br>Account: $' + acc.toLocaleString() + '<br>Risk: ' + risk + '%<br><b>Risk amount: $' + (acc * risk / 100).toFixed(2) + '</b><br><br>Formula: <b>Risk $ = Account × Risk% ÷ 100</b>'; } if (/lot/.test(t) && /pip/.test(t)){ return '<b>Pip value depends on the instrument and broker.</b><br>For forex, it changes with the pair, lot size and account currency. Gold, indices and crypto can use different contract and tick values.<br><br><b>Dagbo Rule:</b> Check the broker contract specifications before calculating risk.'; } if (/(position size|how many lot|what lot|which lot)/.test(t)){ var riskAmt = acc * risk / 100; return '<b>Position-size calculation</b><br>Account:  return null; }
+function tryMath(q, e){
+  var t = q.toLowerCase(), acc = e.amount || getAccount(), risk = e.percent !== null ? e.percent : getRiskPct();
+  if (/(risk|percent|%|loss)/.test(t) && (e.percent !== null || e.amount !== null)){
+    return 'Oga, <b>Risk math:</b><br>Account: $' + acc.toLocaleString() + '<br>Risk: ' + risk + '%<br><b>Risk amount: $' + (acc * risk / 100).toFixed(2) + '</b><br><br>Formula: <b>Risk $ = Account × Risk% ÷ 100</b>';
+  }
+  if (/lot/.test(t) && /pip/.test(t)){
+    return '<b>Pip value depends on the instrument and broker.</b><br>For forex, it changes with the pair, lot size and account currency. Gold, indices and crypto can use different contract and tick values.<br><br><b>Dagbo Rule:</b> Check the broker contract specifications before calculating risk.';
+  }
+  if (/(position size|how many lot|what lot|which lot)/.test(t)){
+    var riskAmt = acc * risk / 100;
+    return '<b>Position-size calculation</b><br>Account: $' + acc.toLocaleString() + '<br>Risk: ' + risk + '% = $' + riskAmt.toFixed(2) + '<br><br><b>Formula:</b> Risk amount ÷ (stop distance × value per point/pip per lot).<br><br>I need your exact pair or instrument, account currency, stop-loss distance and broker contract/tick value to calculate a reliable lot size. The app will not guess a lot size.';
+  }
+  return null;
+}
   /* ═══════════════════════════════════════════════════════════════════════════
    PART 2: THE 200 KB (Knowledge Base)
    ═══════════════════════════════════════════════════════════════════════════ */
