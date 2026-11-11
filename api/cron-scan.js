@@ -12,6 +12,11 @@ const SYMBOLS = {
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY",
   GBPJPY: "GBP/JPY", AUDUSD: "AUD/USD", USDCHF: "USD/CHF",
   USDCAD: "USD/CAD", NZDUSD: "NZD/USD", EURJPY: "EUR/JPY", EURGBP: "EUR/GBP",
+  EURCHF: "EUR/CHF", EURAUD: "EUR/AUD", EURCAD: "EUR/CAD", EURNZD: "EUR/NZD",
+  GBPCHF: "GBP/CHF", GBPAUD: "GBP/AUD", GBPCAD: "GBP/CAD", GBPNZD: "GBP/NZD",
+  AUDJPY: "AUD/JPY", AUDCHF: "AUD/CHF", AUDCAD: "AUD/CAD", AUDNZD: "AUD/NZD",
+  NZDJPY: "NZD/JPY", NZDCHF: "NZD/CHF", NZDCAD: "NZD/CAD",
+  CADJPY: "CAD/JPY", CADCHF: "CAD/CHF", CHFJPY: "CHF/JPY",
   US30: "DJI", US100: "NDX", NAS100: "NDX", US500: "SPX",
   BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
 };
@@ -221,14 +226,6 @@ async function sendNewsAlerts(apiKey) {
       event.date.getTime() <= now + 45 * 60 * 1000);
     eventsChecked = upcoming.length;
 
-    const preNewsPairs = ["DXY","XAUUSD","EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD","NZDUSD","USDCAD"];
-    const usdEvents = new Set(["USD"]);
-    const goldRelevantCurrencies = new Set(["USD"]);
-    const pairRelevant = event => event.currency === "GLOBAL" ||
-      event.currency === "USD" || event.currency === "EUR" || event.currency === "GBP" ||
-      event.currency === "JPY" || event.currency === "CHF" || event.currency === "AUD" ||
-      event.currency === "NZD" || event.currency === "CAD";
-
     for (const event of upcoming) {
       const eventId = crypto.createHash("sha256")
         .update(event.name + "|" + event.currency + "|" + event.date.toISOString()).digest("hex").slice(0, 20);
@@ -244,13 +241,17 @@ async function sendNewsAlerts(apiKey) {
         newsAlerts++;
       }
 
-      // Run the pre-news read only after the release-minus-15m cutoff.
-      // The selected candles cover the 30 minutes ending at that cutoff.
+      // Analyse the event currency, its forex crosses, plus DXY and Gold
+      // as broad USD/precious-metal context. This is not USD-only analysis.
       const cutoffMs = event.date.getTime() - 15 * 60 * 1000;
-      if (!pairRelevant(event) || now < cutoffMs || now >= event.date.getTime()) continue;
+      if (now < cutoffMs || now >= event.date.getTime()) continue;
       const signalKey = "dagbo:news:pre-signal:" + eventId;
       if (await redis.get(signalKey)) continue;
 
+      const forexPairs = Object.keys(SYMBOLS).filter(pair =>
+        pair.length === 6 && /^[A-Z]{6}$/.test(pair) &&
+        (event.currency === "GLOBAL" || pair.includes(event.currency)));
+      const preNewsPairs = Array.from(new Set(["DXY", "XAUUSD", ...forexPairs]));
       const fetched = await Promise.all(preNewsPairs.map(async pair => {
         try {
           const candles = await fetchPreNewsCandles(pair, cutoffMs, apiKey);
@@ -260,48 +261,41 @@ async function sendNewsAlerts(apiKey) {
         }
       }));
       const byPair = Object.fromEntries(fetched.map(x => [x.pair, x]));
-      const dxy = byPair.DXY, gold = byPair.XAUUSD;
-      const usablePairs = preNewsPairs.filter(p => p !== "DXY" && p !== "XAUUSD")
-        .map(p => byPair[p]).filter(x => x && !x.error && x.direction !== "WAIT");
 
-      // A positive vote means broad USD strength; negative means USD weakness.
-      // Gold and USD-quote pairs are normally inverse to USD; USD-base pairs
-      // are normally direct. Correlations can break around individual releases.
-      let usdVotes = [];
-      if (dxy && !dxy.error && dxy.direction !== "WAIT") usdVotes.push(dxy.direction === "BUY" ? 2 : -2);
-      if (gold && !gold.error && gold.direction !== "WAIT") usdVotes.push(gold.direction === "SELL" ? 2 : -2);
-      const inverseUsdPairs = new Set(["EURUSD","GBPUSD","AUDUSD","NZDUSD"]);
-      const directUsdPairs = new Set(["USDJPY","USDCHF","USDCAD"]);
-      for (const pair of inverseUsdPairs) {
+      // For a currency-specific event, a rising BASE/QUOTE pair supports
+      // strength in the base currency; a falling pair supports quote strength.
+      const currencyVotes = forexPairs.map(pair => {
         const item = byPair[pair];
-        if (item && !item.error && item.direction !== "WAIT") usdVotes.push(item.direction === "SELL" ? 1 : -1);
-      }
-      for (const pair of directUsdPairs) {
-        const item = byPair[pair];
-        if (item && !item.error && item.direction !== "WAIT") usdVotes.push(item.direction === "BUY" ? 1 : -1);
-      }
-      const score = usdVotes.reduce((sum,v) => sum + v, 0);
-      const totalWeight = usdVotes.reduce((sum,v) => sum + Math.abs(v), 0);
-      const requiredPairCount = 3;
-      let direction = "WAIT";
-      if (dxy && !dxy.error && gold && !gold.error && usablePairs.length >= requiredPairCount && totalWeight >= 7) {
-        if (score >= 3) direction = "SELL";       // USD strength -> normally bearish gold
-        else if (score <= -3) direction = "BUY"; // USD weakness -> normally bullish gold
-      }
-      const confidence = totalWeight ? Math.round(Math.abs(score) / totalWeight * 100) : 0;
+        if (!item || item.error || item.direction === "WAIT") return null;
+        return pair.startsWith(event.currency)
+          ? (item.direction === "BUY" ? 1 : -1)
+          : (item.direction === "SELL" ? 1 : -1);
+      }).filter(v => v !== null);
+      const strengthScore = currencyVotes.reduce((sum, v) => sum + v, 0);
+      const strengthPct = currencyVotes.length
+        ? Math.round(Math.abs(strengthScore) / currencyVotes.length * 100) : 0;
+      const currencyBias = event.currency === "GLOBAL" ? "MIXED / REVIEW MARKETS" :
+        currencyVotes.length < 2 || Math.abs(strengthScore) < 2 ? "WAIT / MIXED" :
+        strengthScore > 0 ? event.currency + " STRENGTH" : event.currency + " WEAKNESS";
+
       const movementLines = preNewsPairs.map(pair => {
         const item = byPair[pair];
         return item && !item.error
           ? pair + " " + item.direction + " (" + item.pct.toFixed(3) + "%)"
           : pair + " unavailable";
       });
-      const agreement = score > 0 ? "USD-strength votes" : score < 0 ? "USD-weakness votes" : "mixed votes";
-      const body = "15m-before-news read for " + event.currency + " " + event.name +
-        ". Gold bias: " + direction + " · " + confidence + "% directional agreement (" + agreement + "). " +
-        "30-minute window ending 15m before release; two completed 15m candles per instrument. " +
+      const gold = byPair.XAUUSD, dxy = byPair.DXY;
+      const goldBias = gold && !gold.error ? gold.direction : "WAIT";
+      const dxyBias = dxy && !dxy.error ? dxy.direction : "WAIT";
+      const body = "15m-before-news analysis: " + event.currency + " " + event.name +
+        ". " + event.currency + " currency bias: " + currencyBias +
+        " · " + strengthPct + "% pair agreement. XAUUSD: " + goldBias +
+        ". DXY: " + dxyBias +
+        ". Uses two completed 15m candles from the 30-minute window ending 15m before release. " +
         movementLines.join(" · ") +
-        ". Correlations are not fixed and news outcomes are unknown. NOT A GUARANTEED TRADE; confirm spreads, chart and risk.";
-      await broadcast("⚠️ PRE-NEWS GOLD BIAS — " + direction, body, "pre-news-" + eventId);
+        ". Cross-market correlations can change; WAIT means evidence is mixed or insufficient. NOT A GUARANTEED TRADE; confirm spreads, chart and risk.";
+      await broadcast("⚠️ PRE-NEWS BIAS — " + event.currency + " / GOLD",
+        body, "pre-news-" + eventId);
       await redis.set(signalKey, "1", { ex: 60 * 60 * 24 * 2 });
       preNewsSignals++;
     }
@@ -310,7 +304,6 @@ async function sendNewsAlerts(apiKey) {
   }
   return { eventsChecked, newsAlerts, preNewsSignals };
 }
-
 async function monitorTrades(marketData) {
   const devices = await redis.smembers("dagbo:trades:devices");
   let closed = 0, warnings = 0;
