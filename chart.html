@@ -81,7 +81,7 @@ window.addEventListener('resize',function(){if(chart&&!$('chartWrap').classList.
 }
 function ema(period){var out=[],k=2/(period+1),v=candles[0].close;for(var i=0;i<candles.length;i++){v=i===0?candles[i].close:candles[i].close*k+v*(1-k);out.push({time:candles[i].time,value:v})}return out}
 function structureMarkers(){
-var marks=[];for(var i=10;i<candles.length;i++){var prev=candles.slice(Math.max(0,i-10),i),hi=Math.max.apply(null,prev.map(x=>x.high)),lo=Math.min.apply(null,prev.map(x=>x.low)),c=candles[i];if(c.close>hi)marks.push({time:c.time,position:'belowBar',color:'#12b886',shape:'arrowUp',text:'BOS'});else if(c.close<lo)marks.push({time:c.time,position:'aboveBar',color:'#ef476f',shape:'arrowDown',text:'BOS'})}return marks.slice(-12).sort((a,b)=>a.time-b.time)
+var marks=[],bias='';for(var i=10;i<candles.length;i++){var prev=candles.slice(Math.max(0,i-10),i),hi=Math.max.apply(null,prev.map(x=>x.high)),lo=Math.min.apply(null,prev.map(x=>x.low)),c=candles[i];if(c.close>hi){var label=bias==='DOWN'?'CHoCH':'BOS';marks.push({time:c.time,position:'belowBar',color:'#12b886',shape:'arrowUp',text:label});bias='UP'}else if(c.close<lo){var label=bias==='UP'?'CHoCH':'BOS';marks.push({time:c.time,position:'aboveBar',color:'#ef476f',shape:'arrowDown',text:label});bias='DOWN'}}return marks.slice(-12).sort((a,b)=>a.time-b.time)
 }
 function addLine(price,color,title){var line=candleSeries.createPriceLine({price:price,color:color,lineWidth:2,lineStyle:0,axisLabelVisible:true,title:title});priceLines.push(line);return line}
 function clearDrawings(){priceLines.forEach(l=>candleSeries.removePriceLine(l));priceLines=[];drawings=[];$('positionInfo').style.display='none'}
