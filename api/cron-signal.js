@@ -172,7 +172,7 @@ async function calculateNewsBias(event,apiKey){
  const rows=await Promise.all(symbols.map(s=>fetch30mMove(s,apiKey)));
  const strength=rows.reduce((sum,r)=>{const [base,quote]=r.symbol.split("/");return sum+r.changePct*(base===currency?1:quote===currency?-1:0);},0)/rows.length;
  const confidence=Math.abs(strength)>=.12?"HIGH":Math.abs(strength)>=.06?"MEDIUM":"LOW";
- const evidence=rows.map(r=>{const [base]=r.symbol.split("/");const dir=(base===currency?r.changePct:-r.changePct)>=0?"BUY":"SELL";return r.symbol+" "+dir+" ("+(r.changePct>=0?"+":"")+r.changePct.toFixed(3)+"%)";}).join("; ");
+ const evidence=rows.map(r=>{const [base]=r.symbol.split("/");const dir=r.changePct>=0?"BUY":"SELL";return r.symbol+" "+dir+" ("+(r.changePct>=0?"+":"")+r.changePct.toFixed(3)+"%)";}).join("; ");
  return{action:Math.abs(strength)<.025?"WAIT":currency+" "+(strength>0?"STRONGER":"WEAKER"),confidence,score:Number(strength.toFixed(4)),evidence:"Previous 30m correlated basket: "+evidence};
 }
 async function fetchQuote(symbol, apiKey) {
