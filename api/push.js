@@ -225,9 +225,9 @@ module.exports = async function handler(req, res) {
           configureVapid();
           await webpush.sendNotification(subscription, JSON.stringify({
             title: "🤖 Dagbo AI Answer",
-            body: "Your AI answer is ready. Tap to read it.",
+            body: (rawAnswer.trim().replace(/\\s+/g, " ").slice(0, 190) + (rawAnswer.trim().length > 190 ? "…" : "")),
             url: "/ai.html",
-            tag: "dagbo-ai"
+            tag: "dagbo-ai-" + Date.now()
           }), { TTL: 60, urgency: "normal" });
         } catch (error) {
           if ([404, 410].includes(error.statusCode)) {
