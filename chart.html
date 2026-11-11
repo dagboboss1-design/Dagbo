@@ -81,15 +81,17 @@ if(urlPair){var matched=PAIRS.filter(function(p){return p.id===urlPair||(urlPair
 else if(activePairs.length>0){currentPair=activePairs[0].tv;sel.value=currentPair}
 }
 function loadChart(){
-var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull');
-container.innerHTML='';container.appendChild(btn);
+var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull'),toolsBtn=document.getElementById('btnTools');
+container.innerHTML='';container.appendChild(toolsBtn);container.appendChild(btn);
+toolsBtn.textContent=showTools?'✎ DRAWING TOOLS: ON':'✎ DRAWING TOOLS: OFF';toolsBtn.setAttribute('aria-pressed',showTools?'true':'false');
 var theme=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
 var iframe=document.createElement('iframe');
-iframe.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+currentTF+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hidesidetoolbar=0&symboledit=0&saveimage=0&toolbarbg=rgba(0,0,0,0)&hide_volume=true';
+iframe.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+currentTF+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hidesidetoolbar='+ (showTools?'0':'1') +'&symboledit=0&saveimage=0&toolbarbg=rgba(0,0,0,0)&hide_volume=true';
 iframe.setAttribute('allowfullscreen','');container.appendChild(iframe);
 }
 window.changePair=function(tvSymbol){currentPair=tvSymbol;loadChart()};
 window.changeTF=function(tf){currentTF=tf;loadChart()};
+window.toggleTools=function(){showTools=!showTools;loadChart()};
 window.toggleFull=function(){document.body.classList.toggle('chart-full');var btn=document.getElementById('btnFull');btn.textContent=document.body.classList.contains('chart-full')?'✕ CLOSE':'⛶ FULLSCREEN';setTimeout(loadChart,100)};
 buildDropdown();loadChart();
 })();
