@@ -92,7 +92,6 @@ iframe.setAttribute('allowfullscreen','');container.appendChild(iframe);
 window.changePair=function(tvSymbol){currentPair=tvSymbol;loadChart()};
 window.changeTF=function(tf){currentTF=tf;loadChart()};
 window.toggleTools=function(){showTools=!showTools;loadChart()};
-window.toggleTools=function(){showTools=!showTools;loadChart()};
 window.toggleFull=function(){document.body.classList.toggle('chart-full');var btn=document.getElementById('btnFull');btn.textContent=document.body.classList.contains('chart-full')?'✕ CLOSE':'⛶ FULLSCREEN';setTimeout(loadChart,100)};
 buildDropdown();loadChart();
 })();
