@@ -311,7 +311,10 @@
     var sign=direction==='SELL'?-1:1;
     if(pair==='XAUUSD'||pair==='GOLD')return (exit-entry)*sign*lot*100;
     if(!/^[A-Z]{6}$/.test(pair))return null;
-    var base=pair.slice(0,3),quote=pair.slice(3,6),units=lot*100000;
+    var base=pair.slice(0,3),quote=pair.slice(3,6);
+    var fxCurrencies=['USD','EUR','GBP','JPY','CHF','CAD','AUD','NZD','SEK','NOK','DKK','SGD','HKD','ZAR','MXN','TRY','PLN','CNY','CNH'];
+    if(fxCurrencies.indexOf(base)<0||fxCurrencies.indexOf(quote)<0)return null;
+    var units=lot*100000;
     var quotePnl=(exit-entry)*sign*units;
     if(quote==='USD')return quotePnl;
     if(base==='USD')return quotePnl/exit;
