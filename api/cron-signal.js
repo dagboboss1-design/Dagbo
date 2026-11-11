@@ -12,7 +12,7 @@ const EASTERN_TZ = "America/New_York";
 const LOOKAHEAD_DAYS = 75;
 
 function authorized(req) {
-  const secret = process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET;
+  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET;
   const supplied = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(supplied), b = Buffer.from("Bearer " + secret);
@@ -163,7 +163,6 @@ module.exports = async function handler(req,res) {
   if (!authorized(req)) return res.status(401).json({error:"Unauthorized"});
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({error:"Method not allowed"});
   const apiKey = process.env.TWELVE_DATA_API_KEY;
-  if (!apiKey) return res.status(503).json({error:"Missing TWELVE_DATA_API_KEY"});
   const lock = "dagbo:cron:news:lock";
   const acquired = await redis.set(lock,String(Date.now()),{nx:true,ex:4*60});
   if (acquired !== "OK") return res.status(200).json({skipped:true,reason:"News alert check already running"});
@@ -211,7 +210,7 @@ module.exports = async function handler(req,res) {
     const mins = (next.date.getTime() - now.getTime()) / 60000;
     const id = next.id;
 
-    if (mins >= 57 && mins <= 63) {
+    if (mins >= 55 && mins <= 65) {
       const key = "dagbo:news:1hr:" + encodeURIComponent(id);
       if (!(await redis.get(key))) {
         await sendPush("⏰ " + next.currency + " NEWS IN 1 HOUR",
@@ -221,22 +220,34 @@ module.exports = async function handler(req,res) {
         return res.status(200).json({sent:"1-hour alert",event:next.name,currency:next.currency});
       }
     }
-    if (mins >= 12 && mins <= 18) {
+    if (mins >= 10 && mins <= 20) {
       const key = "dagbo:news:15min:" + encodeURIComponent(id);
       if (!(await redis.get(key))) {
         if (next.currency === "USD") {
-          const symbols = ["EUR/USD","USD/JPY","GBP/USD","USD/CAD","USD/SEK","USD/CHF","XAU/USD"];
-          const rows = await Promise.all(symbols.map(async s => [s,await fetchQuote(s,apiKey)]));
-          const q = Object.fromEntries(rows);
-          const dxy = calculateDxyEstimate(q);
-          const goldChange = (q["XAU/USD"].current-q["XAU/USD"].open)/q["XAU/USD"].open*100;
-          const bias = calculateBias(dxy.changePct,goldChange);
+          let bias = { action: "WAIT — INSUFFICIENT LIVE DATA", color: "🟡", score: 50 };
+          let context = "Live USD basket / Gold quotes were unavailable, so no directional bias is being guessed.";
+          if (apiKey) {
+            try {
+              const symbols = ["EUR/USD","USD/JPY","GBP/USD","USD/CAD","USD/SEK","USD/CHF","XAU/USD"];
+              const rows = await Promise.all(symbols.map(async symbol => [symbol, await fetchQuote(symbol,apiKey)]));
+              const q = Object.fromEntries(rows);
+              const dxy = calculateDxyEstimate(q);
+              const goldChange = (q["XAU/USD"].current-q["XAU/USD"].open)/q["XAU/USD"].open*100;
+              bias = calculateBias(dxy.changePct,goldChange);
+              context = "Synthetic USD basket " + dxy.current.toFixed(2) +
+                " (" + (dxy.changePct>=0?"+":"") + dxy.changePct.toFixed(3) + "%); Gold " +
+                (goldChange>=0?"+":"") + goldChange.toFixed(3) + "%. ";
+            } catch (quoteError) {
+              context = "Live market quote check failed (" + quoteError.message + "); no directional bias is being guessed. ";
+              bias = { action: "WAIT — INSUFFICIENT LIVE DATA", color: "🟡", score: 50 };
+            }
+          } else {
+            context = "TWELVE_DATA_API_KEY is not configured; no directional bias is being guessed. ";
+          }
           await sendPush("🎯 15-MIN USD NEWS BIAS",
-            next.name + " in about 15 minutes. Calculated USD basket estimate " + dxy.current.toFixed(2) +
-            " (" + (dxy.changePct>=0?"+":"") + dxy.changePct.toFixed(3) + "%). Gold " +
-            (goldChange>=0?"+":"") + goldChange.toFixed(3) + "%. Indicative gold bias: " +
-            bias.color + " " + bias.action + " (" + bias.score + "/100). Synthetic basket estimate, not official live ICE DXY.",
-            "news-bias-usd","/news.html");
+            next.name + " in about 15 minutes. " + context + "Indicative pre-release context: " +
+            bias.color + " " + bias.action + " (" + bias.score + "/100). This is a market-context estimate, not a guaranteed news-spike prediction. Confirm live prices, spreads and risk.",
+            "news-bias-" + encodeURIComponent(id),"/news.html");
           await claim(key);
           return res.status(200).json({sent:"15-minute USD bias",event:next.name,currency:next.currency,bias});
         }
