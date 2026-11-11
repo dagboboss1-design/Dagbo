@@ -569,7 +569,9 @@
         var local = trades.find(function(t){return t.id === remote.id;});
         if (local && remote.status === 'CLOSED' && local.result === 'OPEN') {
           local.result = remote.result || 'CLOSED';
-          local.pnl = Number(remote.pnl) || 0;
+          local.exit = remote.exit;
+          var calculatedRemotePnl = calculatePnlUsd(local.pair,local.direction,Number(local.entry),Number(remote.exit),Number(local.lotSize));
+          local.pnl = calculatedRemotePnl !== null ? calculatedRemotePnl : (Number(remote.pnl) || 0);
           if (Number(local.riskAmount) > 0) {
             local.rMultiple = Math.round((local.pnl / Number(local.riskAmount)) * 10) / 10;
           } else {
