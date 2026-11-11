@@ -203,8 +203,8 @@
       let res = await fetch(url);
       let data = await res.json();
       
-      if (data.status === 'error') {
-        console.error("API Error:", data.message);
+      if (!res.ok || data.error || data.status === 'error') {
+        console.error("Market data API Error:", data.error || data.message || res.statusText);
         return null;
       }
 
@@ -256,6 +256,9 @@
 
     try { localStorage.setItem('dagbo_best_opportunities', JSON.stringify({timeframe:currentSignalTF,updatedAt:new Date().toISOString(),items:ranked})); } catch(e) {}
     var best = document.getElementById('bestOpportunityList');
+    var monitor = document.getElementById('trendAgreementList');
+    // Insights are rendered on a separate page; their absence must not break Signals.
+    if (!best || !monitor) return;
     best.textContent = '';
     if (!ranked.length) {
       var empty = document.createElement('p'); empty.className='dg-muted'; empty.textContent='No setup currently has at least 3 agreeing method votes. Wait for confirmation.'; best.appendChild(empty);
@@ -270,7 +273,6 @@
       row.appendChild(left); row.appendChild(pill); best.appendChild(row);
     });
 
-    var monitor = document.getElementById('trendAgreementList');
     monitor.textContent = '';
     var snapshots = {};
     try { snapshots = JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots')) || {}; } catch(e) {}
@@ -387,9 +389,11 @@
             '<span style="font-size:11px;color:var(--dg-text-2)">' + currentSignalTF + 'm</span>' +
           '</div>' +
           cardInner +
-          '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;">' +
-            (s.final === 'NO TRADE' ? '' : '<button onclick="executeTrade(\'' + s.pair + '\', \'' + s.final + '\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ', ' + JSON.stringify(s.strategy) + ')" style="flex:1;padding:10px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:14px;cursor:pointer;">Add to Journal</button>') +
-            '<a href="chart.html?pair=' + s.pair + '" style="flex:1;text-align:center;padding:10px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:14px;">View Chart</a>' +
+          '<div style="margin-top:12px;display:flex;gap:7px;align-items:center;">' +
+            (s.final === 'NO TRADE' ? '' :
+              '<button onclick="executeTrade(\\'' + s.pair + '\\', \\' + s.final + '\\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ', ' + JSON.stringify(s.strategy) + ')" style="flex:1;min-width:0;padding:10px 5px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:12px;cursor:pointer;">Add to Journal</button>' +
+              '<button onclick="copySignalTrade(\\'' + s.pair + '\\', \\' + s.final + '\\', ' + s.entry + ', ' + s.sl + ', ' + s.tp1 + ', ' + s.tp2 + ')" style="flex:1;min-width:0;padding:10px 5px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;border:1px solid var(--dg-line);font-size:12px;cursor:pointer;">Copy Trade</button>') +
+            '<a href="chart.html?pair=' + s.pair + '" style="flex:1;min-width:0;text-align:center;padding:10px 5px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:12px;">View Chart</a>' +
           '</div>' +
         '</section>';
     });
@@ -400,6 +404,45 @@
     grid.innerHTML = listHtml;
     renderInsights();
   }
+
+  window.copySignalTrade = async function(pair, signal, entry, sl, tp1, tp2) {
+    var direction = String(signal || '').includes('BUY') ? 'BUY' :
+      String(signal || '').includes('SELL') ? 'SELL' : 'WAIT';
+    if (direction === 'WAIT') {
+      alert('NO TRADE: there are no confirmed trade levels to copy.');
+      return;
+    }
+    var text = [
+      'DAGBO SIGNAL',
+      'Pair: ' + pair,
+      'Signal: ' + signal,
+      'Timeframe: ' + currentSignalTF + 'm',
+      'Entry: ' + entry,
+      'Stop Loss: ' + sl,
+      'Take Profit 1: ' + tp1,
+      'Take Profit 2: ' + tp2
+    ].join('\\n');
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        var field = document.createElement('textarea');
+        field.value = text;
+        field.setAttribute('readonly', '');
+        field.style.position = 'fixed';
+        field.style.opacity = '0';
+        document.body.appendChild(field);
+        field.select();
+        var copied = document.execCommand('copy');
+        field.remove();
+        if (!copied) throw new Error('Clipboard unavailable');
+      }
+      alert('Trade details copied.');
+    } catch (error) {
+      console.error('DAGBO copy trade error:', error);
+      alert('Could not copy trade details. Please try again.');
+    }
+  };
 
   window.executeTrade = async function(pair, signal, entry, sl, tp, strategy) {
     var dir = signal.includes('BUY') ? 'BUY' : signal.includes('SELL') ? 'SELL' : null;
