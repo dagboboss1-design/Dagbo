@@ -169,6 +169,74 @@ async function broadcast(title, body, tag) {
   }
   return { sent, failed, devices: ids.length };
 }
+async function sendNewsAlerts(marketData) {
+  const now = Date.now();
+  let eventsChecked = 0, newsAlerts = 0, preNewsSignals = 0;
+  try {
+    const response = await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.json", {
+      headers: { "User-Agent": "DAGBO-SIGNAL-Economic-Calendar/1.0" }
+    });
+    if (!response.ok) throw new Error("Economic calendar HTTP " + response.status);
+    const rows = await response.json();
+    if (!Array.isArray(rows)) throw new Error("Invalid economic calendar response");
+    const upcoming = rows.map(row => ({
+      name: String(row.title || "Economic event").slice(0, 120),
+      currency: String(row.country || "GLOBAL").toUpperCase(),
+      impact: String(row.impact || ""),
+      date: new Date(row.date)
+    })).filter(event => event.impact.toLowerCase() === "high" &&
+      Number.isFinite(event.date.getTime()) && event.date.getTime() > now &&
+      event.date.getTime() <= now + 30 * 60 * 1000);
+    eventsChecked = upcoming.length;
+
+    for (const event of upcoming) {
+      const eventId = crypto.createHash("sha256")
+        .update(event.name + "|" + event.currency + "|" + event.date.toISOString()).digest("hex").slice(0, 20);
+      const newsKey = "dagbo:news:alert:" + eventId;
+      if (!(await redis.get(newsKey))) {
+        await broadcast("📰 HIGH-IMPACT NEWS COMING",
+          event.currency + " · " + event.name + " is scheduled in about " +
+          Math.max(1, Math.round((event.date.getTime() - now) / 60000)) +
+          " minutes. Check spreads, volatility and your risk plan. Verify the live calendar.",
+          "news-event-" + eventId);
+        await redis.set(newsKey, "1", { ex: 60 * 60 * 24 * 2 });
+        newsAlerts++;
+      }
+
+      // Only markets with a currency link to the event are considered.
+      const currency = event.currency;
+      const affected = Object.keys(marketData).filter(pair => {
+        if (currency === "GLOBAL") return false;
+        if (pair.includes(currency)) return true;
+        if (currency === "USD" && /^(XAUUSD|GOLD|US30|US100|NAS100|US500|BTCUSD|BTC|ETHUSD|ETH)$/.test(pair)) return true;
+        return false;
+      });
+      const directional = affected.map(pair => ({ pair, analysis: marketData[pair] }))
+        .filter(item => item.analysis && (item.analysis.signal.includes("BUY") || item.analysis.signal.includes("SELL")));
+      if (!directional.length) continue;
+
+      const signalKey = "dagbo:news:pre-signal:" + eventId;
+      if (await redis.get(signalKey)) continue;
+      const strongest = directional.sort((a,b) =>
+        Math.max(b.analysis.buyScore,b.analysis.sellScore) - Math.max(a.analysis.buyScore,a.analysis.sellScore))[0];
+      const a = strongest.analysis;
+      const direction = a.signal.includes("BUY") ? "BUY" : "SELL";
+      const confidence = Math.round(Math.max(a.buyScore,a.sellScore) / a.totalMethods * 100);
+      const evidence = a.evidence.filter(x => x.includes("(" + direction + ")")).slice(0, 3).join("; ");
+      await broadcast("⚠️ PRE-NEWS SIGNAL — " + direction,
+        "15m bias for " + strongest.pair + " ahead of " + event.currency + " " + event.name +
+        ". " + direction + " bias · " + confidence + "% method-vote score. Evidence: " +
+        evidence + ". NOT A GUARANTEED TRADE. News outcome is unknown; confirm spread, chart and risk.",
+        "pre-news-" + eventId);
+      await redis.set(signalKey, "1", { ex: 60 * 60 * 24 * 2 });
+      preNewsSignals++;
+    }
+  } catch (error) {
+    console.error("DAGBO pre-news calendar check failed:", error.message);
+  }
+  return { eventsChecked, newsAlerts, preNewsSignals };
+}
+
 async function monitorTrades(marketData) {
   const devices = await redis.smembers("dagbo:trades:devices");
   let closed = 0, warnings = 0;
@@ -309,6 +377,7 @@ module.exports = async function handler(req, res) {
     }
 
     const tradeSummary = await monitorTrades(results);
+    const newsSummary = await sendNewsAlerts(results);
     const errorKey = "dagbo:scan:error:last";
     const previousErrorRaw = await redis.get(errorKey);
     if (errors.length) {
@@ -334,7 +403,8 @@ module.exports = async function handler(req, res) {
       success: true, scannedAt: new Date().toISOString(),
       scanned: Object.keys(results), errors, signals: results,
       tradeMonitoring: tradeSummary,
-      note: "Scheduled 15-minute market scan; alerts are informational and do not execute broker orders."
+      newsMonitoring: newsSummary,
+      note: "Scheduled 15-minute market scan; pre-news bias is a technical 15m snapshot, not a prediction of the news result or a broker order."
     };
     await redis.set("dagbo:cron:scan:last", JSON.stringify({
       scannedAt: responseBody.scannedAt, scanned: responseBody.scanned, errors
