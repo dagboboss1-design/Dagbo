@@ -20,6 +20,18 @@ body{background:var(--dg-bg);color:var(--dg-text)}
 .edu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.lesson{padding:13px;min-width:0}.lesson .meta{font-size:9px;letter-spacing:.8px;color:var(--dg-text-2);font-weight:850}.lesson h3{margin:7px 0;font-size:14px}.lesson p{font-size:12px;line-height:1.5;color:var(--dg-text-2);margin:0 0 10px}.lesson details{border-top:1px solid var(--dg-line);padding-top:9px}.lesson summary{font-size:11px;font-weight:850;cursor:pointer}.lesson .detail{font-size:12px;line-height:1.55;color:var(--dg-text-2);padding-top:9px}.lesson .detail b{color:var(--dg-text)}.lesson .detail p{margin:6px 0}.edu-callout{border-left:3px solid var(--dg-text-2);padding:10px 12px;background:var(--dg-inset);border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;line-height:1.55}
 .chart-demo{background:#0c1420;border-radius:9px;padding:9px;margin:12px 0}.chart-demo svg{width:100%;height:auto;display:block}.chart-caption{color:#aab6c7;font-size:10px;margin-top:5px}
 .edu-empty{display:none;padding:20px;text-align:center;color:var(--dg-text-2);font-size:13px}
+
+.quiz-wrap{padding:14px;margin:14px 0}.quiz-card{border:1px solid var(--dg-line);border-radius:10px;padding:12px;margin:10px 0;background:var(--dg-card)}
+.quiz-q{font-size:13px;font-weight:850;line-height:1.45;margin:0 0 9px}.quiz-options{display:grid;gap:7px}
+.quiz-option{width:100%;text-align:left;border:1px solid var(--dg-line);border-radius:8px;background:var(--dg-inset);color:var(--dg-text);padding:10px;font:inherit;font-size:12px;cursor:pointer}
+.quiz-option:disabled{opacity:1;cursor:default}.quiz-option.correct{border-color:#28a879;background:rgba(40,168,121,.12)}.quiz-option.wrong{border-color:#d36a6a;background:rgba(211,106,106,.12)}
+.quiz-feedback{display:none;font-size:12px;line-height:1.55;color:var(--dg-text-2);margin:9px 0 0}.quiz-score{font-size:12px;font-weight:850;margin:8px 0;color:var(--dg-text)}
+.edu-visual-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.edu-visual{background:#0c1420;border:1px solid #263448;border-radius:10px;padding:10px;min-width:0}
+.edu-visual h3{color:#e7eef8;font-size:12px;margin:0 0 5px}.edu-visual p{color:#aab6c7;font-size:10px;line-height:1.5;margin:5px 0 0}
+.edu-visual svg{width:100%;height:auto;display:block}
+@media(max-width:430px){.edu-visual-grid{grid-template-columns:1fr}}
+
 @media(max-width:430px){.edu-grid{grid-template-columns:1fr}.edu h1{font-size:26px}}
 </style>
 </head>
@@ -56,6 +68,80 @@ body{background:var(--dg-bg);color:var(--dg-text)}
   </div>
  </section>
  <div class="edu-grid" id="eduLessons"></div><div class="edu-empty" id="eduEmpty">No lessons match that search. Try another word or category.</div>
+
+ <section class="edu-panel" style="padding:14px;margin:14px 0">
+  <h2>Annotated chart examples</h2>
+  <p class="edu-muted">These are simplified teaching diagrams, not live prices or automatic trade signals. Learn what each marking means, then find the same structure on a real chart.</p>
+  <div class="edu-visual-grid">
+   <article class="edu-visual"><h3>1. Fair Value Gap (FVG)</h3>
+    <svg viewBox="0 0 320 145" role="img" aria-label="Three candle fair value gap diagram with imbalance zone highlighted">
+     <g stroke="#26384d"><path d="M8 25H312M8 65H312M8 105H312"/></g>
+     <g stroke-width="2"><path d="M55 103V48" stroke="#42c994"/><rect x="46" y="74" width="18" height="20" fill="#42c994"/><path d="M155 112V18" stroke="#42c994"/><rect x="146" y="28" width="18" height="70" fill="#42c994"/><path d="M255 75V38" stroke="#e16e75"/><rect x="246" y="45" width="18" height="20" fill="#e16e75"/></g>
+     <rect x="66" y="48" width="178" height="26" fill="#e7b84b" opacity=".2" stroke="#e7b84b" stroke-dasharray="4 3"/>
+     <path d="M170 48H295" stroke="#e7b84b" stroke-dasharray="3 3"/><text x="174" y="40" fill="#f4cf79" font-size="10">Imbalance zone</text>
+     <text x="9" y="137" fill="#aab6c7" font-size="9">Candle 1</text><text x="128" y="137" fill="#aab6c7" font-size="9">Displacement</text><text x="248" y="137" fill="#aab6c7" font-size="9">Candle 3</text>
+    </svg><p>In a bullish three-candle example, candle 3's low stays above candle 1's high. The space between them is the gap. Wait for context and confirmation; it may never fill.</p>
+   </article>
+   <article class="edu-visual"><h3>2. BOS / CHoCH structure</h3>
+    <svg viewBox="0 0 320 145" role="img" aria-label="Market structure diagram showing swing highs, higher lows and a break of structure">
+     <g stroke="#26384d"><path d="M8 115H312M8 70H312M8 25H312"/></g>
+     <path d="M12 108L55 55L90 83L137 38L174 66L216 20L252 48L292 8" fill="none" stroke="#42c994" stroke-width="3" stroke-linejoin="round"/>
+     <path d="M216 20H306" stroke="#e7b84b" stroke-dasharray="4 3"/><text x="224" y="15" fill="#f4cf79" font-size="10">Prior high</text>
+     <path d="M252 48L292 8" stroke="#42c994" stroke-width="3"/><text x="11" y="137" fill="#aab6c7" font-size="9">Higher low → higher high → break above swing</text>
+    </svg><p>A break above a meaningful prior swing high can support bullish continuation (BOS). A break against the prior sequence may suggest CHoCH/MSS; define swings consistently.</p>
+   </article>
+   <article class="edu-visual"><h3>3. Liquidity sweep and reclaim</h3>
+    <svg viewBox="0 0 320 145" role="img" aria-label="Price briefly breaks above equal highs then falls back below showing a possible liquidity sweep">
+     <g stroke="#26384d"><path d="M8 35H312M8 75H312M8 115H312"/></g>
+     <path d="M8 48H312" stroke="#e7b84b" stroke-dasharray="5 4"/><text x="12" y="41" fill="#f4cf79" font-size="10">Equal highs / possible stops</text>
+     <path d="M12 105L65 77L108 49L150 78L190 45L222 13L246 61L274 88L307 112" fill="none" stroke="#e16e75" stroke-width="3" stroke-linejoin="round"/>
+     <path d="M222 13L246 61" stroke="#f4cf79" stroke-width="2"/><text x="228" y="11" fill="#f4cf79" font-size="9">Sweep</text>
+     <text x="175" y="133" fill="#aab6c7" font-size="9">Reclaim below level = rejection evidence</text>
+    </svg><p>A wick above equal highs followed by a close back below may be a sweep. A sustained close and follow-through above can instead be a genuine breakout.</p>
+   </article>
+   <article class="edu-visual"><h3>4. RSI divergence</h3>
+    <svg viewBox="0 0 320 145" role="img" aria-label="Price makes a higher high while RSI makes a lower high showing bearish divergence example">
+     <g stroke="#26384d"><path d="M8 45H312M8 100H312"/></g>
+     <text x="10" y="14" fill="#aab6c7" font-size="9">PRICE</text><path d="M12 52L65 34L110 48L165 23L215 39L270 12L307 28" fill="none" stroke="#42c994" stroke-width="2.5"/>
+     <path d="M165 18L270 7" stroke="#e7b84b" stroke-dasharray="3 3"/><text x="10" y="86" fill="#aab6c7" font-size="9">RSI</text>
+     <path d="M12 118L65 103L110 120L165 96L215 113L270 105L307 120" fill="none" stroke="#65a9ef" stroke-width="2.5"/>
+     <path d="M165 91L270 100" stroke="#e7b84b" stroke-dasharray="3 3"/><text x="10" y="140" fill="#aab6c7" font-size="9">Price higher high, RSI lower high</text>
+    </svg><p>Bearish divergence is a warning that momentum may be weakening, not a sell instruction. Wait for price structure to confirm any reversal idea.</p>
+   </article>
+  </div>
+ </section>
+ <section class="edu-panel quiz-wrap" id="eduQuiz">
+  <h2>Test what you learned</h2>
+  <p class="edu-muted">Choose one answer for each question. Your score updates as you answer, and every answer includes an explanation.</p>
+  <div class="quiz-score" id="quizScore" aria-live="polite">Answered 0 of 5 · Score 0/5</div>
+  <div class="quiz-card" data-q="0" data-correct="1">
+   <p class="quiz-q">1. What confirms a breakout more reliably than a quick wick through resistance?</p>
+   <div class="quiz-options"><button class="quiz-option" data-a="0">A wick that immediately returns inside the range</button><button class="quiz-option" data-a="1">A candle close beyond the level, with follow-through or a successful retest</button><button class="quiz-option" data-a="2">An RSI reading above 70 by itself</button></div>
+   <p class="quiz-feedback">Correct: a close and follow-through/retest provide better evidence that price is accepting beyond the level. False breakouts are still possible.</p>
+  </div>
+  <div class="quiz-card" data-q="1" data-correct="2">
+   <p class="quiz-q">2. What does ATR measure?</p>
+   <div class="quiz-options"><button class="quiz-option" data-a="0">Whether the next candle will be bullish</button><button class="quiz-option" data-a="1">The exact direction of the trend</button><button class="quiz-option" data-a="2">Recent price volatility, not direction</button></div>
+   <p class="quiz-feedback">Correct: ATR estimates recent volatility. It can help with stop-distance planning, but it does not tell you whether to buy or sell.</p>
+  </div>
+  <div class="quiz-card" data-q="2" data-correct="0">
+   <p class="quiz-q">3. In a liquidity-sweep idea, what evidence are you looking for?</p>
+   <div class="quiz-options"><button class="quiz-option" data-a="0">Price trades beyond an obvious high/low, then rejects and reclaims the level</button><button class="quiz-option" data-a="1">Price touches any moving average</button><button class="quiz-option" data-a="2">A candle has no wick</button></div>
+   <p class="quiz-feedback">Correct: the rejection/reclaim is important. A break that holds and continues may be a genuine breakout instead.</p>
+  </div>
+  <div class="quiz-card" data-q="3" data-correct="1">
+   <p class="quiz-q">4. How should you calculate position size?</p>
+   <div class="quiz-options"><button class="quiz-option" data-a="0">Use the same lot size on every instrument</button><button class="quiz-option" data-a="1">Use your risk amount, stop distance and the broker's contract/pip/tick value</button><button class="quiz-option" data-a="2">Increase lot size after a losing trade to recover quickly</button></div>
+   <p class="quiz-feedback">Correct: position size depends on the amount you are willing to risk, stop distance and the instrument's actual value specifications.</p>
+  </div>
+  <div class="quiz-card" data-q="4" data-correct="2">
+   <p class="quiz-q">5. What is the safest way to use an indicator signal?</p>
+   <div class="quiz-options"><button class="quiz-option" data-a="0">Enter immediately whenever it crosses a line</button><button class="quiz-option" data-a="1">Ignore price action and use several indicators together</button><button class="quiz-option" data-a="2">Use it as supporting evidence with market context, price confirmation and defined risk</button></div>
+   <p class="quiz-feedback">Correct: indicators are tools, not guarantees. Combine them with context, a clear trigger and a risk plan.</p>
+  </div>
+  <button class="edu-link" type="button" id="quizReset">Reset quiz</button>
+ </section>
+
  <section class="edu-panel" style="padding:14px;margin:14px 0">
   <h2>Important price differences</h2>
   <p class="edu-muted"><b>Pip vs point:</b> a pip is a standardised forex price movement unit; a point may mean a full index point, a platform tick or a broker-specific unit. Check the symbol specification.</p>
@@ -142,6 +228,12 @@ var lessons=[
 var root=document.getElementById('eduLessons'),search=document.getElementById('eduSearch'),tabs=document.getElementById('eduTabs'),active='All';
 function safe(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function render(){var q=search.value.trim().toLowerCase(),shown=lessons.filter(function(x){return(active==='All'||x.c===active)&&(!q||(x.n+' '+x.d+' '+x.c+' '+x.l+' '+x.use).toLowerCase().includes(q))});root.innerHTML=shown.map(function(x){return '<article class="lesson"><div class="meta">'+safe(x.c.toUpperCase())+' · '+safe(x.l.toUpperCase())+'</div><h3>'+safe(x.n)+'</h3><p>'+safe(x.d)+'</p><details><summary>How to identify and use this</summary><div class="detail"><p><b>Context:</b> '+safe(x.use)+'</p><p><b>Entry idea:</b> '+safe(x.entry)+'</p><p><b>Stop / invalidation:</b> '+safe(x.stop)+'</p><p><b>Target planning:</b> '+safe(x.target)+'</p><p><b>When it fails:</b> '+safe(x.bad)+'</p></div></details></article>'}).join('');document.getElementById('eduResultCount').textContent=shown.length+' lessons shown';document.getElementById('eduEmpty').style.display=shown.length?'none':'block'}
+
+var quiz=document.getElementById('eduQuiz'),scoreEl=document.getElementById('quizScore');
+function updateQuizScore(){var cards=quiz.querySelectorAll('.quiz-card'),answered=0,score=0;cards.forEach(function(card){var chosen=card.querySelector('.quiz-option:disabled');if(chosen){answered++;if(Number(chosen.dataset.a)===Number(card.dataset.correct))score++}});scoreEl.textContent='Answered '+answered+' of '+cards.length+' · Score '+score+'/'+cards.length}
+quiz.addEventListener('click',function(e){var btn=e.target.closest('.quiz-option');if(!btn||btn.disabled)return;var card=btn.closest('.quiz-card'),correct=Number(btn.dataset.a)===Number(card.dataset.correct);card.querySelectorAll('.quiz-option').forEach(function(option){option.disabled=true;if(Number(option.dataset.a)===Number(card.dataset.correct))option.classList.add('correct')});if(!correct)btn.classList.add('wrong');card.querySelector('.quiz-feedback').style.display='block';updateQuizScore()});
+document.getElementById('quizReset').addEventListener('click',function(){quiz.querySelectorAll('.quiz-option').forEach(function(btn){btn.disabled=false;btn.classList.remove('correct','wrong')});quiz.querySelectorAll('.quiz-feedback').forEach(function(p){p.style.display='none'});updateQuizScore()});
+
 tabs.addEventListener('click',function(e){var b=e.target.closest('button[data-cat]');if(!b)return;active=b.dataset.cat;tabs.querySelectorAll('button').forEach(function(x){x.classList.toggle('active',x===b)});render()});search.addEventListener('input',render);document.getElementById('lessonCount').textContent=lessons.length;render();
 })();
 </script>
