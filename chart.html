@@ -15,7 +15,7 @@
 #tv-chart-container iframe{width:100%!important;height:100%!important;border:none!important;display:block}
 body.chart-full #tv-chart-container{position:fixed!important;top:0;left:0;right:0;bottom:0;width:100vw!important;height:100dvh!important;z-index:9999;border-radius:0;margin:0}
 body.chart-full #tv-chart-container iframe{height:100dvh!important}
-#btnFull{position:absolute;top:10px;right:10px;z-index:10;background:rgba(0,0,0,.8);color:#fff;border:1px solid #555;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.5)}
+#btnFull,#btnTools{position:absolute;top:10px;z-index:10;color:#fff;padding:9px 13px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.35)}#btnFull{right:10px;background:rgba(0,0,0,.85);border:1px solid #555}#btnTools{left:10px;background:rgba(0,113,227,.94);border:1px solid #0071e3}
 .chart-pair-select{appearance:none;-webkit-appearance:none;background:var(--dg-card);border:1px solid var(--dg-line);color:var(--dg-text);font-size:16px;font-weight:700;padding:14px 16px;border-radius:16px;cursor:pointer;width:100%;text-align:center;margin-bottom:12px;box-shadow:var(--dg-shadow)}
 </style>
 <script>
@@ -36,7 +36,7 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}
 <input class="dg-seg__in" type="radio" name="tf" id="tf4" value="240" onchange="changeTF('240')"><label class="dg-seg__lb" for="tf4">4H</label>
 <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
 </div>
-<div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div>
+<div id="tv-chart-container"><button id="btnTools" onclick="toggleTools()" aria-pressed="true">✎ DRAWING TOOLS: ON</button><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div>\n<p class="dg-subtitle" style="font-size:12px;margin-top:-6px">Use the chart toolbar for trend lines, horizontal lines, rectangles and other available drawings. Rotate your phone for more room.</p>
 </main>
 <nav class="dg-tabbar" aria-label="Main">
 <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
@@ -72,7 +72,7 @@ var PAIRS=[
 var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
 var enabledIds=Array.isArray(settings.pairs)&&settings.pairs.length?settings.pairs:PAIRS.map(function(p){return p.id});
 var activePairs=PAIRS.filter(function(p){return enabledIds.indexOf(p.id)>-1||(enabledIds.indexOf('GOLD')>-1&&p.id==='XAUUSD')});
-var currentPair='CAPITALCOM:XAUUSD',currentTF='15';
+var currentPair='CAPITALCOM:XAUUSD',currentTF='15',showTools=true;
 function buildDropdown(){
 var sel=document.getElementById('pairSelect');sel.innerHTML='';
 activePairs.forEach(function(p){var opt=document.createElement('option');opt.value=p.tv;opt.textContent=p.label;sel.appendChild(opt)});
