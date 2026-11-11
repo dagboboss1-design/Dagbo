@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#080d15"><title>BOSS1 Market Heatmap · DAGBO SIGNAL</title>
+<link rel="manifest" href="manifest.json"><link rel="stylesheet" href="dagbo.css">
+<style>
+body{background:var(--dg-bg);color:var(--dg-text)}
+.hm-page{max-width:760px;margin:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 14px 110px}
+.hm-hero,.hm-card{background:var(--dg-card);border:1px solid var(--dg-line);border-radius:12px;padding:16px;margin:14px 0}
+.hm-kicker{color:var(--dg-text-2);font-size:10px;font-weight:850;letter-spacing:1.5px}
+.hm-title{font-size:28px;font-weight:800;margin:8px 0}
+.hm-muted{color:var(--dg-text-2);font-size:13px;line-height:1.55}
+.hm-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:15px}
+.hm-count{border:1px solid var(--dg-line);border-radius:8px;padding:10px 8px;min-width:0}
+.hm-count b{display:block;font-size:19px;font-variant-numeric:tabular-nums}
+.hm-count span{display:block;color:var(--dg-text-2);font-size:10px;margin-top:3px}
+.hm-count.bull b{color:var(--dg-green-ink)}.hm-count.bear b{color:var(--dg-red-ink)}
+.hm-count.side b{color:var(--dg-text)}.hm-count.unknown b{color:var(--dg-text-2)}
+.hm-group{margin-top:20px}.hm-group h3{font-size:14px;margin:0 0 8px}
+.hm-table{border-top:1px solid var(--dg-line)}
+.hm-row{display:grid;grid-template-columns:minmax(76px,1.2fr) repeat(3,minmax(0,1fr));gap:6px;align-items:center;padding:9px 0;border-bottom:1px solid var(--dg-line)}
+.hm-row.hm-head{color:var(--dg-text-2);font-size:9px;font-weight:800;letter-spacing:.6px}
+.hm-pair{font-size:12px;font-weight:800;min-width:0}
+.hm-cell{border:1px solid var(--dg-line);border-radius:6px;padding:6px 3px;text-align:center;font-size:10px;font-weight:800;background:var(--dg-inset);color:var(--dg-text-2)}
+.hm-cell.buy{background:var(--dg-green-soft);color:var(--dg-green-ink);border-color:transparent}
+.hm-cell.sell{background:var(--dg-red-soft);color:var(--dg-red-ink);border-color:transparent}
+.hm-cell.flat{background:var(--dg-fill);color:var(--dg-text-2);border-color:transparent}
+.hm-tools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.hm-tool{border:1px solid var(--dg-line);border-radius:8px;padding:12px;text-decoration:none;color:inherit}
+.hm-tool b{display:block;font-size:12px}.hm-tool span{display:block;font-size:11px;color:var(--dg-text-2);margin-top:4px;line-height:1.4}
+@media(max-width:380px){.hm-summary{grid-template-columns:repeat(2,1fr)}.hm-row{grid-template-columns:minmax(68px,1fr) repeat(3,minmax(0,.9fr));gap:4px}.hm-cell{font-size:9px}}
+</style>
+</head>
+<body>
+<main class="hm-page">
+ <div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">BOSS1</div></div>
+ <section class="hm-hero">
+  <div class="hm-kicker">BOSS1 FEATURE #1</div>
+  <h1 class="hm-title">Market Heatmap</h1>
+  <p class="hm-muted">See which supported markets are bullish, bearish, moving sideways, mixed or waiting for a scan. The heatmap uses the latest 5m and 15m results saved by Signals; it never invents a live direction.</p>
+  <div class="hm-summary">
+   <div class="hm-count bull"><b id="bullCount">0</b><span>BULLISH</span></div>
+   <div class="hm-count bear"><b id="bearCount">0</b><span>BEARISH</span></div>
+   <div class="hm-count side"><b id="sideCount">0</b><span>SIDEWAYS</span></div>
+   <div class="hm-count unknown"><b id="otherCount">0</b><span>MIXED / WAITING</span></div>
+  </div>
+ </section>
+ <section class="hm-card">
+  <div class="hm-kicker">BOSS1 FEATURE #1 · YOUR EDGE DESK</div>
+  <h2 style="font-size:19px;margin:6px 0">The other BOSS1 tools live where you use them</h2>
+  <p class="hm-muted">BOSS1 is the market heatmap. The supporting tools are placed in their proper pages so you can use them beside the feature they support.</p>
+  <div class="hm-tools">
+   <a class="hm-tool" href="signals.html"><b>Signals</b><span>Automatic multi-method signal analysis</span></a>
+   <a class="hm-tool" href="chart.html"><b>Trading Chart</b><span>Indicators and drawing tools</span></a>
+   <a class="hm-tool" href="journal.html"><b>Journal</b><span>Risk Guardian and trade history</span></a>
+   <a class="hm-tool" href="ai.html"><b>AI Commander</b><span>Ask about market concepts and saved signals</span></a>
+  </div>
+  <p class="hm-muted" style="margin-bottom:0">Feature #1 stays here: the Market Heatmap compares the saved 5m and 15m directions. It is not a live execution signal.</p>
+ </section>
+ <section class="hm-card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h2 style="font-size:18px;margin:0">All market groups</h2><button class="dg-btn" id="refreshHeatmap">Refresh</button></div>
+  <p class="hm-muted">Run both 5m and 15m scans on the Signals page to populate the latest market direction.</p>
+  <div id="heatmapGroups"></div>
+ </section>
+ <p class="hm-muted">Heatmap colours show agreement between signal directions, not probability of profit. Confirm price, spread, session and news before considering a trade.</p>
+</main>
+
+<script>
+(function(){
+'use strict';
+var groups=[
+ {name:'Gold & Metals',items:['XAUUSD','XAGUSD']},
+ {name:'Forex Majors',items:['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCHF','USDCAD','NZDUSD']},
+ {name:'Forex Crosses',items:['GBPJPY','EURJPY','EURGBP']},
+ {name:'Indices',items:['US30','US100','NAS100','US500']},
+ {name:'Commodities',items:['WTI','BRENT']},
+ {name:'Crypto',items:['BTCUSD','ETHUSD']}
+];
+function direction(v){if(typeof v!=='string')return'WAIT';if(v.indexOf('BUY')>=0)return'BUY';if(v.indexOf('SELL')>=0)return'SELL';if(v==='NO TRADE'||v==='WAIT')return'FLAT';return'WAIT';}
+function classFor(v){return v==='BUY'?'buy':v==='SELL'?'sell':v==='FLAT'?'flat':'';}
+function cell(v){var label=v==='BUY'?'BULL':v==='SELL'?'BEAR':v==='FLAT'?'FLAT':'—';return '<span class="hm-cell '+classFor(v)+'">'+label+'</span>';}
+function render(){
+ var snaps={};try{snaps=JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots'))||{}}catch(e){}
+ var five=snaps['5']||{},fifteen=snaps['15']||{},counts={bull:0,bear:0,side:0,other:0},root=document.getElementById('heatmapGroups');
+ root.textContent='';
+ groups.forEach(function(group){
+  var section=document.createElement('section');section.className='hm-group';
+  var title=document.createElement('h3');title.textContent=group.name;section.appendChild(title);
+  var table=document.createElement('div');table.className='hm-table';
+  var head=document.createElement('div');head.className='hm-row hm-head';head.innerHTML='<span>MARKET</span><span>5 MIN</span><span>15 MIN</span><span>BIAS</span>';table.appendChild(head);
+  group.items.forEach(function(pair){
+   var a=direction(five[pair]),b=direction(fifteen[pair]),bias=a===b&&a!=='WAIT'?a:(a==='FLAT'&&b==='FLAT'?'FLAT':'WAIT');
+   if(bias==='BUY')counts.bull++;else if(bias==='SELL')counts.bear++;else if(bias==='FLAT')counts.side++;else counts.other++;
+   var row=document.createElement('div');row.className='hm-row';
+   var name=document.createElement('span');name.className='hm-pair';name.textContent=pair;
+   var fiveCell=document.createElement('span');fiveCell.innerHTML=cell(a);
+   var fifteenCell=document.createElement('span');fifteenCell.innerHTML=cell(b);
+   var biasCell=document.createElement('span');biasCell.innerHTML=cell(bias);
+   row.appendChild(name);row.appendChild(fiveCell);row.appendChild(fifteenCell);row.appendChild(biasCell);table.appendChild(row);
+  });
+  section.appendChild(table);root.appendChild(section);
+ });
+ document.getElementById('bullCount').textContent=counts.bull;
+ document.getElementById('bearCount').textContent=counts.bear;
+ document.getElementById('sideCount').textContent=counts.side;
+ document.getElementById('otherCount').textContent=counts.other;
+}
+document.getElementById('refreshHeatmap').addEventListener('click',render);render();
+})();</script>
+<script src="navigation.js" defer></script>
+</body></html>
