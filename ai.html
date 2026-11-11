@@ -106,14 +106,16 @@ var FOMC_DATES = { 2019:['01-30','03-20','05-01','06-19','07-31','09-18','10-30'
 var CPI_DATES = { 2023:['01-12','02-14','03-14','04-12','05-10','06-13','07-12','08-10','09-13','10-12','11-14','12-12'],2024:['01-11','02-13','03-12','04-10','05-15','06-12','07-11','08-14','09-11','10-10','11-13','12-11'],2025:['01-15','02-12','03-12','04-10','05-13','06-11','07-15','08-12','09-10','10-15','11-12','12-10'],2026:['01-14','02-11','03-11','04-14','05-12','06-10','07-14','08-11','09-09','10-14','11-11','12-09'] };
 function tryDate(q, e){
   var t = q.toLowerCase();
+  var asksCalendar = /\b(date|dates|when|next|upcoming|schedule|calendar|20\d{2})\b/.test(t);
+  if (!asksCalendar) return null;
   if (/nfp|non-?farm|jobs report/.test(t)) {
-    return '<b>NFP calendar:</b> The release is usually scheduled monthly, but holidays and government schedule changes can move the date. Its Nigeria release time also shifts with US daylight saving time. Check the current official BLS release calendar before planning a trade.';
+    return '<b>NFP calendar:</b> The release is usually scheduled monthly, but holidays and government schedule changes can move the date. Its Nigeria release time also shifts with US daylight saving time. Check the official BLS release calendar or archive for the year you mean.';
   }
   if (/fomc|fed|interest rate/.test(t)) {
-    return '<b>FOMC calendar:</b> Meeting dates and statement times must be checked against the Federal Reserve calendar. Nigeria time can shift when US daylight saving time changes. Do not rely on a fixed 7pm/8pm conversion.';
+    return '<b>FOMC calendar:</b> Check the Federal Reserve calendar for the exact meeting date and statement time. Nigeria time can shift when US daylight saving time changes. Do not rely on a fixed 7pm/8pm conversion.';
   }
   if (/cpi|inflation/.test(t)) {
-    return '<b>US CPI calendar:</b> Release dates can change, and the Nigeria release time shifts with US daylight saving time. Check the current official BLS calendar before trading the announcement.';
+    return '<b>US CPI calendar:</b> Release dates can change, and the Nigeria release time shifts with US daylight saving time. Check the official BLS release calendar or archive for the year you mean.';
   }
   return null;
 }
