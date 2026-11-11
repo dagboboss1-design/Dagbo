@@ -118,15 +118,28 @@ module.exports = async function handler(req, res) {
 
     if (req.method === "POST" && action === "send") {
       if (!authorized(req)) return res.status(401).json({ error: "Unauthorized" });
-      const { pair, signal, entry, stopLoss, takeProfit } = req.body || {};
+      const { pair, signal, entry, stopLoss, takeProfit, timeframe, signalId } = req.body || {};
+      const normalizedPair = typeof pair === "string" ? pair.trim().toUpperCase() : "";
+      const normalizedSignal = typeof signal === "string" ? signal.trim().toUpperCase() : "";
       const allowed = ["STRONG BUY", "WEAK BUY", "STRONG SELL", "WEAK SELL"];
-      if (typeof pair !== "string" || !/^[A-Z0-9]{3,12}$/i.test(pair) ||
-          typeof signal !== "string" || !allowed.includes(signal.toUpperCase())) {
-        return res.status(400).json({ error: "Invalid pair or signal" });
+      const priceEntry = Number(entry), priceSL = Number(stopLoss), priceTP = Number(takeProfit);
+      const isBuy = normalizedSignal.includes("BUY");
+      const validPrices = [priceEntry, priceSL, priceTP].every(n => Number.isFinite(n) && n > 0) &&
+        (isBuy ? priceSL < priceEntry && priceTP > priceEntry : priceSL > priceEntry && priceTP < priceEntry);
+      if (!/^[A-Z0-9]{3,12}$/.test(normalizedPair) ||
+          !allowed.includes(normalizedSignal) || !validPrices) {
+        return res.status(400).json({ error: "Invalid signal. A valid pair, direction and correctly ordered Entry/SL/TP are required." });
       }
-
+      const safeTimeframe = ["5m", "15m", "30m", "1h", "4h", "1d"].includes(String(timeframe || "").toLowerCase())
+        ? String(timeframe).toLowerCase() : "unspecified";
+      const dedupeSource = String(signalId || [normalizedPair, normalizedSignal, safeTimeframe, priceEntry, priceSL, priceTP].join("|")).slice(0, 300);
+      const dedupeHash = crypto.createHash("sha256").update(dedupeSource).digest("hex");
       configureVapid();
       const redis = getRedis();
+      const claimed = await redis.set("dagbo:push:signal:" + dedupeHash, "sent", { nx: true, ex: 60 * 60 * 6 });
+      if (claimed !== "OK") {
+        return res.status(200).json({ success: true, duplicate: true, sent: 0, message: "This signal notification was already processed." });
+      }
       const ids = await redis.smembers(SUBSCRIPTIONS);
       let sent = 0, failed = 0, removed = 0;
 
@@ -137,14 +150,12 @@ module.exports = async function handler(req, res) {
           if (!stored) { await redis.srem(SUBSCRIPTIONS, id); continue; }
           const sub = typeof stored === "string" ? JSON.parse(stored) : stored;
           await webpush.sendNotification(sub, JSON.stringify({
-            title: "DAGBO SIGNAL — " + pair,
-            body: signal.toUpperCase() + " signal detected for " + pair + ".",
-            pair, signal: signal.toUpperCase(),
-            entry: entry == null ? null : entry,
-            stopLoss: stopLoss == null ? null : stopLoss,
-            takeProfit: takeProfit == null ? null : takeProfit,
+            title: "DAGBO SIGNAL — " + normalizedPair,
+            body: normalizedSignal + " signal detected for " + normalizedPair + " (" + safeTimeframe + "). Entry " + priceEntry + ", SL " + priceSL + ", TP " + priceTP + ".",
+            pair: normalizedPair, signal: normalizedSignal, timeframe: safeTimeframe,
+            entry: priceEntry, stopLoss: priceSL, takeProfit: priceTP,
             url: "/signals.html"
-          }), { TTL: 60, urgency: "high", topic: "dagbo-" + pair });
+          }), { TTL: 60, urgency: "high", topic: "dagbo-" + normalizedPair });
           sent++;
         } catch (error) {
           failed++;
