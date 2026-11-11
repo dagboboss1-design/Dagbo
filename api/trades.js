@@ -1,4 +1,5 @@
 const { Redis } = require("@upstash/redis");
+const webpush = require("web-push");
 const crypto = require("crypto");
 
 const redis = new Redis({
@@ -68,6 +69,21 @@ module.exports = async function handler(req, res) {
       await redis.set("dagbo:trade:" + id + ":" + tradeId, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
       await redis.sadd(setKey, tradeId);
       await redis.sadd("dagbo:trades:devices", id);
+
+      // Notify only the device that added this trade to the DAGBO tracker.
+      try {
+        if (process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+          webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+          await webpush.sendNotification(subscription, JSON.stringify({
+            title: "📌 TRADE ADDED TO DAGBO",
+            body: pair + " " + direction + " has been added to your trade tracker. This does not place a broker order.",
+            url: "/journal.html",
+            tag: "trade-open-" + tradeId
+          }), { TTL: 300, urgency: "high" });
+        }
+      } catch (pushError) {
+        console.error("DAGBO trade-open push error:", pushError.message);
+      }
       return res.status(201).json({ success: true, trade });
     }
 
