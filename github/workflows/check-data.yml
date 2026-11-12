@@ -1,0 +1,16 @@
+name: Twelve Data Coverage Check
+on:
+  workflow_dispatch:
+
+jobs:
+  test-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Pairs
+        run: |
+          echo "Testing Twelve Data API Key..."
+          PAIRS=("XAU/USD" "EUR/USD" "GBP/USD" "USD/JPY" "US30" "BTC/USD")
+          for PAIR in "${PAIRS[@]}"; do
+            RESPONSE=$(curl -s "https://api.twelvedata.com/price?symbol=${PAIR}&apikey=${{ secrets.TWELVE_DATA_API_KEY }}")
+            echo "Pair: $PAIR -> $RESPONSE"
+          done
