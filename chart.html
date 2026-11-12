@@ -20,6 +20,12 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 
 #drawingToolsToggle{display:flex;align-items:center;justify-content:center;margin:0 auto 8px 0;width:34px;height:34px;padding:0;border:1px solid var(--dg-line);border-radius:10px;background:var(--dg-card);color:var(--dg-text);font-size:22px;font-weight:800;line-height:1;cursor:pointer}
 #pinDrawing{display:block;margin:10px 0 16px auto;padding:8px 16px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:800;cursor:pointer}
+#chartDrawLayer{position:absolute;inset:0;width:100%;height:100%;z-index:8;pointer-events:none;touch-action:none}
+#chartDrawLayer.is-active{pointer-events:auto;cursor:crosshair}
+#chartDrawLayer polyline{fill:none;stroke:#f5c542;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+#chartPinActions{display:flex;justify-content:flex-end;gap:8px;margin:10px 0 16px}
+#pinDrawing,#clearPinned{margin:0}
+#clearPinned{padding:8px 12px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:700;cursor:pointer}
 </style>
 <script>
 (function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();
@@ -39,7 +45,7 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 <input class="dg-seg__in" type="radio" name="tf" id="tf4" value="240" onchange="changeTF('240')"><label class="dg-seg__lb" for="tf4">4H</label>
 <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
 </div>
-<button id="drawingToolsToggle" type="button" aria-label="Hide drawing tools" aria-expanded="true" title="Hide drawing tools">‹</button><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div><button id="pinDrawing" type="button" title="Pin chart drawings">📌 Pin</button>
+<button id="drawingToolsToggle" type="button" aria-label="Hide drawing tools" aria-expanded="true" title="Hide drawing tools">‹</button><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div><div id="chartPinActions"><button id="pinDrawing" type="button" title="Draw and pin saved marks">📌 Pin drawings</button><button id="clearPinned" type="button" title="Delete saved drawings">Clear saved</button></div>
 <a href="replay.html" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;margin:8px 0 18px;border-radius:14px;background:#0878e8;color:#fff;text-decoration:none;font-weight:800">⏪ OPEN HISTORICAL REPLAY</a>
 </main>
 <nav class="dg-tabbar" aria-label="Main">
@@ -87,6 +93,50 @@ else if(activePairs.length>0){currentPair=activePairs[0].tv;sel.value=currentPai
 }
 function updateDrawingToolsToggle(){var b=document.getElementById('drawingToolsToggle');if(!b)return;b.textContent=drawingToolsVisible?'‹':'›';b.setAttribute('aria-expanded',drawingToolsVisible?'true':'false');b.setAttribute('aria-label',drawingToolsVisible?'Hide drawing tools':'Show drawing tools');b.title=drawingToolsVisible?'Hide drawing tools':'Show drawing tools'}
 document.getElementById('drawingToolsToggle').addEventListener('click',function(){drawingToolsVisible=!drawingToolsVisible;try{localStorage.setItem('dagbo_chart_tools_visible',drawingToolsVisible?'true':'false')}catch(e){}updateDrawingToolsToggle();loadChart()});
+document.getElementById('pinDrawing').addEventListener('click',function(){setPinMode(!pinMode)});
+document.getElementById('clearPinned').addEventListener('click',function(){
+if(!confirm('Delete all saved drawings for this market and timeframe?'))return;
+var all={};try{all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}')}catch(e){}
+delete all[drawingKey()];try{localStorage.setItem('dagbo_pinned_drawings_v1',JSON.stringify(all))}catch(e){}
+renderPinned();
+});
+var pinMode=false,activeLine=null,drawLayer=null;
+function drawingKey(){return 'dagbo_pinned_drawings_v1:'+currentPair+':'+currentTF}
+function readPinned(){try{var all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}');return Array.isArray(all[drawingKey()])?all[drawingKey()]:[]}catch(e){return []}}
+function savePinned(lines){try{var all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}');all[drawingKey()]=lines;localStorage.setItem('dagbo_pinned_drawings_v1',JSON.stringify(all))}catch(e){alert('Could not save drawings. Check phone storage space.');}}
+function renderPinned(){
+if(!drawLayer)return;
+drawLayer.textContent='';
+readPinned().forEach(function(points){var line=document.createElementNS('http://www.w3.org/2000/svg','polyline');line.setAttribute('points',points);drawLayer.appendChild(line)});
+}
+function setPinMode(on){
+pinMode=!!on;
+if(drawLayer)drawLayer.classList.toggle('is-active',pinMode);
+var b=document.getElementById('pinDrawing');if(b){b.textContent=pinMode?'✓ Finish drawing':'📌 Pin drawings';b.setAttribute('aria-pressed',String(pinMode))}
+}
+function bindDrawingLayer(){
+drawLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+drawLayer.setAttribute('id','chartDrawLayer');drawLayer.setAttribute('viewBox','0 0 1000 1000');drawLayer.setAttribute('preserveAspectRatio','none');
+drawLayer.addEventListener('pointerdown',function(e){
+if(!pinMode)return;
+e.preventDefault();drawLayer.setPointerCapture(e.pointerId);
+var r=drawLayer.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*1000,y=(e.clientY-r.top)/r.height*1000;
+activeLine=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+activeLine.setAttribute('points',x.toFixed(1)+','+y.toFixed(1));drawLayer.appendChild(activeLine);
+});
+drawLayer.addEventListener('pointermove',function(e){
+if(!pinMode||!activeLine)return;
+var r=drawLayer.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*1000,y=(e.clientY-r.top)/r.height*1000;
+var p=activeLine.getAttribute('points');activeLine.setAttribute('points',p+' '+x.toFixed(1)+','+y.toFixed(1));
+});
+function finishLine(){
+if(!activeLine)return;
+var pts=activeLine.getAttribute('points').trim();activeLine=null;
+if(pts.split(' ').length>1){var saved=readPinned();saved.push(pts);savePinned(saved)}
+}
+drawLayer.addEventListener('pointerup',finishLine);drawLayer.addEventListener('pointercancel',finishLine);
+renderPinned();
+}
 function loadChart(){
 var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull');
 container.innerHTML='';
@@ -97,7 +147,9 @@ frame.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(cu
 frame.setAttribute('allowfullscreen','');
 frame.style.cssText='width:100%;height:100%;border:0;display:block';
 container.appendChild(frame);
+bindDrawingLayer();container.appendChild(drawLayer);
 container.appendChild(btn);
+setPinMode(false);
 }
 window.changePair=function(tvSymbol){currentPair=tvSymbol;loadChart()};
 window.changeTF=function(tf){currentTF=tf;loadChart()};
