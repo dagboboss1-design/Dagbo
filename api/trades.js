@@ -62,7 +62,7 @@ module.exports = async function handler(req, res) {
       }
       const tradeId = crypto.randomUUID();
       const trade = {
-        id: tradeId, pair, direction, entry, stopLoss, takeProfit, lotSize,
+        id: tradeId, journalTradeId: String(body.journalTradeId || ""), pair, direction, entry, stopLoss, takeProfit, lotSize,
         status: "OPEN", result: "OPEN", pnl: 0,
         dateOpened: new Date().toISOString(), dateClosed: null
       };
