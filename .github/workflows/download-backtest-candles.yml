@@ -1,0 +1,55 @@
+name: DAGBO Download Backtest Candles
+
+on:
+  workflow_dispatch:
+    inputs:
+      outputsize:
+        description: "Historical candles per pair (100–5000)"
+        required: true
+        default: "5000"
+        type: string
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/multi-pair-spike-predictor-phase1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Download historical candles
+        env:
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+          HISTORY_OUTPUTSIZE: ${{ inputs.outputsize }}
+          HISTORY_INTERVAL: 5min
+        run: |
+          if [ -z "$TWELVE_DATA_API_KEY" ]; then
+            echo "::error::GitHub secret TWELVE_DATA_API_KEY is missing."
+            exit 1
+          fi
+          node scripts/download-backtest-candles.js
+      - name: Run walk-forward backtests on downloaded pairs
+        if: always()
+        run: |
+          mkdir -p reports/backtest
+          for pair in EURUSD GBPUSD GBPJPY XAUUSD; do
+            file="data/backtest/$pair.json"
+            if [ -f "$file" ]; then
+              node scripts/backtest-spike.js "$file" "$pair" > "reports/backtest/$pair.json"
+            fi
+          done
+      - name: Upload candle files and backtest reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dagbo-backtest-results
+          path: |
+            data/backtest/*.json
+            reports/backtest/*.json
+          if-no-files-found: warn
+          retention-days: 7
