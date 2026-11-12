@@ -43,7 +43,7 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 <input class="dg-seg__in" type="radio" name="tf" id="tf4" value="240" onchange="changeTF('240')"><label class="dg-seg__lb" for="tf4">4H</label>
 <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
 </div>
-<div id="drawing-toolbar" aria-label="Chart drawing tools"><button type="button" data-tool="line">↗ Trend line</button><button type="button" data-tool="hline">— Horizontal</button><button type="button" data-tool="rect">▭ Rectangle</button><button type="button" data-tool="erase">⌫ Erase</button><button type="button" data-tool="select" class="active">↖ Select</button><button type="button" id="deleteSelected" class="danger">Delete selected</button><button type="button" id="clearDrawings" class="danger">Clear all</button></div><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div>\n<p class="dg-subtitle" style="font-size:12px;margin-top:-6px">Use the chart toolbar for trend lines, horizontal lines, rectangles and other available drawings. Rotate your phone for more room.</p>
+<div id="drawing-toolbar" aria-label="Chart drawing tools"><button type="button" data-tool="line">↗ Trend line</button><button type="button" data-tool="hline">— Horizontal</button><button type="button" data-tool="rect">▭ Rectangle</button><button type="button" data-tool="erase">⌫ Erase</button><button type="button" data-tool="select">↖ Select</button><button type="button" id="deleteSelected" class="danger">Delete selected</button><button type="button" id="clearDrawings" class="danger">Clear all</button></div><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div>\n<p class="dg-subtitle" style="font-size:12px;margin-top:-6px">Use the chart toolbar for trend lines, horizontal lines, rectangles and other available drawings. Rotate your phone for more room.</p>
 <a href="replay.html" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;margin:8px 0 18px;border-radius:14px;background:#0878e8;color:#fff;text-decoration:none;font-weight:800">⏪ OPEN HISTORICAL REPLAY</a>
 </main>
 <nav class="dg-tabbar" aria-label="Main">
@@ -81,7 +81,7 @@ var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))|
 var enabledIds=Array.isArray(settings.pairs)&&settings.pairs.length?settings.pairs:PAIRS.map(function(p){return p.id});
 var activePairs=PAIRS.filter(function(p){return enabledIds.indexOf(p.id)>-1||(enabledIds.indexOf('GOLD')>-1&&p.id==='XAUUSD')});
 var currentPair='CAPITALCOM:XAUUSD',currentTF='15';
-var drawingTool='select',drawingItems=[],selectedDrawing=-1,activeStart=null,previewPoint=null,drawCanvas=null,drawCtx=null;
+var drawingTool='off',drawingItems=[],selectedDrawing=-1,activeStart=null,previewPoint=null,drawCanvas=null,drawCtx=null;
 var DRAW_KEY='dagbo_chart_drawings_v1';
 function readDrawings(){try{var all=JSON.parse(localStorage.getItem(DRAW_KEY)||'{}');return Array.isArray(all[currentPair])?all[currentPair]:[]}catch(e){return[]}}
 function saveDrawings(){try{var all=JSON.parse(localStorage.getItem(DRAW_KEY)||'{}');all[currentPair]=drawingItems;localStorage.setItem(DRAW_KEY,JSON.stringify(all))}catch(e){alert('Could not save drawings. Check device storage space.');}}
