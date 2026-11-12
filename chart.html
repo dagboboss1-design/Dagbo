@@ -84,11 +84,17 @@ else if(activePairs.length>0){currentPair=activePairs[0].tv;sel.value=currentPai
 function loadChart(){
 var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull');
 container.innerHTML='';
+var wrap=document.createElement('div');
+wrap.className='tradingview-widget-container';
+wrap.style.width='100%';
+wrap.style.height='100%';
+wrap.style.position='relative';
 var widget=document.createElement('div');
 widget.className='tradingview-widget-container__widget';
 widget.style.width='100%';
 widget.style.height='100%';
-container.appendChild(widget);
+wrap.appendChild(widget);
+container.appendChild(wrap);
 container.appendChild(btn);
 var theme=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
 var script=document.createElement('script');
@@ -97,6 +103,8 @@ script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-
 script.async=true;
 script.textContent=JSON.stringify({
   autosize:true,
+  width:'100%',
+  height:'100%',
   symbol:currentPair,
   interval:currentTF,
   timezone:'Africa/Lagos',
@@ -106,14 +114,25 @@ script.textContent=JSON.stringify({
   allow_symbol_change:false,
   calendar:false,
   hide_side_toolbar:false,
-  show_drawing_toolbar:true,
   hide_top_toolbar:false,
   hide_legend:false,
   save_image:false,
   hide_volume:true,
   support_host:'https://www.tradingview.com'
 });
-container.appendChild(script);
+wrap.appendChild(script);
+window.clearTimeout(window.dagboChartFallbackTimer);
+window.dagboChartFallbackTimer=window.setTimeout(function(){
+  if(!wrap.querySelector('iframe')){
+    var fallback=document.createElement('iframe');
+    fallback.title='TradingView live chart';
+    fallback.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+currentTF+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hidesidetoolbar=0&symboledit=0&saveimage=0&toolbarbg=%23000000&hide_volume=true';
+    fallback.setAttribute('allowfullscreen','');
+    fallback.style.cssText='width:100%;height:100%;border:0;display:block';
+    wrap.innerHTML='';
+    wrap.appendChild(fallback);
+  }
+},9000);
 }
 window.changePair=function(tvSymbol){currentPair=tvSymbol;loadChart()};
 window.changeTF=function(tf){currentTF=tf;loadChart()};
