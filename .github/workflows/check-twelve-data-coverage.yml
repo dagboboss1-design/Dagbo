@@ -1,0 +1,35 @@
+name: Check Twelve Data Coverage
+
+on:
+  workflow_dispatch:
+    inputs:
+      all_symbols:
+        description: "Check every mapped provider symbol (uses more API credits)"
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check provider symbol coverage
+        env:
+          TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
+        run: |
+          if [ -z "$TWELVE_DATA_API_KEY" ]; then
+            echo "::error::GitHub Actions secret TWELVE_DATA_API_KEY is not configured."
+            echo "Add it under Settings > Secrets and variables > Actions. Do not put the key in code or workflow files."
+            exit 1
+          fi
+          if [ "${{ inputs.all_symbols }}" = "true" ]; then
+            node scripts/check-twelve-data-symbols.js --all
+          else
+            node scripts/check-twelve-data-symbols.js
+          fi
