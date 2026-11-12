@@ -1,0 +1,22 @@
+name: DAGBO Spike Engine Tests
+
+on:
+  push:
+    branches:
+      - feature/multi-pair-spike-predictor-phase1
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  spike-engine-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run spike engine tests
+        run: node --test tests/*.test.js

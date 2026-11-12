@@ -26,6 +26,20 @@
 .news-calendar-link strong{display:block;font-size:15px}
 .news-calendar-link small{display:block;color:var(--dg-text-2);margin-top:5px;line-height:1.45}
 
+
+.dg-spike-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.dg-spike-actions button{min-height:44px;padding:9px 10px;font-size:12px}
+.dg-spike-secondary{background:#252044!important;border-color:#6742b8!important}
+.dg-spike-result{margin-top:12px;padding:13px;border-radius:12px;background:#081421;border:1px solid #29415b;min-height:58px}
+.dg-spike-result-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0}
+.dg-spike-metric{background:#101f30;border:1px solid #29415b;border-radius:9px;padding:9px 6px;text-align:center}
+.dg-spike-metric b{display:block;font-size:18px;color:#fff}
+.dg-spike-metric small{font-size:10px;color:#9eb2cc}
+.dg-spike-direction{font-size:22px;font-weight:900;letter-spacing:.5px}
+.dg-spike-buy{color:#20e67a}.dg-spike-sell{color:#ff657a}.dg-spike-wait{color:#ffd34c}
+.dg-spike-reasons{font-size:12px;line-height:1.55;color:#c8d6e8;padding-left:18px}
+@media(max-width:390px){.dg-spike-actions{grid-template-columns:1fr}.dg-spike-result-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
 /* DAGBO SIGNAL premium mobile news terminal */
 body{background:#050b14!important;color:#edf4ff!important}
 .dg-page{max-width:760px;margin:0 auto;padding:14px 12px 110px!important}
@@ -110,6 +124,35 @@ body{background:#050b14!important;color:#edf4ff!important}
     <div class="dg-section" style="margin-top:0">DAGBO AI News Analyst</div>
     <p class="dg-muted" style="font-size:13px;line-height:1.5">Ask AI to explain market headlines and identify potentially affected forex pairs, metals, indices and crypto markets.</p>
     <button id="openNewsAI" class="dg-btn" type="button">Ask DAGBO AI about news</button>
+  </section>
+
+  
+  <section class="dg-card dg-spike-card" style="margin:18px 0;padding:16px;border-color:#6742b8!important">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div class="dg-section" style="margin-top:0">AI Spike Predictor</div>
+      <span class="news-scan-status">EXPERIMENTAL</span>
+    </div>
+    <p class="dg-muted" style="font-size:12px;line-height:1.5">Choose a market and run either a live spike scan or a scheduled pre-news check. The predictor checks price structure and momentum; it does not place trades.</p>
+    <label for="spikePair" class="dg-muted" style="display:block;font-size:12px;margin:12px 0 6px">Market / pair</label>
+    <select id="spikePair" style="width:100%;padding:12px;border-radius:10px;background:#081421;color:#f4f8ff;border:1px solid #29415b;font-size:14px">
+      <optgroup label="Major Forex pairs">
+        <option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>USDCHF</option><option>USDCAD</option><option>AUDUSD</option><option>NZDUSD</option>
+      </optgroup>
+      <optgroup label="Forex crosses">
+        <option>EURJPY</option><option>EURGBP</option><option>EURCHF</option><option>EURAUD</option><option>EURCAD</option><option>EURNZD</option><option>GBPJPY</option><option>GBPCHF</option><option>GBPAUD</option><option>GBPCAD</option><option>GBPNZD</option><option>AUDJPY</option><option>AUDCHF</option><option>AUDCAD</option><option>AUDNZD</option><option>NZDJPY</option><option>NZDCHF</option><option>NZDCAD</option><option>CADJPY</option><option>CADCHF</option><option>CHFJPY</option>
+      </optgroup>
+      <optgroup label="Metals"><option>XAUUSD</option><option>XAGUSD</option></optgroup>
+      <optgroup label="Indices"><option>US30</option><option>US100</option><option>NAS100</option><option>US500</option></optgroup>
+      <optgroup label="Crypto"><option>BTCUSD</option><option>ETHUSD</option></optgroup>
+    </select>
+    <div class="dg-spike-actions">
+      <button id="runLiveSpike" class="dg-btn" type="button">⚡ Live spike scan</button>
+      <button id="runPreNewsSpike" class="dg-btn dg-spike-secondary" type="button">◷ 15-min pre-news check</button>
+    </div>
+    <div id="spikeResult" class="dg-spike-result" aria-live="polite">
+      <div class="dg-muted" style="font-size:13px">Select a market and tap a scan button to get a fresh analysis.</div>
+    </div>
+    <p class="dg-muted" style="font-size:10px;line-height:1.5;margin:10px 0 0">Spike score is a rule-based research score, not a probability. Direction agreement is not a win rate. Provider coverage varies by instrument. Always verify the broker price, spread and risk.</p>
   </section>
 
   <h3 class="dg-section" style="margin-top:0">Market Sessions · Live</h3>
@@ -353,6 +396,67 @@ body{background:#050b14!important;color:#edf4ff!important}
       });
   }
 
+
+
+  function renderSpikeResult(data, mode) {
+    var target = document.getElementById('spikeResult');
+    target.replaceChildren();
+    if (!data || data.ready !== true) {
+      var waiting = document.createElement('div');
+      waiting.className = 'dg-muted';
+      waiting.textContent = (data && data.reason) || 'No usable prediction is available right now.';
+      target.appendChild(waiting);
+      return;
+    }
+    var heading = document.createElement('div');
+    heading.style.cssText = 'display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap';
+    var pair = document.createElement('b');
+    pair.textContent = data.pair + ' · ' + (mode === 'pre-news' ? 'PRE-NEWS' : 'LIVE');
+    var direction = document.createElement('strong');
+    direction.className = 'dg-spike-direction ' + (data.direction === 'BUY' ? 'dg-spike-buy' : data.direction === 'SELL' ? 'dg-spike-sell' : 'dg-spike-wait');
+    direction.textContent = data.direction || 'WAIT';
+    heading.appendChild(pair); heading.appendChild(direction); target.appendChild(heading);
+    var metrics = document.createElement('div');
+    metrics.className = 'dg-spike-result-grid';
+    [
+      ['Spike score', String(data.spikeScore) + '/100'],
+      ['Risk level', data.spikeLevel || '—'],
+      ['Direction votes', String(data.directionAgreementPct || 0) + '%']
+    ].forEach(function(item){
+      var box=document.createElement('div'); box.className='dg-spike-metric';
+      var b=document.createElement('b'); b.textContent=item[1];
+      var small=document.createElement('small'); small.textContent=item[0];
+      box.appendChild(b); box.appendChild(small); metrics.appendChild(box);
+    });
+    target.appendChild(metrics);
+    if (data.event) {
+      var event=document.createElement('p'); event.style.cssText='font-size:12px;color:#ffd34c;line-height:1.5';
+      event.textContent='Upcoming event: '+data.event.name+' ('+data.event.currency+') · '+data.event.minutesToRelease+' minutes to release';
+      target.appendChild(event);
+    }
+    var reasons=document.createElement('ul'); reasons.className='dg-spike-reasons';
+    (data.evidence || []).forEach(function(reason){var li=document.createElement('li');li.textContent=reason;reasons.appendChild(li);});
+    if (reasons.children.length) target.appendChild(reasons);
+    var timestamp=document.createElement('div'); timestamp.className='dg-muted';
+    timestamp.style.cssText='font-size:10px;margin-top:8px';
+    timestamp.textContent='Last candle: '+(data.candleTime || 'not supplied')+' · '+new Date().toLocaleTimeString();
+    target.appendChild(timestamp);
+  }
+
+  function runSpikeScan(mode, button) {
+    var pair=document.getElementById('spikePair').value;
+    var target=document.getElementById('spikeResult');
+    var buttons=[document.getElementById('runLiveSpike'),document.getElementById('runPreNewsSpike')];
+    buttons.forEach(function(b){b.disabled=true;b.style.opacity='.65';});
+    target.textContent='Analysing '+pair+'… Please wait.';
+    fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&mode='+encodeURIComponent(mode),{cache:'no-store'})
+      .then(function(res){return res.json().then(function(data){if(!res.ok)throw new Error(data.error || 'Spike service unavailable ('+res.status+')');return data;});})
+      .then(function(data){renderSpikeResult(data,mode);})
+      .catch(function(error){target.textContent=error.message+'. Try again later or choose another supported market.';})
+      .finally(function(){buttons.forEach(function(b){b.disabled=false;b.style.opacity='1';});});
+  }
+  document.getElementById('runLiveSpike').addEventListener('click',function(){runSpikeScan('live',this);});
+  document.getElementById('runPreNewsSpike').addEventListener('click',function(){runSpikeScan('pre-news',this);});
 
   document.getElementById('refreshCalendar').addEventListener('click', loadCalendar);
   document.getElementById('openNewsAI').addEventListener('click', function(){ localStorage.setItem('dagbo_news_prefill','Explain the latest market-moving news and identify potentially affected forex pairs, metals, indices and crypto markets. Separate confirmed facts from possible market reactions.'); window.location.href='ai.html'; });
