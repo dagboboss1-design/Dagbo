@@ -107,7 +107,14 @@ async function sendPush(title, body, tag, url) {
       } else console.error("DAGBO news push error:",err.message);
     }
   }
-  return {sent,failed};
+  if (sent === 0) {
+    throw new Error(
+      ids.length === 0
+        ? "No registered push subscriptions found. Enable notifications on the device in DAGBO Settings."
+        : "No push notification was delivered (" + failed + " failed). The alert will be retried on the next scheduled run."
+    );
+  }
+  return {sent,failed,total:ids.length};
 }
 async function getHighImpactEvents(now) {
   const horizon = now.getTime() + 7 * 24 * 60 * 60 * 1000;
