@@ -73,6 +73,7 @@
     <button onclick="loadAllSignals()" class="dg-btn" style="min-height:32px; padding:0 14px; font-size:13px; border-radius:20px; background:var(--dg-card); border:1px solid var(--dg-line);">↻ Refresh</button>
   </div>
 
+  <section class="dg-card" id="newsSignalContext" style="margin:0 0 12px;padding:13px;display:none" aria-live="polite"></section>
   <div class="dg-stack" id="signals-grid" style="margin-top:12px">
     <div class="dg-card" style="text-align:center; padding: 30px;">
       <p class="dg-muted" id="loadingText">Connecting to live market data...</p>
@@ -116,6 +117,7 @@
   var currentFilter = 'ALL';
   var signalsData = {};
   var currentSignalTF = '15';
+  var latestNewsCandidate = null;
 
   // --- MATH ENGINES ---
   function calculateRSI(closes, period) {
@@ -310,6 +312,35 @@
     localStorage.setItem('dagbo_alert_history',JSON.stringify(history.slice(-100)));
   }
 
+  // Fetch the latest short-lived news context from the server.
+  async function loadNewsSignalContext() {
+    var panel = document.getElementById('newsSignalContext');
+    if (!panel) return;
+    try {
+      var response = await fetch('/api/news-signal', { cache: 'no-store' });
+      if (!response.ok) throw new Error('News context unavailable');
+      var data = await response.json();
+      latestNewsCandidate = data && data.candidate ? data.candidate : null;
+      if (!latestNewsCandidate) {
+        panel.style.display = 'none';
+        return;
+      }
+      var age = Math.max(0, Math.round((Date.now() - new Date(latestNewsCandidate.createdAt).getTime()) / 60000));
+      panel.style.display = 'block';
+      panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<strong style="font-size:14px">📰 NEWS MARKET BIAS · ' + latestNewsCandidate.pair + '</strong>' +
+        '<span class="dg-pill dg-pill--wait">CONTEXT ONLY</span></div>' +
+        '<div style="font-size:15px;font-weight:800;margin-top:8px">' + latestNewsCandidate.action + ' · ' + latestNewsCandidate.confidence + ' confidence</div>' +
+        '<div class="dg-muted" style="font-size:12px;margin-top:5px">' + latestNewsCandidate.event + ' · ' + age + ' min ago</div>' +
+        '<div class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:6px">' + latestNewsCandidate.evidence + '</div>' +
+        '<div style="font-size:11px;color:var(--dg-text-2);margin-top:7px">A trade signal appears only if the independent technical scan agrees. Check the XAUUSD card below.</div>';
+    } catch (error) {
+      latestNewsCandidate = null;
+      panel.style.display = 'none';
+      console.warn('News signal context unavailable:', error);
+    }
+  }
+
   // --- RENDER UI ---
   function renderCards() {
     var grid = document.getElementById('signals-grid');
@@ -356,6 +387,10 @@
       var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
       var pillCls = isBuy ? 'dg-pill--buy' : (isSell ? 'dg-pill--sell' : 'dg-pill--wait');
       var pillText = isBuy ? 'BUY' : (isSell ? 'SELL' : 'WAIT');
+      var newsConfirmed = !!(latestNewsCandidate &&
+        String(s.pair).toUpperCase() === String(latestNewsCandidate.pair).toUpperCase() &&
+        ((isBuy && latestNewsCandidate.direction === 'BUY') || (isSell && latestNewsCandidate.direction === 'SELL')) &&
+        Date.now() < new Date(latestNewsCandidate.expiresAt).getTime());
 
       // Visual Debug Box
       var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
@@ -396,7 +431,8 @@
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + fTp1 + '</strong></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + fTp2 + '</strong></div>' +
           '</div>' +
-          '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Signal sources / evidence:</b><br>' + (s.evidence||[]).join('<br>') + '</div>';
+          '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Signal sources / evidence:</b><br>' + (s.evidence||[]).join('<br>') + '</div>' +
+          (newsConfirmed ? '<div style="font-size:12px;margin-top:8px;padding:9px;border-radius:9px;background:var(--dg-inset);color:var(--dg-text-2)"><b>News confirmation:</b> ' + latestNewsCandidate.event + ' bias agrees with the technical scan. ' + latestNewsCandidate.evidence + '</div>' : '');
       }
 
       listHtml += 
@@ -405,6 +441,7 @@
             '<div style="display:flex;align-items:center;gap:8px">' +
               '<h2 class="dg-card__title" style="font-size:18px;margin:0">' + s.pair + '</h2>' +
               '<span class="dg-pill ' + pillCls + '" style="min-height:22px;font-size:11px;padding:0 8px">' + pillText + '</span>' +
+              (newsConfirmed ? '<span class="dg-pill dg-pill--buy" style="min-height:22px;font-size:10px;padding:0 7px">NEWS CONFIRMED</span>' : '') +
             '</div>' +
             '<span style="font-size:11px;color:var(--dg-text-2)">' + currentSignalTF + 'm</span>' +
           '</div>' +
@@ -579,8 +616,9 @@
     var loading = document.getElementById('loadingText');
     if (loading) loading.innerText = "Downloading live candles...";
     
-    signalsData = {}; 
-    
+    signalsData = {};
+    await loadNewsSignalContext();
+
     for (let pair of enabledPairs) {
       let data = await fetchPairData(pair, currentSignalTF);
       if (data) signalsData[pair] = data;
