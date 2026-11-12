@@ -595,7 +595,8 @@
               entry:trade.entry,
               stopLoss:trade.stopLoss,
               takeProfit:trade.takeProfit,
-              lotSize:trade.lotSize
+              lotSize:trade.lotSize,
+              journalTradeId:trade.id
             })
           });
         }).catch(function(error){console.warn('Cloud trade monitoring unavailable; local journal entry was saved.',error);});
