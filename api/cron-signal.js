@@ -12,7 +12,7 @@ const EASTERN_TZ = "America/New_York";
 const LOOKAHEAD_DAYS = 75;
 
 function authorized(req) {
-  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET;
+  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY;
   const supplied = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(supplied), b = Buffer.from("Bearer " + secret);
