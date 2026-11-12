@@ -229,7 +229,7 @@
   function updateProfileUI() {
     var name = (state.name || 'Oga Emma').trim();
     var acc = Number(state.accountSize) || 100;
-    var shown = state.currencyDisplay === 'NGN' && Number.isFinite(usdNgnRate) ? '₦' + (acc * usdNgnRate).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2}) : '
+    var shown = state.currencyDisplay === 'NGN' && Number.isFinite(usdNgnRate) ? '₦' + (acc * usdNgnRate).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2}) : '$' + acc.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
     
     document.getElementById('displayName').textContent = name;
     document.getElementById('displayAccount').textContent = shown;
