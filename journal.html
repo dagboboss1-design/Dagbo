@@ -299,6 +299,8 @@
     document.getElementById('fPnl').value = trade.pnl || '';
     document.getElementById('fExit').value = trade.exit ?? '';
     document.getElementById('tradeModal').style.display = 'flex';
+    // Recalculate risk and potential reward from the imported signal levels and lot size.
+    updateTradeEstimate();
   };
   window.saveTrade = function() {
     var pair = document.getElementById('fPair').value;
