@@ -339,7 +339,7 @@
         '<div style="font-size:15px;font-weight:800;margin-top:8px">' + escapeNewsText(latestNewsCandidate.action) + ' · ' + latestNewsCandidate.confidence + ' confidence</div>' +
         '<div class="dg-muted" style="font-size:12px;margin-top:5px">' + escapeNewsText(latestNewsCandidate.event) + ' · ' + age + ' min ago</div>' +
         '<div class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:6px">' + escapeNewsText(latestNewsCandidate.evidence) + '</div>' +
-        '<div style="font-size:11px;color:var(--dg-text-2);margin-top:7px">A trade signal appears only if the independent technical scan agrees. Check the XAUUSD card below.</div>';
+        '<div style="font-size:11px;color:var(--dg-text-2);margin-top:7px">A trade signal appears only if the independent technical scan agrees. Check the ' + escapeNewsText(latestNewsCandidate.pair) + ' card below.</div>';
     } catch (error) {
       latestNewsCandidate = null;
       panel.style.display = 'none';
