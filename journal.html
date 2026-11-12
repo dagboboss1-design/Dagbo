@@ -395,6 +395,41 @@
 </html>
  + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
+  function renderFxStatus() {
+    var el = document.getElementById('fxRateStatus');
+    if (!el) return;
+    if (usdNgnRate && Number.isFinite(usdNgnRate)) {
+      var stamp = usdNgnUpdated ? new Date(usdNgnUpdated).toLocaleString('en-NG') : 'recently';
+      el.textContent = '1 USD = ₦' + usdNgnRate.toLocaleString('en-NG', {maximumFractionDigits:2}) + ' · Updated ' + stamp;
+    } else {
+      el.textContent = 'USD/NGN live rate unavailable. Showing USD until a rate is available.';
+    }
+  }
+  async function refreshUsdNgnRate() {
+    try {
+      var response = await fetch('/api/exchange-rate', {cache:'no-store'});
+      if (!response.ok) throw new Error('Rate request failed');
+      var data = await response.json();
+      var rate = Number(data.usdNgn);
+      if (!Number.isFinite(rate) || rate <= 0) throw new Error('Invalid exchange rate');
+      usdNgnRate = rate;
+      usdNgnUpdated = data.updatedAt || new Date().toISOString();
+      localStorage.setItem('dagbo_usd_ngn_rate', JSON.stringify({rate:usdNgnRate,updatedAt:usdNgnUpdated}));
+    } catch (e) {
+      console.warn('USD/NGN rate unavailable; using last saved rate.', e);
+    }
+    renderFxStatus();
+    renderStats();
+  }
+  window.setJournalCurrency = function(currency) {
+    journalCurrency = currency === 'NGN' ? 'NGN' : 'USD';
+    localStorage.setItem('dagbo_journal_currency', journalCurrency);
+    document.getElementById('currencyUSD').setAttribute('aria-pressed', String(journalCurrency === 'USD'));
+    document.getElementById('currencyNGN').setAttribute('aria-pressed', String(journalCurrency === 'NGN'));
+    renderStats();
+    renderList();
+    renderFxStatus();
+  };
   function persist() { localStorage.setItem('dagbo_journal', JSON.stringify(trades)); }
   function syncServerTrade(trade) {
     if (!trade || !trade.serverTracked || trade.result === 'OPEN') return;
