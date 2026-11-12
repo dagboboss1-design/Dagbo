@@ -39,6 +39,7 @@ jobs:
             "https://dagbo-beige.vercel.app/api/cron-scan"
 
       - name: Run economic news alerts
+        if: always()
         env:
           DAGBO_CRON_SECRET: ${{ secrets.DAGBO_CRON_SECRET }}
         run: |
