@@ -412,7 +412,7 @@
       alert('NO TRADE: there are no confirmed trade levels to copy.');
       return;
     }
-    var text = [
+    var tradeText = [
       'DAGBO SIGNAL',
       'Pair: ' + pair,
       'Signal: ' + signal,
@@ -422,25 +422,41 @@
       'Take Profit 1: ' + tp1,
       'Take Profit 2: ' + tp2
     ].join('\n');
+
+    // Try the modern clipboard API first, then a mobile-friendly selection fallback.
     try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        var field = document.createElement('textarea');
-        field.value = text;
-        field.setAttribute('readonly', '');
-        field.style.position = 'fixed';
-        field.style.opacity = '0';
-        document.body.appendChild(field);
-        field.select();
-        var copied = document.execCommand('copy');
-        field.remove();
-        if (!copied) throw new Error('Clipboard unavailable');
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(tradeText);
+        alert('Trade details copied.');
+        return;
       }
+    } catch (clipboardError) {
+      console.warn('Clipboard API unavailable; trying fallback.', clipboardError);
+    }
+
+    var field = document.createElement('textarea');
+    field.value = tradeText;
+    field.setAttribute('readonly', '');
+    field.setAttribute('aria-label', 'Trade details to copy');
+    field.style.position = 'fixed';
+    field.style.left = '0';
+    field.style.top = '0';
+    field.style.width = '2px';
+    field.style.height = '2px';
+    field.style.padding = '0';
+    field.style.opacity = '0.01';
+    document.body.appendChild(field);
+    field.focus();
+    field.select();
+    field.setSelectionRange(0, field.value.length);
+    var copied = false;
+    try { copied = document.execCommand('copy'); } catch (e) {}
+    field.remove();
+
+    if (copied) {
       alert('Trade details copied.');
-    } catch (error) {
-      console.error('DAGBO copy trade error:', error);
-      alert('Could not copy trade details. Please try again.');
+    } else {
+      window.prompt('Copy your trade details:', tradeText);
     }
   };
 
