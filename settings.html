@@ -244,12 +244,12 @@
     document.getElementById('inName').value = state.name || '';
     document.getElementById('inAccount').value = acc;
     document.getElementById('selRisk').value = state.risk;
-    document.getElementById('tgNotify').checked = false;
+    document.getElementById('tgNotify').checked = state.notify === true;
     document.getElementById('tgDark').checked = state.theme === 'dark';
     document.getElementById('selLang').value = state.language || 'en';
     document.getElementById('tgSound').checked = state.sound === true;
     
-    document.getElementById('testPushRow').style.display = 'none';
+    document.getElementById('testPushRow').style.display = state.notify === true ? 'flex' : 'none';
 
     var selPair = document.getElementById('selPair');
     selPair.innerHTML = '';
@@ -408,157 +408,6 @@
   load();
   updateProfileUI();
   refreshFxRate();
-  refreshPushUI();
-
-})();
-</script>
-</body>
-    </html>
- + acc.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-    
-    document.getElementById('displayName').textContent = name;
-    document.getElementById('displayAccount').textContent = '$' + acc.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-    document.getElementById('avatarInitials').textContent = name.substring(0, 2).toUpperCase();
-    
-    document.getElementById('inName').value = state.name || '';
-    document.getElementById('inAccount').value = acc;
-    document.getElementById('selRisk').value = state.risk;
-    document.getElementById('tgNotify').checked = false;
-    document.getElementById('tgDark').checked = state.theme === 'dark';
-    document.getElementById('selLang').value = state.language || 'en';
-    document.getElementById('tgSound').checked = state.sound === true;
-    
-    document.getElementById('testPushRow').style.display = 'none';
-
-    var selPair = document.getElementById('selPair');
-    selPair.innerHTML = '';
-    ALL_PAIRS.forEach(function(p) {
-      if (state.pairs.indexOf(p) > -1) {
-        var opt = document.createElement('option');
-        opt.value = p; opt.textContent = p === 'XAUUSD' ? 'GOLD (XAUUSD)' : p;
-        selPair.appendChild(opt);
-      }
-    });
-    if (state.pairs.indexOf(state.defaultPair) === -1 && state.pairs.length > 0) state.defaultPair = state.pairs[0];
-    selPair.value = state.defaultPair;
-
-    var grid = document.getElementById('pairGrid');
-    grid.innerHTML = '';
-    ALL_PAIRS.forEach(function(p) {
-      var isChecked = state.pairs.indexOf(p) > -1;
-      var label = document.createElement('label');
-      label.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;padding:4px 0;cursor:pointer';
-      label.innerHTML = '<input type="checkbox" value="' + p + '" ' + (isChecked ? 'checked' : '') + ' style="width:18px;height:18px;accent-color:var(--dg-blue)"> ' + p;
-      
-      label.querySelector('input').addEventListener('change', function(e){
-        if (e.target.checked) { if (state.pairs.indexOf(p) === -1) state.pairs.push(p); } 
-        else { state.pairs = state.pairs.filter(function(x){ return x !== p; }); }
-        save();
-      });
-      grid.appendChild(label);
-    });
-  }
-
-  document.getElementById('inName').addEventListener('input', function(e){ state.name = e.target.value; save(); });
-  document.getElementById('inAccount').addEventListener('input', function(e){ state.accountSize = parseFloat(e.target.value) || 0; save(); });
-  document.getElementById('selRisk').addEventListener('change', function(e){ state.risk = parseFloat(e.target.value); save(); });
-  document.getElementById('selPair').addEventListener('change', function(e){ state.defaultPair = e.target.value; save(); });
-  document.getElementById('tgSound').addEventListener('change', function(e){ state.sound = e.target.checked; save(); });
-
-  document.getElementById('tgDark').addEventListener('change', function(e){
-    state.theme = e.target.checked ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', state.theme);
-    save();
-  });
-
-  document.getElementById('selLang').addEventListener('change', function(e){
-    state.language = e.target.value;
-    save();
-    alert('Language set to: ' + (state.language === 'pidgin' ? 'Pidgin' : 'English'));
-  });
-  
-  function refreshPushUI() {
-    var status = document.getElementById('notificationStatus');
-    var toggle = document.getElementById('tgNotify');
-    if (!window.DagboPWA || !window.DagboPWA.getStatus) {
-      toggle.checked = false;
-      status.textContent = 'Notification setup is not ready. Refresh this page.';
-      return;
-    }
-    window.DagboPWA.getStatus().then(function(result) {
-      toggle.checked = !!result.enabled;
-      state.notify = !!result.enabled;
-      localStorage.setItem(KEY, JSON.stringify(state));
-      document.getElementById('testPushRow').style.display = result.enabled ? 'flex' : 'none';
-      status.textContent = result.message;
-    });
-  }
-
-  document.getElementById('tgNotify').addEventListener('change', function(e) {
-    var toggle = e.target;
-    toggle.disabled = true;
-    if (toggle.checked) {
-      if (!window.DagboPWA) {
-        toggle.checked = false;
-        toggle.disabled = false;
-        alert("Notification module is not ready. Refresh and try again.");
-        return;
-      }
-      window.DagboPWA.enableNotifications().then(function(res) {
-        state.notify = true;
-        save();
-        document.getElementById("notificationStatus").textContent = "This device is registered for push notifications.";
-        document.getElementById("testPushRow").style.display = "flex";
-      }).catch(function(err) {
-        state.notify = false;
-        toggle.checked = false;
-        save();
-        document.getElementById("notificationStatus").textContent = err.message || "Could not enable notifications.";
-        document.getElementById("testPushRow").style.display = "none";
-        alert(err.message || "Could not enable notifications.");
-      }).finally(function() { toggle.disabled = false; });
-    } else {
-      if (!window.DagboPWA) {
-        toggle.disabled = false;
-        return;
-      }
-      window.DagboPWA.disableNotifications().then(function() {
-        state.notify = false;
-        save();
-        document.getElementById("notificationStatus").textContent = "Notifications are disabled on this device.";
-        document.getElementById("testPushRow").style.display = "none";
-      }).catch(function(err) {
-        toggle.checked = true;
-        alert(err.message || "Could not disable notifications.");
-      }).finally(function() { toggle.disabled = false; });
-    }
-  });
-
-  document.getElementById('btnTestPush').addEventListener('click', function() {
-    var btn = this;
-    if (!window.DagboPWA || !state.notify) {
-      alert("Enable push notifications first.");
-      return;
-    }
-    btn.disabled = true;
-    btn.textContent = "Sending...";
-    window.DagboPWA.sendTest().then(function() {
-      alert("The push service accepted the test. Check your notification shade. If it does not appear, check Android app notification permission and battery restrictions.");
-    }).catch(function(err) {
-      alert(err.message || "Test notification failed.");
-    }).finally(function() {
-      btn.disabled = false;
-      btn.textContent = "Send Test";
-    });
-  });
-
-  window.toggleAllPairs = function() { state.pairs = (state.pairs.length === ALL_PAIRS.length) ? [] : ALL_PAIRS.slice(); save(); };
-  window.saveSettings = function() { save(); localStorage.setItem(KEY_SAVED, JSON.stringify(state)); alert('Settings Saved! Hello ' + (state.name || 'Trader')); };
-  window.resetSettings = function() { var raw = localStorage.getItem(KEY_SAVED); if (raw) { state = JSON.parse(raw); save(); alert('Reverted to last saved.'); } else { alert('No saved settings found.'); } };
-  window.clearAllData = function() { if (confirm("Are you sure? This will delete your Journal and all Settings.")) { localStorage.clear(); location.reload(); } };
-
-  load();
-  updateProfileUI();
   refreshPushUI();
 
 })();
