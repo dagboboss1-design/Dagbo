@@ -36,7 +36,7 @@ jobs:
             --header "Authorization: Bearer $DAGBO_CRON_SECRET" \
             --header "Content-Type: application/json" \
             --data '{}' \
-            "https://dagbo-beige.vercel.app/api/cron-scan"
+            "https://dagbo-v9g7.vercel.app/api/cron-scan"
 
       - name: Run economic news alerts
         if: always()
@@ -48,4 +48,4 @@ jobs:
             --header "Authorization: Bearer $DAGBO_CRON_SECRET" \
             --header "Content-Type: application/json" \
             --data '{}' \
-            "https://dagbo-beige.vercel.app/api/cron-signal"
+            "https://dagbo-v9g7.vercel.app/api/cron-signal"
