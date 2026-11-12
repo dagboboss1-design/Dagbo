@@ -427,6 +427,10 @@
   document.getElementById('currencyNGN').setAttribute('aria-pressed',String(journalCurrency==='NGN'));
   renderStats();renderList();renderFxStatus();refreshUsdNgnRate();setInterval(refreshUsdNgnRate,5*60*1000);
   syncCloudTrades();
+  // Keep the journal current while it remains open, and refresh immediately when the user returns.
+  setInterval(syncCloudTrades, 60 * 1000);
+  window.addEventListener('focus', syncCloudTrades);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) syncCloudTrades(); });
 
   // The Add to Journal action from Signals opens the saved trade with its strategy and levels already filled in.
   try {
