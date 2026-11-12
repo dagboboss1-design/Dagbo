@@ -18,7 +18,8 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 #btnFull{position:absolute;top:10px;right:10px;z-index:20;background:rgba(0,0,0,.88);color:#fff;border:1px solid #555;padding:9px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.35)}
 .chart-pair-select{appearance:none;-webkit-appearance:none;background:var(--dg-card);border:1px solid var(--dg-line);color:var(--dg-text);font-size:16px;font-weight:700;padding:14px 16px;border-radius:16px;cursor:pointer;width:100%;text-align:center;margin-bottom:12px;box-shadow:var(--dg-shadow)}
 
-#drawingToolsToggle{display:flex;align-items:center;justify-content:center;margin:0 auto 8px 0;width:34px;height:34px;padding:0;border:1px solid var(--dg-line);border-radius:10px;background:var(--dg-card);color:var(--dg-text);font-size:22px;font-weight:800;line-height:1;cursor:pointer}\n#pinDrawing{display:block;margin:10px 0 16px auto;padding:8px 16px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:800;cursor:pointer}
+#drawingToolsToggle{display:flex;align-items:center;justify-content:center;margin:0 auto 8px 0;width:34px;height:34px;padding:0;border:1px solid var(--dg-line);border-radius:10px;background:var(--dg-card);color:var(--dg-text);font-size:22px;font-weight:800;line-height:1;cursor:pointer}
+#pinDrawing{display:block;margin:10px 0 16px auto;padding:8px 16px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:800;cursor:pointer}
 </style>
 <script>
 (function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();
@@ -75,7 +76,8 @@ var PAIRS=[
 var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
 var enabledIds=Array.isArray(settings.pairs)&&settings.pairs.length?settings.pairs:PAIRS.map(function(p){return p.id});
 var activePairs=PAIRS.filter(function(p){return enabledIds.indexOf(p.id)>-1||(enabledIds.indexOf('GOLD')>-1&&p.id==='XAUUSD')});
-var currentPair='CAPITALCOM:XAUUSD',currentTF='15';\nvar drawingToolsVisible=true;try{drawingToolsVisible=localStorage.getItem('dagbo_chart_tools_visible')!=='false'}catch(e){}
+var currentPair='CAPITALCOM:XAUUSD',currentTF='15';
+var drawingToolsVisible=true;try{drawingToolsVisible=localStorage.getItem('dagbo_chart_tools_visible')!=='false'}catch(e){}
 function buildDropdown(){
 var sel=document.getElementById('pairSelect');sel.innerHTML='';
 activePairs.forEach(function(p){var opt=document.createElement('option');opt.value=p.tv;opt.textContent=p.label;sel.appendChild(opt)});
@@ -83,7 +85,9 @@ var urlParams=new URLSearchParams(window.location.search),urlPair=urlParams.get(
 if(urlPair){var matched=PAIRS.filter(function(p){return p.id===urlPair||(urlPair==='GOLD'&&p.id==='XAUUSD')})[0];if(matched&&activePairs.indexOf(matched)>-1){currentPair=matched.tv;sel.value=currentPair;window.history.replaceState({},'',window.location.pathname)}}
 else if(activePairs.length>0){currentPair=activePairs[0].tv;sel.value=currentPair}
 }
-function updateDrawingToolsToggle(){var b=document.getElementById('drawingToolsToggle');if(!b)return;b.textContent=drawingToolsVisible?'‹':'›';b.setAttribute('aria-expanded',drawingToolsVisible?'true':'false');b.setAttribute('aria-label',drawingToolsVisible?'Hide drawing tools':'Show drawing tools');b.title=drawingToolsVisible?'Hide drawing tools':'Show drawing tools'}\ndocument.getElementById('drawingToolsToggle').addEventListener('click',function(){drawingToolsVisible=!drawingToolsVisible;try{localStorage.setItem('dagbo_chart_tools_visible',drawingToolsVisible?'true':'false')}catch(e){}updateDrawingToolsToggle();loadChart()});\nfunction loadChart(){
+function updateDrawingToolsToggle(){var b=document.getElementById('drawingToolsToggle');if(!b)return;b.textContent=drawingToolsVisible?'‹':'›';b.setAttribute('aria-expanded',drawingToolsVisible?'true':'false');b.setAttribute('aria-label',drawingToolsVisible?'Hide drawing tools':'Show drawing tools');b.title=drawingToolsVisible?'Hide drawing tools':'Show drawing tools'}
+document.getElementById('drawingToolsToggle').addEventListener('click',function(){drawingToolsVisible=!drawingToolsVisible;try{localStorage.setItem('dagbo_chart_tools_visible',drawingToolsVisible?'true':'false')}catch(e){}updateDrawingToolsToggle();loadChart()});
+function loadChart(){
 var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull');
 container.innerHTML='';
 var theme=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
