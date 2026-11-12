@@ -13,8 +13,10 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout checker script from feature branch
         uses: actions/checkout@v4
+        with:
+          ref: feature/multi-pair-spike-predictor-phase1
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
