@@ -145,7 +145,19 @@
     return registerSW().then(function (reg) {
       return reg.pushManager.getSubscription();
     }).then(function (subscription) {
-      return subscription ? subscription.toJSON() : null;
+      if (!subscription) return null;
+      var json = subscription.toJSON();
+      // Keep the server-side recipient registry fresh for scheduled news and signal alerts.
+      return fetch("/api/push?action=subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(json)
+      }).then(function (res) {
+        if (!res.ok) return res.json().then(function (data) {
+          throw new Error(data.error || "Could not register this device for scheduled alerts");
+        });
+        return json;
+      });
     });
   }
 
