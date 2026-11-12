@@ -125,7 +125,7 @@ function analyze(candles, pair) {
 }
 
 function validAuth(req) {
-  const secret = process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET;
+  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET;
   const auth = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(auth);
