@@ -129,6 +129,41 @@
     }
     return String.fromCharCode(36) + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
   }
+  function renderFxStatus() {
+    var el = document.getElementById('fxRateStatus');
+    if (!el) return;
+    if (Number.isFinite(usdNgnRate) && usdNgnRate > 0) {
+      var stamp = usdNgnUpdated ? new Date(usdNgnUpdated).toLocaleString('en-NG') : 'saved rate';
+      el.textContent = '1 USD = ₦' + usdNgnRate.toLocaleString('en-NG', {maximumFractionDigits:2}) + ' · Updated ' + stamp;
+    } else {
+      el.textContent = 'Live USD/NGN rate unavailable. USD display remains available.';
+    }
+  }
+  async function refreshUsdNgnRate() {
+    try {
+      var response = await fetch('/api/exchange-rate', {cache:'no-store'});
+      if (!response.ok) throw new Error('Exchange-rate request failed: ' + response.status);
+      var data = await response.json();
+      var rate = Number(data.usdNgn);
+      if (!Number.isFinite(rate) || rate <= 0) throw new Error('Invalid USD/NGN rate');
+      usdNgnRate = rate;
+      usdNgnUpdated = data.updatedAt || new Date().toISOString();
+      localStorage.setItem('dagbo_usd_ngn_rate', JSON.stringify({rate:rate,updatedAt:usdNgnUpdated}));
+    } catch (error) {
+      console.warn('Could not refresh USD/NGN rate; keeping the last saved rate.', error);
+    }
+    renderFxStatus();
+    renderStats();
+  }
+  window.setJournalCurrency = function(currency) {
+    journalCurrency = currency === 'NGN' ? 'NGN' : 'USD';
+    localStorage.setItem('dagbo_journal_currency', journalCurrency);
+    document.getElementById('currencyUSD').setAttribute('aria-pressed', String(journalCurrency === 'USD'));
+    document.getElementById('currencyNGN').setAttribute('aria-pressed', String(journalCurrency === 'NGN'));
+    renderStats();
+    renderList();
+    renderFxStatus();
+  };
   function persist() { localStorage.setItem('dagbo_journal', JSON.stringify(trades)); }
   function syncServerTrade(trade) {
     if (!trade || !trade.serverTracked || trade.result === 'OPEN') return;
