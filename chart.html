@@ -18,7 +18,7 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 #btnFull{position:absolute;top:10px;right:10px;z-index:20;background:rgba(0,0,0,.88);color:#fff;border:1px solid #555;padding:9px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.35)}
 .chart-pair-select{appearance:none;-webkit-appearance:none;background:var(--dg-card);border:1px solid var(--dg-line);color:var(--dg-text);font-size:16px;font-weight:700;padding:14px 16px;border-radius:16px;cursor:pointer;width:100%;text-align:center;margin-bottom:12px;box-shadow:var(--dg-shadow)}
 
-#drawingToolsToggle{display:flex;align-items:center;gap:7px;margin:0 0 8px auto;padding:7px 11px;border:1px solid var(--dg-line);border-radius:18px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:800;cursor:pointer}\n#pinDrawing{display:block;margin:10px 0 16px auto;padding:8px 16px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:800;cursor:pointer}
+#drawingToolsToggle{display:flex;align-items:center;justify-content:center;margin:0 auto 8px 0;width:34px;height:34px;padding:0;border:1px solid var(--dg-line);border-radius:10px;background:var(--dg-card);color:var(--dg-text);font-size:22px;font-weight:800;line-height:1;cursor:pointer}\n#pinDrawing{display:block;margin:10px 0 16px auto;padding:8px 16px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:800;cursor:pointer}
 </style>
 <script>
 (function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();
@@ -38,7 +38,7 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 <input class="dg-seg__in" type="radio" name="tf" id="tf4" value="240" onchange="changeTF('240')"><label class="dg-seg__lb" for="tf4">4H</label>
 <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
 </div>
-<button id="drawingToolsToggle" type="button" aria-expanded="true" title="Hide drawing tools">‹ Hide drawing tools</button><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div><button id="pinDrawing" type="button" title="Pin chart drawings">📌 Pin</button>
+<button id="drawingToolsToggle" type="button" aria-label="Hide drawing tools" aria-expanded="true" title="Hide drawing tools">‹</button><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div><button id="pinDrawing" type="button" title="Pin chart drawings">📌 Pin</button>
 <a href="replay.html" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;margin:8px 0 18px;border-radius:14px;background:#0878e8;color:#fff;text-decoration:none;font-weight:800">⏪ OPEN HISTORICAL REPLAY</a>
 </main>
 <nav class="dg-tabbar" aria-label="Main">
@@ -83,62 +83,18 @@ var urlParams=new URLSearchParams(window.location.search),urlPair=urlParams.get(
 if(urlPair){var matched=PAIRS.filter(function(p){return p.id===urlPair||(urlPair==='GOLD'&&p.id==='XAUUSD')})[0];if(matched&&activePairs.indexOf(matched)>-1){currentPair=matched.tv;sel.value=currentPair;window.history.replaceState({},'',window.location.pathname)}}
 else if(activePairs.length>0){currentPair=activePairs[0].tv;sel.value=currentPair}
 }
-function updateDrawingToolsToggle(){var b=document.getElementById('drawingToolsToggle');if(!b)return;b.textContent=drawingToolsVisible?'‹ Hide drawing tools':'› Show drawing tools';b.setAttribute('aria-expanded',drawingToolsVisible?'true':'false');b.title=drawingToolsVisible?'Hide drawing tools':'Show drawing tools'}\ndocument.getElementById('drawingToolsToggle').addEventListener('click',function(){drawingToolsVisible=!drawingToolsVisible;try{localStorage.setItem('dagbo_chart_tools_visible',drawingToolsVisible?'true':'false')}catch(e){}updateDrawingToolsToggle();loadChart()});\nfunction loadChart(){
+function updateDrawingToolsToggle(){var b=document.getElementById('drawingToolsToggle');if(!b)return;b.textContent=drawingToolsVisible?'‹':'›';b.setAttribute('aria-expanded',drawingToolsVisible?'true':'false');b.setAttribute('aria-label',drawingToolsVisible?'Hide drawing tools':'Show drawing tools');b.title=drawingToolsVisible?'Hide drawing tools':'Show drawing tools'}\ndocument.getElementById('drawingToolsToggle').addEventListener('click',function(){drawingToolsVisible=!drawingToolsVisible;try{localStorage.setItem('dagbo_chart_tools_visible',drawingToolsVisible?'true':'false')}catch(e){}updateDrawingToolsToggle();loadChart()});\nfunction loadChart(){
 var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull');
 container.innerHTML='';
-var wrap=document.createElement('div');
-wrap.className='tradingview-widget-container';
-wrap.style.width='100%';
-wrap.style.height='100%';
-wrap.style.position='relative';
-var widget=document.createElement('div');
-widget.className='tradingview-widget-container__widget';
-widget.style.width='100%';
-widget.style.height='100%';
-wrap.appendChild(widget);
-container.appendChild(wrap);
-container.appendChild(btn);
 var theme=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
-var script=document.createElement('script');
-script.type='text/javascript';
-script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-script.async=true;
-script.textContent=JSON.stringify({
-  autosize:true,
-  width:'100%',
-  height:'100%',
-  symbol:currentPair,
-  interval:currentTF,
-  timezone:'Africa/Lagos',
-  theme:theme,
-  style:'1',
-  locale:'en',
-  allow_symbol_change:false,
-  calendar:false,
-  hide_side_toolbar:!drawingToolsVisible,
-  hide_top_toolbar:false,
-  hide_legend:false,
-  save_image:false,
-  hide_volume:true,
-  support_host:'https://www.tradingview.com'
-});
-wrap.appendChild(script);
-window.clearTimeout(window.dagboChartFallbackTimer);
-window.dagboChartFallbackTimer=window.setTimeout(function(){
-  if(!wrap.querySelector('iframe')){
-    var fallback=document.createElement('iframe');
-    fallback.title='TradingView live chart';
-    fallback.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+currentTF+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hidesidetoolbar='+(drawingToolsVisible?'0':'1')+'&symboledit=0&saveimage=0&toolbarbg=%23000000&hide_volume=true';
-    fallback.setAttribute('allowfullscreen','');
-    fallback.style.cssText='width:100%;height:100%;border:0;display:block';
-    wrap.innerHTML='';
-    wrap.appendChild(fallback);
-  }
-},9000);
+var frame=document.createElement('iframe');
+frame.title='TradingView live chart';
+frame.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+encodeURIComponent(currentTF)+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hidesidetoolbar='+(drawingToolsVisible?'0':'1')+'&symboledit=0&saveimage=0&toolbarbg=%23000000&hide_volume=true';
+frame.setAttribute('allowfullscreen','');
+frame.style.cssText='width:100%;height:100%;border:0;display:block';
+container.appendChild(frame);
+container.appendChild(btn);
 }
-document.getElementById('pinDrawing').addEventListener('click',function(){
-  alert('Your original TradingView drawing tools are still available. Pinning and saving their drawings requires a chart integration that exposes native drawing data; this embedded chart does not provide that access yet.');
-});
 window.changePair=function(tvSymbol){currentPair=tvSymbol;loadChart()};
 window.changeTF=function(tf){currentTF=tf;loadChart()};
 window.toggleFull=function(){document.body.classList.toggle('chart-full');var btn=document.getElementById('btnFull');btn.textContent=document.body.classList.contains('chart-full')?'✕ CLOSE':'⛶ FULLSCREEN';setTimeout(loadChart,100)};
