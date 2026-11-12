@@ -1,6 +1,7 @@
 const webpush = require("web-push");
 const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
+const spikeEngine = require("../lib/spike-engine");
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
@@ -304,6 +305,66 @@ async function sendNewsAlerts(apiKey) {
   }
   return { eventsChecked, newsAlerts, preNewsSignals };
 }
+async function scanAndNotifySpikes(apiKey, pairs) {
+  const alerts = [], errors = [];
+  if (!vapidReady()) return { alerts, errors: ["Push notifications are not configured"] };
+  const candidates = await Promise.all(pairs.map(async pair => {
+    try {
+      const symbol = spikeEngine.SYMBOLS[pair] || SYMBOLS[pair];
+      if (!symbol) throw new Error("No provider symbol mapping");
+      const url = "https://api.twelvedata.com/time_series?symbol=" +
+        encodeURIComponent(symbol) + "&interval=5min&outputsize=60&timezone=UTC&apikey=" +
+        encodeURIComponent(apiKey);
+      const response = await fetch(url);
+      const data = await response.json();
+      if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
+        throw new Error(data.message || "5-minute candles unavailable");
+      }
+      const result = spikeEngine.analyze(data.values.slice().reverse(), pair, "LIVE", null);
+      if (!result || !result.ready) return { pair, skipped: result && result.reason || "Insufficient candles" };
+      // Alert on a developing setup only when both setup strength and direction
+      // agreement clear the minimums. These are research thresholds, not odds.
+      if (result.spikeScore < 60 || result.direction === "WAIT" ||
+          result.directionAgreementPct < 75) return { pair, watched: true, score: result.spikeScore };
+      return { pair, result };
+    } catch (error) {
+      return { pair, error: error.message };
+    }
+  }));
+
+  for (const item of candidates) {
+    if (item.error) { errors.push({ pair: item.pair, error: item.error }); continue; }
+    if (!item.result) continue;
+    const result = item.result;
+    const candleId = String(result.candleTime || "latest").replace(/[^a-zA-Z0-9]/g, "");
+    const dedupeKey = "dagbo:spike:push:" + item.pair + ":" + candleId + ":" + result.direction;
+    const claimed = await redis.set(dedupeKey, "1", { nx: true, ex: 60 * 60 * 24 * 2 });
+    if (claimed !== "OK") continue;
+    try {
+      const body = item.pair + " · " + result.direction + " developing spike setup. " +
+        "Setup score " + result.spikeScore + "/100; direction agreement " +
+        result.directionAgreementPct + "%. " + result.evidence.slice(0, 4).join("; ") +
+        ". Experimental research alert, not a calibrated probability or guaranteed trade. Confirm live price, spread and risk.";
+      const delivery = await broadcast(
+        (result.direction === "BUY" ? "🚀 " : "🔻 ") + item.pair + " SPIKE SETUP — " + result.direction,
+        body,
+        "spike-" + item.pair + "-" + candleId + "-" + result.direction
+      );
+      if (!delivery.sent) {
+        await redis.del(dedupeKey);
+        errors.push({ pair: item.pair, error: "No subscribed device received the alert; it will be retried." });
+        continue;
+      }
+      alerts.push({ pair: item.pair, direction: result.direction, score: result.spikeScore,
+        agreement: result.directionAgreementPct, sent: delivery.sent, failed: delivery.failed });
+    } catch (error) {
+      await redis.del(dedupeKey);
+      errors.push({ pair: item.pair, error: error.message });
+    }
+  }
+  return { alerts, errors };
+}
+
 async function monitorTrades(marketData) {
   const devices = await redis.smembers("dagbo:trades:devices");
   let closed = 0, warnings = 0;
@@ -443,6 +504,7 @@ module.exports = async function handler(req, res) {
       await redis.set(stateKey, JSON.stringify({ signal: analysis.signal, candleTime: analysis.candleTime, scannedAt: new Date().toISOString() }), { ex: 60 * 60 * 24 * 7 });
     }
 
+    const spikeSummary = await scanAndNotifySpikes(apiKey, pairsToScan);
     const tradeSummary = await monitorTrades(results);
     const newsSummary = await sendNewsAlerts(apiKey);
     const errorKey = "dagbo:scan:error:last";
@@ -469,6 +531,7 @@ module.exports = async function handler(req, res) {
     const responseBody = {
       success: true, scannedAt: new Date().toISOString(),
       scanned: Object.keys(results), errors, signals: results,
+      spikeNotifications: spikeSummary,
       tradeMonitoring: tradeSummary,
       newsMonitoring: newsSummary,
       note: "Pre-news analysis compares DXY, XAUUSD and correlated USD pairs using two completed 15-minute candles from the 30-minute window ending 15 minutes before high-impact news. It is a directional bias, not a prediction of the news result or a broker order."
