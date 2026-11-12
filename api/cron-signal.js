@@ -260,15 +260,39 @@ module.exports = async function handler(req,res) {
         // Publish a short-lived news context candidate. Signals page may confirm it
         // only when its independent technical scan agrees; this is not a trade by itself.
         let newsCandidate = null;
-        if (next.currency === "USD" &&
-            (bias.action === "BUY GOLD" || bias.action === "SELL GOLD") &&
+        const currency = String(next.currency || "").toUpperCase();
+        const targetMap = {
+          EUR: { pair: "EURUSD", inverse: false },
+          GBP: { pair: "GBPUSD", inverse: false },
+          AUD: { pair: "AUDUSD", inverse: false },
+          NZD: { pair: "NZDUSD", inverse: false },
+          JPY: { pair: "USDJPY", inverse: true },
+          CAD: { pair: "USDCAD", inverse: true },
+          CHF: { pair: "USDCHF", inverse: true }
+        };
+        let candidatePair = null, candidateDirection = null;
+        if (currency === "USD" && (bias.action === "BUY GOLD" || bias.action === "SELL GOLD")) {
+          candidatePair = "XAUUSD";
+          candidateDirection = bias.action === "BUY GOLD" ? "BUY" : "SELL";
+        } else if (targetMap[currency]) {
+          const stronger = bias.action === currency + " STRONGER";
+          const weaker = bias.action === currency + " WEAKER";
+          if (stronger || weaker) {
+            candidatePair = targetMap[currency].pair;
+            const currencyDirection = stronger ? "BUY" : "SELL";
+            candidateDirection = targetMap[currency].inverse
+              ? (currencyDirection === "BUY" ? "SELL" : "BUY")
+              : currencyDirection;
+          }
+        }
+        if (candidatePair && candidateDirection &&
             ["MEDIUM","HIGH"].includes(String(bias.confidence).toUpperCase())) {
           newsCandidate = {
-            pair: "XAUUSD",
-            direction: bias.action === "BUY GOLD" ? "BUY" : "SELL",
-            action: bias.action,
+            pair: candidatePair,
+            direction: candidateDirection,
+            action: candidateDirection + " " + candidatePair,
             event: next.name,
-            currency: next.currency,
+            currency,
             confidence: bias.confidence,
             evidence,
             source: "ECONOMIC_NEWS",
