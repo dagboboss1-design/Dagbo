@@ -111,10 +111,17 @@
   var usdNgnRate = null, usdNgnUpdated = null;
   try { var cachedRate=JSON.parse(localStorage.getItem('dagbo_usd_ngn_rate')||'null'); if(cachedRate&&Number(cachedRate.rate)>0){usdNgnRate=Number(cachedRate.rate);usdNgnUpdated=cachedRate.updatedAt||null;} } catch(e) {}
   function money(n) {
-    var v=Number(n)||0;
-    if(journalCurrency==='NGN') { if(!Number.isFinite(usdNgnRate))return '₦—'; var q=v*usdNgnRate; return (q>0?'+₦':q<0?'-₦':'₦')+Math.abs(q).toLocaleString('en-NG',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-    return (v>0?'+
-  function persist() { localStorage.setItem('dagbo_journal', JSON.stringify(trades)); }
+    var v = Number(n) || 0;
+    if (journalCurrency === 'NGN') {
+      if (!Number.isFinite(usdNgnRate)) return '₦—';
+      var converted = v * usdNgnRate;
+      return (converted > 0 ? '+₦' : converted < 0 ? '-₦' : '₦') +
+        Math.abs(converted).toLocaleString('en-NG', {minimumFractionDigits:2, maximumFractionDigits:2});
+    }
+    return (v > 0 ? '+$' : v < 0 ? '-$' : '$') +
+      Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+    function persist() { localStorage.setItem('dagbo_journal', JSON.stringify(trades)); }
   function syncServerTrade(trade) {
     if (!trade || !trade.serverTracked || trade.result === 'OPEN') return;
     if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
