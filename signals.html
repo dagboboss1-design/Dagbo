@@ -541,7 +541,11 @@
       return String(t.pair).toUpperCase()===String(pair).toUpperCase() && t.result==='OPEN';
     });
     if (duplicate) {
-      alert('You already have an OPEN '+pair+' trade in your journal. Manage or close it before tracking another.');
+      // Do not leave the button appearing dead: take the user to the existing open
+      // trade instead of silently blocking the Journal hand-off.
+      try { sessionStorage.setItem('dagbo_open_journal_trade', duplicate.id); }
+      catch (e) { alert('Could not open the existing Journal trade. Please check browser storage.'); return; }
+      window.location.href='journal.html';
       return;
     }
 
