@@ -93,7 +93,7 @@ container.innerHTML='';
 var theme=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
 var frame=document.createElement('iframe');
 frame.title='TradingView live chart';
-frame.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+encodeURIComponent(currentTF)+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hidesidetoolbar='+(drawingToolsVisible?'0':'1')+'&symboledit=0&saveimage=0&toolbarbg=%23000000&hide_volume=true';
+frame.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+encodeURIComponent(currentTF)+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hide_side_toolbar='+(drawingToolsVisible?'0':'1')+'&symboledit=0&saveimage=0&toolbarbg=%23000000&hide_volume=true';
 frame.setAttribute('allowfullscreen','');
 frame.style.cssText='width:100%;height:100%;border:0;display:block';
 container.appendChild(frame);
