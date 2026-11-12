@@ -257,11 +257,32 @@ module.exports = async function handler(req,res) {
         try { bias = await calculateNewsBias(next,apiKey); }
         catch (e) { bias = {action:"WAIT",confidence:"LOW",reason:"30m correlation data unavailable: "+e.message}; }
         const evidence=bias.evidence||bias.reason||"Insufficient live correlated market data.";
+        // Publish a short-lived news context candidate. Signals page may confirm it
+        // only when its independent technical scan agrees; this is not a trade by itself.
+        let newsCandidate = null;
+        if (next.currency === "USD" &&
+            (bias.action === "BUY GOLD" || bias.action === "SELL GOLD") &&
+            ["MEDIUM","HIGH"].includes(String(bias.confidence).toUpperCase())) {
+          newsCandidate = {
+            pair: "XAUUSD",
+            direction: bias.action === "BUY GOLD" ? "BUY" : "SELL",
+            action: bias.action,
+            event: next.name,
+            currency: next.currency,
+            confidence: bias.confidence,
+            evidence,
+            source: "ECONOMIC_NEWS",
+            createdAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
+          };
+          await redis.set("dagbo:news:signal:latest", JSON.stringify(newsCandidate), { ex: 4 * 60 * 60 });
+        }
         const title="🎯 15-MIN "+next.currency+" NEWS BIAS: "+bias.action;
         const body=next.name+" in about 15 minutes. Analysed the previous 30 minutes using 1-minute candles. "+evidence+
           " Bias: "+bias.action+". Confidence: "+bias.confidence+
           ". This is pre-news market context, not a guaranteed spike prediction. Wait for post-release confirmation and manage risk.";
-        await sendPush(title,body,"news-bias-"+encodeURIComponent(id),"/news.html");
+        await sendPush(title,body,"news-bias-"+encodeURIComponent(id),
+          newsCandidate ? "/signals.html" : "/news.html");
         await claim(key);
         return res.status(200).json({sent:"15-minute 30m correlation bias",event:next.name,currency:next.currency,bias});
       }
