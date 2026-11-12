@@ -312,6 +312,12 @@
     localStorage.setItem('dagbo_alert_history',JSON.stringify(history.slice(-100)));
   }
 
+  function escapeNewsText(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+    });
+  }
+
   // Fetch the latest short-lived news context from the server.
   async function loadNewsSignalContext() {
     var panel = document.getElementById('newsSignalContext');
@@ -328,11 +334,11 @@
       var age = Math.max(0, Math.round((Date.now() - new Date(latestNewsCandidate.createdAt).getTime()) / 60000));
       panel.style.display = 'block';
       panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
-        '<strong style="font-size:14px">📰 NEWS MARKET BIAS · ' + latestNewsCandidate.pair + '</strong>' +
+        '<strong style="font-size:14px">📰 NEWS MARKET BIAS · ' + escapeNewsText(latestNewsCandidate.pair) + '</strong>' +
         '<span class="dg-pill dg-pill--wait">CONTEXT ONLY</span></div>' +
-        '<div style="font-size:15px;font-weight:800;margin-top:8px">' + latestNewsCandidate.action + ' · ' + latestNewsCandidate.confidence + ' confidence</div>' +
-        '<div class="dg-muted" style="font-size:12px;margin-top:5px">' + latestNewsCandidate.event + ' · ' + age + ' min ago</div>' +
-        '<div class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:6px">' + latestNewsCandidate.evidence + '</div>' +
+        '<div style="font-size:15px;font-weight:800;margin-top:8px">' + escapeNewsText(latestNewsCandidate.action) + ' · ' + latestNewsCandidate.confidence + ' confidence</div>' +
+        '<div class="dg-muted" style="font-size:12px;margin-top:5px">' + escapeNewsText(latestNewsCandidate.event) + ' · ' + age + ' min ago</div>' +
+        '<div class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:6px">' + escapeNewsText(latestNewsCandidate.evidence) + '</div>' +
         '<div style="font-size:11px;color:var(--dg-text-2);margin-top:7px">A trade signal appears only if the independent technical scan agrees. Check the XAUUSD card below.</div>';
     } catch (error) {
       latestNewsCandidate = null;
@@ -432,7 +438,7 @@
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + fTp2 + '</strong></div>' +
           '</div>' +
           '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Signal sources / evidence:</b><br>' + (s.evidence||[]).join('<br>') + '</div>' +
-          (newsConfirmed ? '<div style="font-size:12px;margin-top:8px;padding:9px;border-radius:9px;background:var(--dg-inset);color:var(--dg-text-2)"><b>News confirmation:</b> ' + latestNewsCandidate.event + ' bias agrees with the technical scan. ' + latestNewsCandidate.evidence + '</div>' : '');
+          (newsConfirmed ? '<div style="font-size:12px;margin-top:8px;padding:9px;border-radius:9px;background:var(--dg-inset);color:var(--dg-text-2)"><b>News confirmation:</b> ' + escapeNewsText(latestNewsCandidate.event) + ' bias agrees with the technical scan. ' + escapeNewsText(latestNewsCandidate.evidence) + '</div>' : '');
       }
 
       listHtml += 
