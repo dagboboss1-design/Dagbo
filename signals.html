@@ -444,8 +444,8 @@
     }
   };
 
-  window.executeTrade = async function(pair, signal, entry, sl, tp, strategy) {
-    var dir = signal.includes('BUY') ? 'BUY' : signal.includes('SELL') ? 'SELL' : null;
+  window.executeTrade = function(pair, signal, entry, sl, tp, strategy) {
+    var dir = String(signal || '').includes('BUY') ? 'BUY' : String(signal || '').includes('SELL') ? 'SELL' : null;
     if (!dir) { alert('This is not an executable BUY or SELL setup. Wait for confirmation.'); return; }
     entry=Number(entry); sl=Number(sl); tp=Number(tp);
     if (![entry,sl,tp].every(Number.isFinite) || entry<=0 || sl<=0 || tp<=0 ||
@@ -454,78 +454,74 @@
       alert('This signal has invalid Entry / Stop Loss / Take Profit levels. Refresh the signal before tracking it.');
       return;
     }
-    var journal = [];
-    try { journal = JSON.parse(localStorage.getItem('dagbo_journal')) || []; } catch(e) {}
-    var duplicate = journal.find(function(t) {
-      return String(t.pair).toUpperCase() === String(pair).toUpperCase() && t.result === 'OPEN';
+
+    var journal=[];
+    try { journal=JSON.parse(localStorage.getItem('dagbo_journal'))||[]; } catch(e) { journal=[]; }
+    if (!Array.isArray(journal)) journal=[];
+    var duplicate=journal.find(function(t) {
+      return String(t.pair).toUpperCase()===String(pair).toUpperCase() && t.result==='OPEN';
     });
     if (duplicate) {
-      alert('You already have an OPEN ' + pair + ' trade in your journal. Manage or close it before tracking another.');
+      alert('You already have an OPEN '+pair+' trade in your journal. Manage or close it before tracking another.');
       return;
     }
 
-    var trade = {
-      id: String(Date.now()),
-      pair: pair,
-      direction: dir,
-      entry: Number(entry),
-      stopLoss: Number(sl),
-      takeProfit: Number(tp),
-      lotSize: Number(settings.lotSize) || 0.01,
-      riskAmount: (Number(settings.accountSize) || 100) * (Number(settings.risk) || 1) / 100,
-      strategy: strategy || '3-System Confluence',
-      timeframe: currentSignalTF + 'm',
-      result: 'OPEN',
-      status: 'OPEN',
-      pnl: 0,
-      rMultiple: 0,
-      dateOpened: new Date().toISOString(),
-      dateClosed: null
+    var trade={
+      id:String(Date.now())+'-'+Math.random().toString(36).slice(2,7),
+      pair:pair,
+      direction:dir,
+      entry:entry,
+      stopLoss:sl,
+      takeProfit:tp,
+      lotSize:Number(settings.lotSize)||0.01,
+      riskAmount:(Number(settings.accountSize)||100)*(Number(settings.risk)||1)/100,
+      strategy:strategy||'3-System Confluence',
+      timeframe:currentSignalTF+'m',
+      result:'OPEN',
+      status:'OPEN',
+      pnl:0,
+      rMultiple:0,
+      dateOpened:new Date().toISOString(),
+      dateClosed:null,
+      monitoringPending:true
     };
 
-    var subscription = null;
+    // Save locally first so the button works even if push permission or cloud monitoring is unavailable.
     try {
-      if (window.DagboPWA && window.DagboPWA.getSubscription) {
-        subscription = await window.DagboPWA.getSubscription();
-      }
-    } catch(e) {}
-
-    if (subscription) {
-      try {
-        var response = await fetch('/api/trades?action=open', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            subscription: subscription,
-            pair: trade.pair,
-            direction: trade.direction,
-            entry: trade.entry,
-            stopLoss: trade.stopLoss,
-            takeProfit: trade.takeProfit,
-            lotSize: trade.lotSize
-          })
-        });
-        var result = await response.json();
-        if (response.ok) {
-          trade.id = result.trade.id;
-          trade.serverTracked = true;
-        } else {
-          trade.monitoringPending = true;
-          console.warn('Cloud trade monitoring unavailable:', result.error);
-        }
-      } catch(e) {
-        trade.monitoringPending = true;
-        console.warn('Cloud trade monitoring unavailable; saving locally.', e);
-      }
-    } else {
-      trade.monitoringPending = true;
+      journal.push(trade);
+      localStorage.setItem('dagbo_journal',JSON.stringify(journal));
+      sessionStorage.setItem('dagbo_open_journal_trade',trade.id);
+    } catch(e) {
+      alert('Could not save this trade on your device. Check your phone storage and try again.');
+      return;
     }
 
-    journal.push(trade);
-    localStorage.setItem('dagbo_journal', JSON.stringify(journal));
-    // Track this signal in Journal with the strategy, timeframe and levels already saved. No broker order is sent.
-    try { sessionStorage.setItem('dagbo_open_journal_trade', trade.id); } catch(e) {}
-    window.location.href = 'journal.html';
+    // Cloud monitoring is optional and must never block the local journal save or page navigation.
+    try {
+      if (window.DagboPWA && window.DagboPWA.getSubscription) {
+        window.DagboPWA.getSubscription().then(function(subscription) {
+          if (!subscription) return;
+          return fetch('/api/trades?action=open',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            keepalive:true,
+            body:JSON.stringify({
+              subscription:subscription,
+              pair:trade.pair,
+              direction:trade.direction,
+              entry:trade.entry,
+              stopLoss:trade.stopLoss,
+              takeProfit:trade.takeProfit,
+              lotSize:trade.lotSize
+            })
+          });
+        }).catch(function(error){console.warn('Cloud trade monitoring unavailable; local journal entry was saved.',error);});
+      }
+    } catch(error) {
+      console.warn('Cloud trade monitoring unavailable; local journal entry was saved.',error);
+    }
+
+    window.location.href='journal.html';
   };
 
   document.getElementById('filterChips').addEventListener('click', function(e){
