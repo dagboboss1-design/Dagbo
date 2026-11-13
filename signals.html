@@ -269,7 +269,7 @@
     var buys=votes.filter(function(v){return v==='BUY'}).length,sells=votes.filter(function(v){return v==='SELL'}).length;
     var direction=buys>=4&&buys>sells?'BUY':sells>=4&&sells>buys?'SELL':'WAIT';
     var final=direction==='BUY'?(buys>=7?'STRONG BUY':'BUY'):direction==='SELL'?(sells>=7?'STRONG SELL':'SELL'):'NO TRADE';
-    return {final:final,direction:direction,buyScore:buys,sellScore:sells,totalMethods:13,evidence:evidence,rsi:rsi,emaTrend:trend,macd:macd,candleName:candleName,structure:structure,structureName:structureName,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir};
+    return {final:final,direction:direction,buyScore:buys,sellScore:sells,totalMethods:13,evidence:evidence,rsi:rsi,emaTrend:trend,macd:macd,candleName:candleName,structure:smcName,structureName:smcName,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,orderBlock:obDir,premiumDiscount:pdDir,trendline:trendlineDir};
   }
 
   // --- FETCH REAL DATA ---
