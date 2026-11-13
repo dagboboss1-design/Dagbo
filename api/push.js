@@ -254,6 +254,25 @@ module.exports = async function handler(req, res) {
           } else {
             economicCalendarContext = "ShowMyTrades economic calendar is temporarily unavailable; do not invent upcoming event details.";
           }
+          try {
+            const rssResponse = await fetch("https://www.fxstreet.com/rss/news", {
+              headers: { "Accept": "application/rss+xml, application/xml, text/xml", "User-Agent": "DAGBO-SIGNAL-AI/1.0" }
+            });
+            if (rssResponse.ok) {
+              const xml = await rssResponse.text();
+              const blocks = xml.match(/<item\\b[\\s\\S]*?<\\/item>/gi) || [];
+              const headlines = blocks.slice(0, 6).map(block => {
+                const read = tag => {
+                  const match = block.match(new RegExp("<" + tag + "(?:\\\\s[^>]*)?>([\\\\s\\S]*?)<\\/" + tag + ">", "i"));
+                  return match ? match[1].replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, "$1").replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\\s+/g, " ").trim() : "";
+                };
+                return { title: read("title"), published: read("pubDate"), summary: read("description").slice(0, 240) };
+              }).filter(item => item.title);
+              if (headlines.length) economicCalendarContext += " Recent FXStreet headlines (headline feed, not independently verified): " + JSON.stringify(headlines) + ". Treat these as reported headlines, not confirmed causal explanations.";
+            }
+          } catch (error) {
+            economicCalendarContext += " Live FXStreet headline feed unavailable.";
+          }
         } catch (error) {
           economicCalendarContext = "ShowMyTrades economic calendar could not be reached; do not invent upcoming event details.";
         }
