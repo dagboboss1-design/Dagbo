@@ -78,7 +78,8 @@ function createResponseBridge() {
 
 async function handleApi(request, env, ctx) {
   const url = new URL(request.url);
-  const handler = routes.get(url.pathname.replace(/\\/$/, ""));
+  const routePath = url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
+  const handler = routes.get(routePath);
   if (!handler) return Response.json({ error: "API route not found" }, { status: 404 });
 
   const headers = {};
