@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
   if (tf !== "5" && tf !== "15") return res.status(400).json({ error: "Timeframe must be 5 or 15 minutes" });
 
   const apiKey = process.env.TWELVE_DATA_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: "Market data is not configured. Add TWELVE_DATA_API_KEY in Vercel." });
+  if (!apiKey) return res.status(503).json({ error: "Market data is not configured. Add TWELVE_DATA_API_KEY in the Cloudflare Worker environment." });
 
   try {
     const url = "https://api.twelvedata.com/time_series?symbol=" +
