@@ -1,0 +1,18 @@
+# Keep only public website files in the Cloudflare static asset bundle.
+# Backend source and deployment configuration must never be served as static files.
+api/
+lib/
+cloudflare/
+.github/
+.git/
+node_modules/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+wrangler.toml
+package.json
+package-lock.json
+CLOUDFLARE-MIGRATION.md
+README.md
+.assetsignore
