@@ -109,6 +109,7 @@
   var initialBalance = Number(settings.accountSize) || 100;
   var journalCurrency = localStorage.getItem('dagbo_journal_currency') === 'NGN' ? 'NGN' : 'USD';
   var usdNgnRate = null, usdNgnUpdated = null;
+  var quoteUsdRateCache = { USD: 1 }, quoteUsdRateCacheAt = {};
   try { var cachedRate=JSON.parse(localStorage.getItem('dagbo_usd_ngn_rate')||'null'); if(cachedRate&&Number(cachedRate.rate)>0){usdNgnRate=Number(cachedRate.rate);usdNgnUpdated=cachedRate.updatedAt||null;} } catch(e) {}
   function money(n) {
     var v = Number(n) || 0;
@@ -305,7 +306,7 @@
     // Recalculate risk and potential reward from the imported signal levels and lot size.
     updateTradeEstimate();
   };
-  window.saveTrade = function() {
+  window.saveTrade = async function() {
     var pair = document.getElementById('fPair').value;
     var direction = document.getElementById('fDir').value;
     var result = document.getElementById('fResult').value;
@@ -328,13 +329,13 @@
       return;
     }
     if(result!=='OPEN'&&(!Number.isFinite(exitPrice)||exitPrice<=0))exitPrice=result==='WIN'?tp:result==='LOSS'?sl:entry;
-    var autoPnl=result==='OPEN'?null:calculatePnlUsd(pair,direction,entry,exitPrice,lot);
+    var autoPnl=result==='OPEN'?null:await calculatePnlUsdWithConversion(pair,direction,entry,exitPrice,lot);
     if(autoPnl!==null){
       pnl=autoPnl;
       // For supported contract types, derive the result from the actual exit price.
       result=pnl>0?'WIN':pnl<0?'LOSS':'BREAKEVEN';
     }
-    var autoRisk=calculatePnlUsd(pair,direction,entry,sl,lot);
+    var autoRisk=await calculatePnlUsdWithConversion(pair,direction,entry,sl,lot);
     if(autoRisk!==null)riskAmount=Math.abs(autoRisk);
     if(result!=='OPEN'&&autoPnl===null&&!manualPnlProvided){alert('This market needs a verified broker P&L or contract specification. Enter the broker P&L (including 0.00 for breakeven) rather than saving a guessed result.');return;}
     var existing = editingId ? trades.find(function(t){return t.id===editingId;}) : null;
@@ -381,13 +382,42 @@
     if(base==='USD')return quotePnl/exit;
     return null;
   }
-  function updateTradeEstimate() {
+  async function getQuoteUsdRate(currency) {
+    currency=String(currency||'').toUpperCase();
+    if(currency==='USD')return 1;
+    if(quoteUsdRateCache[currency]&&Date.now()-(quoteUsdRateCacheAt[currency]||0)<60000)return quoteUsdRateCache[currency];
+    try {
+      var response=await fetch('/api/currency-conversion?currency='+encodeURIComponent(currency),{cache:'no-store'});
+      var data=await response.json();
+      var rate=Number(data&&data.usdPerUnit);
+      if(!response.ok||!Number.isFinite(rate)||rate<=0)throw new Error(data.error||'Conversion rate unavailable');
+      quoteUsdRateCache[currency]=rate;
+      quoteUsdRateCacheAt[currency]=Date.now();
+      return rate;
+    } catch(error) {
+      console.warn('DAGBO quote currency conversion unavailable:',currency,error);
+      return null;
+    }
+  }
+  async function calculatePnlUsdWithConversion(pair,direction,entry,exit,lot) {
+    var direct=calculatePnlUsd(pair,direction,entry,exit,lot);
+    if(direct!==null)return direct;
+    pair=String(pair||'').toUpperCase().replace(/[^A-Z]/g,'');
+    if(!/^[A-Z]{6}$/.test(pair)||![entry,exit,lot].every(Number.isFinite)||entry<=0||exit<=0||lot<=0)return null;
+    var quote=pair.slice(3,6),rate=await getQuoteUsdRate(quote);
+    if(!Number.isFinite(rate)||rate<=0)return null;
+    var sign=direction==='SELL'?-1:1;
+    return (exit-entry)*sign*lot*100000*rate;
+  }
+  async function updateTradeEstimate() {
     var pair=document.getElementById('fPair').value,dir=document.getElementById('fDir').value;
     var e=Number(document.getElementById('fEntry').value),sl=Number(document.getElementById('fSl').value),tp=Number(document.getElementById('fTp').value),lot=Number(document.getElementById('fLot').value);
-    var risk=calculatePnlUsd(pair,dir,e,sl,lot),reward=calculatePnlUsd(pair,dir,e,tp,lot),hint=document.getElementById('tradeCalcHint');
-    if(risk===null||reward===null){hint.textContent='Auto-calculation supports standard 100,000-unit USD-quoted/USD-base forex pairs and XAUUSD at 100 oz per lot. Cross pairs, indices and crypto need verified broker contract specifications or manual P&L.';return;}
+    var hint=document.getElementById('tradeCalcHint');
+    var risk=await calculatePnlUsdWithConversion(pair,dir,e,sl,lot);
+    var reward=await calculatePnlUsdWithConversion(pair,dir,e,tp,lot);
+    if(risk===null||reward===null){hint.textContent='Auto-calculation supports standard 100,000-unit FX lots and XAUUSD at 100 oz per lot. Cross-pair USD conversion needs a live Twelve Data rate; indices and crypto require broker contract specifications or manual P&L.';return;}
     document.getElementById('fRiskAmount').value=Math.abs(risk).toFixed(2);
-    hint.textContent='Estimated risk at SL: ' + plainMoney(Math.abs(risk)) + ' | Potential reward: ' + plainMoney(Math.abs(reward));
+    hint.textContent='Estimated risk at SL: ' + plainMoney(Math.abs(risk)) + ' | Potential reward: ' + plainMoney(Math.abs(reward)) + ' (cross-pair conversion uses a live indicative FX rate).';
   }
 
   async function syncCloudTrades() {
@@ -401,7 +431,7 @@
       });
       if (!response.ok) return;
       var data = await response.json();
-      (data.trades || []).forEach(function(remote) {
+      for (const remote of (data.trades || [])) {
         var local = trades.find(function(t){return t.id === (remote.journalTradeId || remote.id);});
         if (!local && remote.status === 'CLOSED') {
           var candidates = trades.filter(function(t){
@@ -420,7 +450,7 @@
         if (local && remote.status === 'CLOSED' && local.result === 'OPEN') {
           local.result = remote.result || 'CLOSED';
           local.exit = remote.exit;
-          var autoRemotePnl=calculatePnlUsd(local.pair,local.direction,Number(local.entry),Number(remote.exit),Number(local.lotSize));
+          var autoRemotePnl=await calculatePnlUsdWithConversion(local.pair,local.direction,Number(local.entry),Number(remote.exit),Number(local.lotSize));
           local.pnl=autoRemotePnl!==null?autoRemotePnl:(Number(remote.pnl)||0);
           // Count a closed trade from its verified P&L if the server did not return a WIN/LOSS label.
           const remoteResult = String(remote.result || "").toUpperCase();
@@ -438,7 +468,7 @@
           local.closeReason = remote.closeReason;
           local.dateClosed = remote.dateClosed;
         }
-      });
+      }
       persist();
       renderStats();
       renderList();
