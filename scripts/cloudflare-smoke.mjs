@@ -25,12 +25,12 @@ await get("/", 200, (_response, body) => {
   if (!/<!doctype html|<html/i.test(body)) throw new Error("Homepage did not return HTML");
 });
 for (const page of [
-  "index.html", "ai.html", "alerts.html", "boss1.html", "chart.html",
+  "index.html", "ai.html", "alerts.html", "boss1.html", "chart.html", "fundamental.html",
   "journal.html", "market-heatmap.html", "news.html", "replay.html",
   "settings.html", "signal-insights.html", "signals.html",
   "strategy-lab.html", "trader-score.html"
 ]) await get("/" + page, 200);
-for (const asset of ["dagbo.css", "navigation.js", "pwa.js", "manifest.json", "service-worker.js"]) {
+for (const asset of ["dagbo.css", "navigation.js", "fundamental-widget.js", "pwa.js", "manifest.json", "service-worker.js"]) {
   await get("/" + asset, 200);
 }
 await get("/api/health", 200, (_response, body) => {
@@ -53,6 +53,7 @@ await get("/api/market-data?pair=EURUSD&tf=15", 503);
 await get("/api/exchange-rate", 503);
 await get("/api/replay?pair=EURUSD&interval=15", 400);
 await get("/api/news-signal", 503);
+await get("/api/fundamentals", 503, (_response, body) => { if (!JSON.parse(body).configured === false) throw new Error("Fundamental endpoint should report missing provider configuration"); });
 await get("/api/not-a-real-route", 404);
 await get("/api/cron-scan.js", 404);
 await get("/lib/push-adapter.js", 404);
