@@ -20,7 +20,7 @@ This branch prepares a Cloudflare Workers deployment while keeping the existing 
 Add these in Cloudflare Dashboard → Workers & Pages → DAGBO Worker → Settings → Variables and Secrets. Mark credentials as secrets. Do not commit their values.
 
 Required for the main features:
-- `TRADING_ECONOMICS_API_KEY` (macro indicators and relative currency-strength analysis)
+- `TRADING_ECONOMICS_API_KEY` (optional paid/provider credential for macro time-series indicators and relative currency-strength analysis; not needed for the free ShowMyTrades calendar)
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 - `TWELVE_DATA_API_KEY`
@@ -40,6 +40,15 @@ Optional:
 - `SIGNAL_PUSH_SECRET`
 
 The optional Twelve Data spike keys are fallbacks; `TWELVE_DATA_API_KEY` is sufficient for the shared provider setup. Use one cron secret consistently where possible.
+
+## Free economic calendar integration
+
+- `/api/calendar` now proxies ShowMyTrades' public economic calendar endpoint. It needs no account, API key, or new Cloudflare secret.
+- The News page countdown and the scheduled news monitor use this feed for high-impact releases across USD, EUR, GBP, JPY, AUD, NZD, CAD, CHF and CNY.
+- The normalized event data includes scheduled UTC time, impact, actual, forecast, previous, event status, confidence and schedule-change metadata where supplied.
+- News spike alerts continue to separate pre-release price/flow context from post-release observed results. Actual-versus-forecast is displayed as event context; it is not treated as a guaranteed price direction.
+- The News page links to ShowMyTrades' calendar and identifies the source. See https://showmytrades.com/docs/api/economic-calendar.
+- No `TRADING_ECONOMICS_API_KEY` is required for this calendar. The separate macro time-series endpoint still uses Trading Economics until another indicators provider is integrated.
 
 ## Fundamental analysis integration
 
