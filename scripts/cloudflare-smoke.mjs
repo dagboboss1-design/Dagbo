@@ -53,7 +53,7 @@ await get("/api/market-data?pair=EURUSD&tf=15", 503);
 await get("/api/exchange-rate", 503);
 await get("/api/replay?pair=EURUSD&interval=15", 400);
 await get("/api/news-signal", 503);
-await get("/api/fundamentals", 503, (_response, body) => { if (!JSON.parse(body).configured === false) throw new Error("Fundamental endpoint should report missing provider configuration"); });
+await get("/api/fundamentals", 503, (_response, body) => { if (JSON.parse(body).configured !== false) throw new Error("Fundamental endpoint should report missing provider configuration"); });
 await get("/api/not-a-real-route", 404);
 await get("/api/cron-scan.js", 404);
 await get("/lib/push-adapter.js", 404);
