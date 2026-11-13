@@ -386,7 +386,197 @@ async function monitorTrades(marketData) {
   return { closed, warnings };
 }
 
+
+
+// --- SMART PAIR HEDGE + HIGHER-TIMEFRAME ENGINE ---
+// Uses cached Twelve Data candles so the 5-minute cron does not repeatedly
+// consume requests for monthly/weekly/daily/4H data.
+const HTF_FRAMES = [
+  { key: "1month", label: "Monthly", ttl: 28 * 24 * 60 * 60 },
+  { key: "1week", label: "Weekly", ttl: 6 * 24 * 60 * 60 },
+  { key: "1day", label: "Daily", ttl: 22 * 60 * 60 },
+  { key: "4h", label: "4H", ttl: 3 * 60 * 60 + 45 * 60 }
+];
+
+function pairDecimals(pair) {
+  return pair.includes("JPY") ? 3 : (pair === "XAUUSD" || pair === "GOLD" ? 2 : 5);
+}
+function htfDirection(candles) {
+  if (!Array.isArray(candles) || candles.length < 55) return "WAIT";
+  const closes = candles.map(c => num(c.close));
+  if (closes.some(v => v === null)) return "WAIT";
+  const fast = ema(closes, 20), slow = ema(closes, 50), last = closes[closes.length - 1];
+  return fast > slow && last > fast ? "BUY" :
+    fast < slow && last < fast ? "SELL" : "WAIT";
+}
+async function getHtfCandles(pair, frame, apiKey) {
+  const cacheKey = "dagbo:htf:candles:" + pair + ":" + frame.key;
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    try {
+      const parsed = typeof cached === "string" ? JSON.parse(cached) : cached;
+      if (Array.isArray(parsed) && parsed.length >= 55) return parsed;
+    } catch (e) {}
+  }
+  const symbol = SYMBOLS[pair];
+  if (!symbol) throw new Error("Unsupported pair " + pair);
+  const url = "https://api.twelvedata.com/time_series?symbol=" +
+    encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(frame.key) +
+    "&outputsize=80&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+  const response = await fetch(url);
+  const data = await response.json();
+  if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
+    throw new Error(data.message || "No " + frame.label + " candles");
+  }
+  const candles = data.values.slice().reverse().map(c => ({
+    datetime: String(c.datetime || ""),
+    open: num(c.open), high: num(c.high), low: num(c.low), close: num(c.close)
+  })).filter(c => c.datetime && [c.open,c.high,c.low,c.close].every(v => v !== null));
+  if (candles.length < 55) throw new Error("Insufficient " + frame.label + " history");
+  await redis.set(cacheKey, JSON.stringify(candles), { ex: frame.ttl });
+  return candles;
+}
+function pearsonCorrelation(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (n < 25) return null;
+  const x = a.slice(-n), y = b.slice(-n);
+  const mx = x.reduce((s,v)=>s+v,0)/n, my = y.reduce((s,v)=>s+v,0)/n;
+  let cov=0,vx=0,vy=0;
+  for(let i=0;i<n;i++){const dx=x[i]-mx,dy=y[i]-my;cov+=dx*dy;vx+=dx*dx;vy+=dy*dy;}
+  return vx>0&&vy>0?cov/Math.sqrt(vx*vy):null;
+}
+function alignedReturns(a, b) {
+  function mapReturns(rows) {
+    const out = new Map();
+    for(let i=1;i<rows.length;i++){
+      const prev=num(rows[i-1].close),cur=num(rows[i].close);
+      if(prev&&cur&&rows[i].datetime) out.set(rows[i].datetime,(cur-prev)/prev);
+    }
+    return out;
+  }
+  const x=mapReturns(a),y=mapReturns(b),keys=Array.from(x.keys()).filter(k=>y.has(k)).sort();
+  return { a:keys.map(k=>x.get(k)), b:keys.map(k=>y.get(k)), bars:keys.length };
+}
+function tradePlan(pair, direction, candles) {
+  if (!Array.isArray(candles) || candles.length < 15) return null;
+  const last=candles[candles.length-1], entry=num(last.close);
+  if(entry===null) return null;
+  let atr=0,count=0;
+  for(let i=Math.max(1,candles.length-14);i<candles.length;i++){
+    const c=candles[i],p=candles[i-1],hi=num(c.high),lo=num(c.low),pc=num(p.close);
+    if([hi,lo,pc].some(v=>v===null)) continue;
+    atr+=Math.max(hi-lo,Math.abs(hi-pc),Math.abs(lo-pc));count++;
+  }
+  if(!count) return null;
+  atr/=count;
+  const risk=atr*1.5, reward=risk*2, buy=direction==="BUY", d=pairDecimals(pair);
+  return {
+    pair,direction,entry:Number(entry.toFixed(d)),
+    stopLoss:Number((buy?entry-risk:entry+risk).toFixed(d)),
+    takeProfit:Number((buy?entry+reward:entry-reward).toFixed(d)),
+    timeframe:"4H", candleTime:last.datetime
+  };
+}
+function currencyExposure(plan) {
+  const base=plan.pair.slice(0,3), quote=plan.pair.slice(3,6), sign=plan.direction==="BUY"?1:-1;
+  return { [base]:sign, [quote]:-sign };
+}
+function summarizeExposure(first, second) {
+  const out={};
+  [first,second].forEach(p=>Object.entries(currencyExposure(p)).forEach(([c,v])=>out[c]=(out[c]||0)+v));
+  Object.keys(out).forEach(c=>{if(!out[c]) delete out[c];});
+  return out;
+}
+async function runPairIntelligence(pairs, apiKey) {
+  const forexPairs=pairs.filter(p=>/^[A-Z]{6}$/.test(p) && SYMBOLS[p]);
+  const data={}, errors=[];
+  // Fetch only missing/expired timeframe caches; monthly/weekly/daily data is cached.
+  await Promise.all(forexPairs.map(async pair=>{
+    data[pair]={};
+    await Promise.all(HTF_FRAMES.map(async frame=>{
+      try { data[pair][frame.key]=await getHtfCandles(pair,frame,apiKey); }
+      catch(err){data[pair][frame.key]=null;errors.push({pair,timeframe:frame.label,error:err.message});}
+    }));
+  }));
+
+  const htfSignals=[];
+  for(const pair of forexPairs){
+    const directions={};
+    HTF_FRAMES.forEach(frame=>{directions[frame.label]=data[pair][frame.key]?htfDirection(data[pair][frame.key]):"WAIT";});
+    const valid=Object.values(directions).filter(d=>d==="BUY"||d==="SELL");
+    const buys=valid.filter(d=>d==="BUY").length,sells=valid.filter(d=>d==="SELL").length;
+    const direction=buys>=3&&buys>sells&&directions["4H"]==="BUY"?"BUY":
+      sells>=3&&sells>buys&&directions["4H"]==="SELL"?"SELL":"WAIT";
+    if(direction!=="WAIT"){
+      const plan=tradePlan(pair,direction,data[pair]["4h"]);
+      if(plan) htfSignals.push({...plan,timeframes:directions,agreement:Math.max(buys,sells)+"/4"});
+    }
+  }
+
+  const combos=[];
+  for(let i=0;i<forexPairs.length;i++) for(let j=i+1;j<forexPairs.length;j++){
+    const p1=forexPairs[i],p2=forexPairs[j],a=data[p1]["4h"],b=data[p2]["4h"];
+    if(!a||!b) continue;
+    const aligned=alignedReturns(a,b),corr=pearsonCorrelation(aligned.a,aligned.b);
+    if(corr===null||aligned.bars<25||Math.abs(corr)<0.65) continue;
+    const first=htfSignals.find(x=>x.pair===p1),second=htfSignals.find(x=>x.pair===p2);
+    if(!first||!second) continue;
+    const expectedSame=corr>=0;
+    if((expectedSame&&first.direction!==second.direction)||(!expectedSame&&first.direction===second.direction)) continue;
+    const exposure=summarizeExposure(first,second);
+    combos.push({
+      id:p1+"-"+p2,correlation:Number(corr.toFixed(2)),
+      relationship:expectedSame?"POSITIVE":"NEGATIVE",
+      agreement:Math.min(Number(first.agreement.split("/")[0]),Number(second.agreement.split("/")[0]))+"/4",
+      legs:[first,second],currencyExposure:exposure,
+      sharedUsdExposure:exposure.USD||0,
+      riskNote:Math.abs(exposure.USD)>=2?"Both legs add to the same USD exposure; this is a correlated two-trade basket, not a risk-reducing hedge.":"Review combined currency exposure and position sizes; correlation does not guarantee offsetting risk."
+    });
+  }
+  combos.sort((x,y)=>Math.abs(y.correlation)-Math.abs(x.correlation));
+  const snapshot={updatedAt:new Date().toISOString(),source:"Twelve Data candles",timeframes:["Monthly","Weekly","Daily","4H"],htfSignals,combos:combos.slice(0,10),errors};
+  await redis.set("dagbo:pair-intelligence:last",JSON.stringify(snapshot),{ex:60*60*24*3});
+
+  // Notify only when a new direction/correlation combination is first detected.
+  for(const signal of htfSignals){
+    const key="dagbo:htf:alert:"+signal.pair;
+    const signature=signal.direction+"|"+signal.candleTime;
+    const old=await redis.get(key);
+    if(old!==signature){
+      await broadcast("🧭 HTF "+signal.direction+" — "+signal.pair,
+        signal.pair+" "+signal.direction+" · Monthly "+signal.timeframes.Monthly+
+        " · Weekly "+signal.timeframes.Weekly+" · Daily "+signal.timeframes.Daily+
+        " · 4H "+signal.timeframes["4H"]+" · Entry "+signal.entry+
+        " · SL "+signal.stopLoss+" · TP "+signal.takeProfit+
+        " · "+signal.agreement+" timeframe agreement. Source: Twelve Data candles; confirm before trading.",
+        "htf-"+signal.pair);
+      await redis.set(key,signature,{ex:60*60*24*14});
+    }
+  }
+  for(const combo of snapshot.combos){
+    const signature=combo.legs.map(x=>x.pair+":"+x.direction+":"+x.candleTime).join("|")+"|"+combo.correlation;
+    const key="dagbo:hedge:alert:"+combo.id,old=await redis.get(key);
+    if(old!==signature){
+      const legs=combo.legs.map(x=>x.pair+" "+x.direction+" Entry "+x.entry+" SL "+x.stopLoss+" TP "+x.takeProfit).join(" / ");
+      await broadcast("🔗 SMART PAIR HEDGE SETUP",
+        legs+" · "+combo.relationship+" correlation "+combo.correlation+
+        " · HTF agreement "+combo.agreement+" · Combined USD exposure "+combo.sharedUsdExposure+
+        ". "+combo.riskNote+" Not a guaranteed hedge or trade.",
+        "smart-hedge-"+combo.id);
+      await redis.set(key,signature,{ex:60*60*24*14});
+    }
+  }
+  return snapshot;
+}
+
 module.exports = async function handler(req, res) {
+  if (req.method === "GET" && req.query && req.query.view === "pair-intelligence") {
+    const raw = await redis.get("dagbo:pair-intelligence:last");
+    if (!raw) return res.status(200).json({ success: true, snapshot: null, message: "No pair-intelligence scan has completed yet." });
+    let snapshot = raw;
+    if (typeof raw === "string") { try { snapshot = JSON.parse(raw); } catch (e) { snapshot = null; } }
+    return res.status(200).json({ success: true, snapshot });
+  }
   if (!validAuth(req)) return res.status(401).json({ error: "Unauthorized scheduled scan" });
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   const apiKey = process.env.TWELVE_DATA_API_KEY;
@@ -443,6 +633,13 @@ module.exports = async function handler(req, res) {
       await redis.set(stateKey, JSON.stringify({ signal: analysis.signal, candleTime: analysis.candleTime, scannedAt: new Date().toISOString() }), { ex: 60 * 60 * 24 * 7 });
     }
 
+    let pairIntelligence = null;
+    try {
+      pairIntelligence = await runPairIntelligence(pairsToScan, apiKey);
+    } catch (pairError) {
+      console.error("DAGBO pair-intelligence scan failed:", pairError.message);
+    }
+
     const tradeSummary = await monitorTrades(results);
     const newsSummary = { delegatedTo: "/api/news-monitor", note: "Economic-news and spike alerts run in the dedicated 5-minute news monitor." };
     const errorKey = "dagbo:scan:error:last";
@@ -470,6 +667,7 @@ module.exports = async function handler(req, res) {
       success: true, scannedAt: new Date().toISOString(),
       scanned: Object.keys(results), errors, signals: results,
       tradeMonitoring: tradeSummary,
+      pairIntelligence: pairIntelligence ? { htfSignals: pairIntelligence.htfSignals.length, hedgeCombinations: pairIntelligence.combos.length, updatedAt: pairIntelligence.updatedAt } : null,
       newsMonitoring: newsSummary,
       note: "News alerts and spike analysis run separately for GBPUSD, GBPJPY, EURUSD and XAUUSD; pre-news bias is not a prediction or broker order."
     };
