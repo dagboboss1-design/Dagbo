@@ -191,9 +191,9 @@ module.exports = async function handler(req, res) {
         USDCAD:"USD/CAD", NZDUSD:"NZD/USD", EURJPY:"EUR/JPY", EURGBP:"EUR/GBP",
         BTCUSD:"BTC/USD", ETHUSD:"ETH/USD", US30:"DJI", US100:"NDX", NAS100:"NDX", US500:"SPX"
       };
-      const asksPrice = /\b(price|quote|trading at|how much is|current value)\\b/i.test(question);
+      const asksPrice = /\b(price|quote|trading at|how much is|current value)\b/i.test(question);
       let quotePair = Object.keys(pairSymbols).find(pair => new RegExp("\\b" + pair + "\\b", "i").test(question));
-      if (!quotePair && asksPrice && /\b(this pair|current pair|selected pair)\\b/i.test(question) && safeMarketContext) {
+      if (!quotePair && asksPrice && /\b(this pair|current pair|selected pair)\b/i.test(question) && safeMarketContext) {
         try {
           const snapshot = JSON.parse(safeMarketContext);
           const walk = (value) => {
