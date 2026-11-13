@@ -354,7 +354,7 @@ function compose(userQ){
   var d = tryDate(raw, e); if (d) return d;
 
   var results = matchKB(raw);
-  if (results.length > 0 && results[0].score >= 30) return KB[results[0].idx].a;
+  if (results.length > 0 && results[0].score >= 30) return { type: 'lesson', text: KB[results[0].idx].a, title: KB[results[0].idx].k[0] };
 
   return { type: 'groq', query: raw };
 }
@@ -469,6 +469,54 @@ function loadChatHistory() {
   }
 }
 
+function lessonVisual(title, topic) {
+  var t = String(topic || '').toLowerCase();
+  var label = String(title || 'Trading example').replace(/[<>&"]/g, '');
+  var mode = /support|resistance|breakout|fakeout|retest|range|triangle|rectangle|double|triple|wedge|flag|cup|pivot|liquidity|sweep/.test(t) ? 'levels' :
+    /order block|breaker|mitigation|fvg|fair value|imbalance|bpr|premium|discount|ote|supply|demand/.test(t) ? 'zone' :
+    /pin bar|hammer|engulf|doji|marubozu|harami|inside bar|outside bar|tweezer|star|candle|wick/.test(t) ? 'candle' :
+    /rsi|macd|ema|moving average|bollinger|atr|adx|stochastic|vwap|ichimoku|supertrend|sar|cci|obv|momentum|roc|williams|donchian|keltner/.test(t) ? 'indicator' :
+    /risk|lot|position|drawdown|margin|leverage|expectancy|r multiple|compound|portfolio|partial|stop/.test(t) ? 'risk' : 'trend';
+  var shapes = {
+    levels: '<path d="M45 92H510 M45 45H510" stroke="#f59e0b" stroke-width="2" stroke-dasharray="7 5"/><path d="M55 112 L95 98 L135 108 L175 72 L215 84 L255 48 L295 65 L335 31 L375 50 L415 22 L455 38 L500 15" fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="335" cy="31" r="6" fill="#22c55e"/>',
+    zone: '<rect x="210" y="52" width="130" height="35" rx="5" fill="#3b82f6" opacity=".22" stroke="#60a5fa" stroke-width="2"/><path d="M45 115 L90 105 L130 112 L170 93 L205 101 L245 28 L280 12 L310 20 L350 67 L385 79 L425 51 L465 35 L510 15" fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M330 68L350 67L385 79" stroke="#f59e0b" stroke-width="3"/>',
+    candle: '<g stroke-width="3"><path d="M95 25V115 M165 18V102 M235 42V125 M305 12V94 M375 32V116 M445 20V100" stroke="#94a3b8"/><rect x="82" y="48" width="26" height="42" fill="#22c55e"/><rect x="152" y="38" width="26" height="44" fill="#22c55e"/><rect x="222" y="62" width="26" height="36" fill="#ef4444"/><rect x="292" y="30" width="26" height="42" fill="#22c55e"/><rect x="362" y="52" width="26" height="44" fill="#ef4444"/><rect x="432" y="40" width="26" height="38" fill="#22c55e"/></g>',
+    indicator: '<path d="M45 42 C110 20 150 100 220 70 S330 22 390 57 S460 78 510 35" fill="none" stroke="#22c55e" stroke-width="4"/><path d="M45 82 C110 72 150 86 220 82 S330 68 390 78 S460 88 510 72" fill="none" stroke="#60a5fa" stroke-width="3"/><path d="M45 110H510" stroke="#94a3b8" stroke-dasharray="5 5"/>',
+    risk: '<rect x="65" y="28" width="430" height="82" rx="8" fill="#1e293b" stroke="#64748b"/><rect x="85" y="48" width="270" height="18" rx="4" fill="#22c55e"/><rect x="85" y="78" width="90" height="14" rx="4" fill="#ef4444"/><path d="M385 45V96 M375 45H395 M375 96H395" stroke="#f59e0b" stroke-width="3"/>',
+    trend: '<path d="M45 112 L90 94 L135 105 L180 72 L225 84 L270 50 L315 65 L360 35 L405 49 L450 20 L510 30" fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="180" cy="72" r="5" fill="#60a5fa"/><circle cx="270" cy="50" r="5" fill="#60a5fa"/><circle cx="360" cy="35" r="5" fill="#60a5fa"/>'
+  };
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 170"><rect width="560" height="170" rx="14" fill="#0f172a"/><g stroke="#334155" stroke-width="1"><path d="M45 20V135 M45 135H520 M45 60H520 M45 95H520"/></g>' + shapes[mode] + '<text x="45" y="155" fill="#e2e8f0" font-family="Arial,sans-serif" font-size="13">' + label + ' · illustrative chart example</text></svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+function addLessonMessage(lesson) {
+  var d = document.createElement('div');
+  d.className = 'chat-bubble ai';
+  d.style.maxWidth = '94%';
+  d.style.whiteSpace = 'normal';
+  d.innerHTML = lesson.text;
+  var figure = document.createElement('figure');
+  figure.style.cssText = 'margin:12px 0 2px;padding:8px;background:var(--dg-fill);border-radius:12px';
+  var img = document.createElement('img');
+  img.alt = 'Illustrative chart example for ' + lesson.title;
+  img.src = lessonVisual(lesson.title, lesson.title);
+  img.style.cssText = 'display:block;width:100%;height:auto;border-radius:8px';
+  figure.appendChild(img);
+  var caption = document.createElement('figcaption');
+  caption.textContent = 'Example illustration — use it to understand the pattern, not as a live trade signal.';
+  caption.style.cssText = 'font-size:11px;color:var(--dg-muted);margin-top:6px';
+  figure.appendChild(caption);
+  d.appendChild(figure);
+  var timeNode = document.createElement('span');
+  timeNode.className = 'chat-time';
+  timeNode.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  d.appendChild(timeNode);
+  chatArea.appendChild(d);
+  _hist.push({ role:'ai', text: lesson.text + ' [Illustrative chart example shown]' });
+  saveChatHistory();
+  window.scrollTo({ top: document.body.scrollHeight, behavior:'smooth' });
+}
+
 function sendMessage() {
   var text = chatInput.value.trim();
   if (!text) return;
@@ -484,7 +532,7 @@ function sendMessage() {
   setTimeout(function() {
     chatArea.removeChild(typing);
     var reply = compose(text);
-    if (reply && reply.type === 'groq') {
+    if (reply && reply.type === 'lesson') {\n      addLessonMessage(reply);\n      if (getAutoRead()) speak(reply.text);\n    } else if (reply && reply.type === 'groq') {
       askGroq(reply.query).then(function(ans) {
         addMessage('ai', ans);
         if (getAutoRead()) speak(ans);
