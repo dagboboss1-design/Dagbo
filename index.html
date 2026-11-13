@@ -95,7 +95,7 @@ body{background:var(--dg-bg);color:var(--dg-text)}
  <section class="home-section"><h2>Your account snapshot</h2><p>Personal figures from your saved settings and journal.</p></section>
  <div class="home-stats">
   <div class="home-stat"><span>Account size</span><strong id="statAccount">$100</strong></div>
-  <div class="home-stat"><span>Risk / trade</span><strong id="statRisk">1%</strong></div>
+  <div class="home-stat"><span>Risk / trade</span><strong id="statRisk">0.5%</strong></div>
   <div class="home-stat"><span>Win rate</span><strong id="statWinRate">—</strong></div>
  </div>
  <div class="home-list" style="margin-top:10px">
@@ -201,7 +201,7 @@ body{background:var(--dg-bg);color:var(--dg-text)}
 (function(){
  var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
  var name=(settings.name||'').replace(/^Oga\s+/i,'');
- var account=Number(settings.accountSize)||100,risk=Number(settings.risk)||1,hour=new Date().getHours();
+ var account=Number(settings.accountSize)||100,risk=settings.risk===undefined?0.5:(Number(settings.risk)||0.5),hour=new Date().getHours();
  var greeting=hour<12?'Good morning':(hour<17?'Good afternoon':'Good evening');
  document.getElementById('hello').textContent=name?greeting+', '+name:greeting;
  document.getElementById('statAccount').textContent='$'+account.toLocaleString();
