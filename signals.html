@@ -566,7 +566,7 @@
       stopLoss:sl,
       takeProfit:tp,
       lotSize:Number(settings.lotSize)||0.01,
-      riskAmount:(Number(settings.accountSize)||100)*(Number(settings.risk)||1)/100,
+      riskAmount:(Number(settings.accountSize)||100)*(settings.risk===undefined?0.5:(Number(settings.risk)||0.5))/100,
       strategy:strategy||'3-System Confluence',
       timeframe:currentSignalTF+'m',
       result:'OPEN',
