@@ -4,6 +4,7 @@ import cronScan from "../api/cron-scan.js";
 import cronSignal from "../api/cron-signal.js";
 import cronSignals from "../api/cron-signals.js";
 import exchangeRate from "../api/exchange-rate.js";
+import fundamentals from "../api/fundamentals.js";
 import health from "../api/health.js";
 import marketData from "../api/market-data.js";
 import newsMonitor from "../api/news-monitor.js";
@@ -19,6 +20,7 @@ const routes = new Map([
   ["/api/cron-signal", cronSignal],
   ["/api/cron-signals", cronSignals],
   ["/api/exchange-rate", exchangeRate],
+  ["/api/fundamentals", fundamentals],
   ["/api/health", health],
   ["/api/market-data", marketData],
   ["/api/news-monitor", newsMonitor],
