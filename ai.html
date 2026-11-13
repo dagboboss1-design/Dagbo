@@ -342,7 +342,8 @@ function matchKB(q){
 function compose(userQ){
   var raw = String(userQ).trim(), low = raw.toLowerCase();
   
-  if (/\b(current|live|price)\b/i.test(low)) return "I no dey give live price. Open the Chart page to see real price from TradingView.";
+  if (/\b(hi|hello|hey|good morning|good afternoon|good evening)\b[!.? ]*$/i.test(low)) return "Hi! Which pair are we checking?";
+  if (/\b(current|live|price|quote)\b/i.test(low)) return { type: "groq", query: raw };
   if (/\b(should|can|make)\b i (buy|sell)\b/i.test(low)) return "I no dey give trade calls, I only teach. Check the Chart page.";
   
   var e = { numbers: raw.match(/\d+(?:\.\d+)?/g) || [], amount: null, percent: null, year: null };
