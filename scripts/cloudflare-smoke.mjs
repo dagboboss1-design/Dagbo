@@ -37,6 +37,10 @@ await get("/api/health", 200, (_response, body) => {
   const data = JSON.parse(body);
   if (data.success !== true || !data.services || data.services.cronSecret !== true) throw new Error("Health endpoint returned an invalid response or did not read the test secret from process.env");
 });
+await get("/api/health?check=push-runtime", 200, (_response, body) => {
+  const data = JSON.parse(body);
+  if (data.services?.pushRuntime !== true) throw new Error("Web Crypto push library could not load inside the Worker runtime");
+});
 await get("/api/cron-scan", 401);
 await get("/api/cron-signal", 401);
 await get("/api/cron-signals", 401);
