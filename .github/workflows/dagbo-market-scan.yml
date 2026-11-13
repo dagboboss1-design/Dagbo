@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Run 15-minute market scanner
         env:
-          DAGBO_BASE_URL: ${{ vars.DAGBO_BASE_URL }}
+          DAGBO_BASE_URL: ${{ vars.DAGBO_BASE_URL || 'https://dagbo-v9g7.vercel.app' }}
           SIGNAL_PUSH_SECRET: ${{ secrets.SIGNAL_PUSH_SECRET }}
         run: |
           if [ -z "$DAGBO_BASE_URL" ]; then
