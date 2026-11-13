@@ -134,8 +134,10 @@ body{background:#050b14!important;color:#edf4ff!important}
       <span aria-hidden="true" style="font-size:20px;color:var(--dg-blue-ink)">↗</span>
     </a>
   </div>
-  <div class="dg-card" style="padding:0; overflow:hidden; border-radius:16px; height:400px; margin-bottom:16px;">
-    <iframe src="https://sslecal2.forexprostools.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone&countries=5,6,17,29&calType=day&timeZone=56&lang=1" title="Live economic calendar" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" style="width:100%; height:100%; border:none;"></iframe>
+  <div class="dg-card" style="padding:14px;margin-bottom:16px">
+    <div class="dg-section" style="margin:0 0 8px">Upcoming releases · Live data</div>
+    <div id="economicEventsList" class="dg-muted" aria-live="polite">Loading ShowMyTrades economic events…</div>
+    <a href="https://showmytrades.com/tools/economic-calendar" target="_blank" rel="noopener noreferrer" style="display:block;color:#71e6a1;font-size:11px;font-weight:800;text-decoration:none;margin-top:12px">Economic calendar data by ShowMyTrades ↗</a>
   </div>
 
   <h3 class="dg-section">Live Headlines</h3>
@@ -252,6 +254,36 @@ body{background:#050b14!important;color:#edf4ff!important}
       ' · Previous: ' + (nextCalendarEvent.previous || '—');
   }
 
+  function renderEconomicEvents(events) {
+    var target=document.getElementById('economicEventsList');
+    if(!target) return;
+    target.replaceChildren();
+    if(!events.length){target.textContent='No upcoming events in the current calendar window.';return;}
+    events.slice(0,12).forEach(function(event){
+      var row=document.createElement('div');
+      row.style.cssText='padding:10px 0;border-bottom:1px solid #23354b';
+      var top=document.createElement('div');
+      top.style.cssText='display:flex;justify-content:space-between;gap:8px;align-items:flex-start';
+      var name=document.createElement('strong');
+      name.style.cssText='font-size:13px;color:#f5f8ff';
+      name.textContent=event.currency+' · '+event.name;
+      var impact=document.createElement('span');
+      impact.style.cssText='font-size:10px;font-weight:900;white-space:nowrap;color:'+(event.impact==='high'?'#ff8d9a':event.impact==='medium'?'#ffd36a':'#9eb2cc');
+      impact.textContent=String(event.impact||'unknown').toUpperCase();
+      top.append(name,impact);
+      var meta=document.createElement('div');
+      meta.style.cssText='font-size:11px;color:#9eb2cc;margin-top:5px';
+      meta.textContent=new Date(event.date).toLocaleString('en-NG',{dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Lagos'})+' WAT · Actual '+(event.actual||'—')+' · Forecast '+(event.forecast||'—')+' · Previous '+(event.previous||'—');
+      row.append(top,meta);
+      if(event.status==='moved'||event.status==='tentative'){
+        var status=document.createElement('div');status.style.cssText='font-size:10px;color:#ffd36a;margin-top:4px';
+        status.textContent='Schedule: '+event.status+(event.confidence?' · '+event.confidence.replace(/_/g,' '):'');
+        row.appendChild(status);
+      }
+      target.appendChild(row);
+    });
+  }
+
   function loadCalendar() {
     var title = document.getElementById('newsEventTitle');
     var status = document.getElementById('newsCountdownStatus');
@@ -265,9 +297,10 @@ body{background:#050b14!important;color:#edf4ff!important}
       .then(function(data) {
         if (!data.success || !Array.isArray(data.events)) throw new Error(data.error || 'Invalid calendar response');
         calendarEvents = data.events.filter(function(ev) {
-          return String(ev.impact).toLowerCase() === 'high' && new Date(ev.date).getTime() > Date.now();
+          return new Date(ev.date).getTime() > Date.now();
         });
-        nextCalendarEvent = calendarEvents[0] || null;
+        nextCalendarEvent = calendarEvents.filter(function(ev){return String(ev.impact).toLowerCase()==='high';})[0] || null;
+        renderEconomicEvents(calendarEvents);
         calendarFetchedAt = data.fetchedAt || new Date().toISOString();
         updateNewsCountdown();
       })
