@@ -1,5 +1,5 @@
-const VERSION = "dagbo-v20";
-const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "settings.html", "dagbo.css", "manifest.json", "pwa.js", "navigation.js"];
+const VERSION = "dagbo-v21";
+const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "market-heatmap.html", "replay.html", "settings.html", "icons/dagbo-icon.svg", "dagbo.css", "manifest.json", "pwa.js", "navigation.js"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -39,8 +39,8 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "DAGBO SIGNAL", {
       body: data.body || "You have a new trading alert.",
       tag: data.tag || "dagbo-alert",
-      icon: "./icons/icon-192.png",
-      badge: "./icons/icon-192.png",
+      icon: "./icons/dagbo-icon.svg",
+      badge: "./icons/dagbo-icon.svg",
       timestamp: Date.now(),
       data: { url: data.url || "./signals.html" },
       vibrate: [90, 45, 90],
