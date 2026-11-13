@@ -532,7 +532,10 @@ function sendMessage() {
   setTimeout(function() {
     chatArea.removeChild(typing);
     var reply = compose(text);
-    if (reply && reply.type === 'lesson') {\n      addLessonMessage(reply);\n      if (getAutoRead()) speak(reply.text);\n    } else if (reply && reply.type === 'groq') {
+    if (reply && reply.type === 'lesson') {
+      addLessonMessage(reply);
+      if (getAutoRead()) speak(reply.text);
+    } else if (reply && reply.type === 'groq') {
       askGroq(reply.query).then(function(ans) {
         addMessage('ai', ans);
         if (getAutoRead()) speak(ans);
