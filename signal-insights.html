@@ -26,6 +26,19 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
   <p class="intel-muted">Compares the latest saved 5-minute and 15-minute multi-method signal directions. Both scans must have run on this device. 1H / 4H confirmation is not connected.</p>
   <div id="trendList" class="intel-muted">No saved timeframe comparison yet.</div>
  </section>
+
+ <section class="intel-card">
+  <div class="dg-card__head"><h2 class="dg-card__title">Smart Pair Hedge</h2><span class="dg-pill">CORRELATION ENGINE</span></div>
+  <p class="intel-muted">Finds two-pair combinations using measured 4H return correlation (minimum ±0.65) and confirmation from Monthly, Weekly, Daily and 4H trends. Each leg has its own Entry, SL and TP.</p>
+  <div id="hedgeList" class="intel-muted">Loading latest pair combinations…</div>
+ </section>
+ <section class="intel-card">
+  <div class="dg-card__head"><h2 class="dg-card__title">Higher-Timeframe Scanner</h2><span class="dg-pill">MONTHLY → 4H</span></div>
+  <p class="intel-muted">A directional signal requires at least 3 of 4 timeframes to agree, including 4H. The scan uses EMA20/EMA50 trend structure on completed provider candles.</p>
+  <div id="htfList" class="intel-muted">Loading latest higher-timeframe signals…</div>
+  <div id="htfUpdated" class="intel-muted" style="margin-top:8px"></div>
+ </section>
+
  <p class="intel-muted">These tools read the existing DAGBO signal engine. They do not create a trade or guarantee a winning result. Refresh the Signals page to update the source scan.</p>
  <button id="refreshIntel" class="dg-btn dg-btn--primary dg-btn--block">Refresh saved results</button>
  <a class="dg-row dg-row--link" href="signals.html" style="margin-top:12px"><span class="dg-row__body"><span class="dg-row__title">← Back to Signals</span></span></a>
@@ -61,7 +74,39 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
    row.appendChild(name);row.appendChild(value);trend.appendChild(row);
   });
  }
- document.getElementById('refreshIntel').addEventListener('click',render);render();
+
+ async function loadPairIntelligence(){
+  var hedge=document.getElementById('hedgeList'),htf=document.getElementById('htfList'),updated=document.getElementById('htfUpdated');
+  try{
+   var response=await fetch('/api/cron-scan?view=pair-intelligence',{cache:'no-store'});
+   var data=await response.json(),snap=data&&data.snapshot;
+   hedge.textContent='';htf.textContent='';
+   if(!response.ok||!snap){hedge.textContent='No pair scan saved yet. The scheduled market scanner must complete first.';htf.textContent='No HTF scan saved yet.';return;}
+   if(!Array.isArray(snap.combos)||!snap.combos.length){hedge.textContent='No qualifying two-pair combination right now. DAGBO requires correlation of at least 0.65 and HTF confirmation; it will wait rather than force a trade.';}
+   (snap.combos||[]).forEach(function(combo){
+    var card=document.createElement('div');card.className='intel-row';card.style.display='block';
+    var title=document.createElement('strong');title.textContent=combo.legs.map(function(x){return x.direction+' '+x.pair}).join('  +  ');
+    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent=(combo.relationship||'')+' correlation '+combo.correlation+' · HTF '+combo.agreement+' · USD exposure '+combo.sharedUsdExposure;
+    card.appendChild(title);card.appendChild(detail);
+    combo.legs.forEach(function(leg){
+     var line=document.createElement('div');line.className='intel-muted';line.textContent=leg.pair+' '+leg.direction+' · Entry '+leg.entry+' · SL '+leg.stopLoss+' · TP '+leg.takeProfit;card.appendChild(line);
+    });
+    var note=document.createElement('div');note.className='intel-muted';note.style.marginTop='5px';note.textContent=combo.riskNote||'Check combined exposure and position sizing.';card.appendChild(note);hedge.appendChild(card);
+   });
+   if(!Array.isArray(snap.htfSignals)||!snap.htfSignals.length){htf.textContent='No pair currently has 3-of-4 timeframe agreement including 4H.';}
+   (snap.htfSignals||[]).forEach(function(signal){
+    var row=document.createElement('div');row.className='intel-row';
+    var left=document.createElement('div'),name=document.createElement('strong');name.textContent=signal.direction+' '+signal.pair;
+    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent='M '+signal.timeframes.Monthly+' · W '+signal.timeframes.Weekly+' · D '+signal.timeframes.Daily+' · 4H '+signal.timeframes['4H']+' · '+signal.agreement;
+    left.appendChild(name);left.appendChild(detail);
+    var price=document.createElement('div');price.className='intel-muted';price.textContent='Entry '+signal.entry+' · SL '+signal.stopLoss+' · TP '+signal.takeProfit;
+    row.appendChild(left);row.appendChild(price);htf.appendChild(row);
+   });
+   updated.textContent='Updated '+new Date(snap.updatedAt).toLocaleString()+' · Source: '+snap.source;
+  }catch(e){hedge.textContent='Could not load pair analysis. Try again after the next scheduled scan.';htf.textContent='HTF data is temporarily unavailable.';}
+ }
+
+ document.getElementById('refreshIntel').addEventListener('click',function(){render();loadPairIntelligence();});render();loadPairIntelligence();
 
 })();
 </script>
