@@ -1,11 +1,7 @@
 const webpush = require("../lib/push-adapter.js");
-const { Redis } = require("@upstash/redis");
+const redis = require("../lib/redis.js");
 const crypto = require("crypto");
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
-});
 const BLS_CALENDAR_URL = "https://www.bls.gov/schedule/news_release/bls.ics";
 const FF_CALENDAR_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
 const EASTERN_TZ = "America/New_York";
