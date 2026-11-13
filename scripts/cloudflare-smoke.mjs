@@ -51,7 +51,7 @@ await get("/api/push?action=unknown", 404);
 await get("/api/chart?pair=EURUSD&interval=15", 503);
 await get("/api/market-data?pair=EURUSD&tf=15", 503);
 await get("/api/exchange-rate", 503);
-await get("/api/replay?pair=EURUSD&interval=15", 503);
+await get("/api/replay?pair=EURUSD&interval=15", 400);
 await get("/api/news-signal", 503);
 await get("/api/not-a-real-route", 404);
 await get("/api/cron-scan.js", 404);
