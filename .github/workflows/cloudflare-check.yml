@@ -28,7 +28,7 @@ jobs:
         run: npx --yes wrangler@latest deploy --dry-run
       - name: Start local Cloudflare Worker
         run: |
-          npx --yes wrangler@latest dev --local --ip 127.0.0.1 --port 8787 --log-level error > /tmp/dagbo-worker.log 2>&1 &
+          npx --yes wrangler@latest dev --local --ip 127.0.0.1 --port 8787 --var DAGBO_CRON_SECRET:smoke-test-secret --log-level error > /tmp/dagbo-worker.log 2>&1 &
           echo $! > /tmp/dagbo-worker.pid
       - name: Smoke-test API routes and static assets
         run: node scripts/cloudflare-smoke.mjs
