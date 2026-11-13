@@ -1,3 +1,5 @@
+const webpush = require("../lib/push-adapter.js");
+
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
@@ -10,6 +12,15 @@ module.exports = async function handler(req, res) {
     marketData: !!process.env.TWELVE_DATA_API_KEY,
     cronSecret: !!(process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.SIGNAL_PUSH_SECRET)
   };
+  if (req.query && req.query.check === "push-runtime") {
+    try {
+      await webpush.checkRuntime();
+      checks.pushRuntime = true;
+    } catch (error) {
+      checks.pushRuntime = false;
+      console.error("DAGBO push runtime check failed:", error.message);
+    }
+  }
   return res.status(200).json({
     success: true,
     services: checks,
