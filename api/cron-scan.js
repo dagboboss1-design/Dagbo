@@ -487,6 +487,23 @@ function summarizeExposure(first, second) {
   Object.keys(out).forEach(c=>{if(!out[c]) delete out[c];});
   return out;
 }
+async function getConfiguredForexPairs() {
+  const ids = await redis.smembers("dagbo:push:subscriptions");
+  const selected = new Set();
+  for (const id of ids) {
+    const raw = await redis.get("dagbo:scan:pairs:" + id);
+    if (!raw) continue;
+    try {
+      const list = typeof raw === "string" ? JSON.parse(raw) : raw;
+      if (Array.isArray(list)) list.forEach(item => {
+        const pair=String(item).toUpperCase();
+        if (/^[A-Z]{6}$/.test(pair) && SYMBOLS[pair]) selected.add(pair);
+      });
+    } catch(e) {}
+  }
+  return Array.from(selected).slice(0, 8);
+}
+
 async function runPairIntelligence(pairs, apiKey) {
   const forexPairs=pairs.filter(p=>/^[A-Z]{6}$/.test(p) && SYMBOLS[p]);
   const data={}, errors=[];
@@ -635,7 +652,7 @@ module.exports = async function handler(req, res) {
 
     let pairIntelligence = null;
     try {
-      pairIntelligence = await runPairIntelligence(pairsToScan, apiKey);
+      pairIntelligence = await runPairIntelligence(await getConfiguredForexPairs(), apiKey);
     } catch (pairError) {
       console.error("DAGBO pair-intelligence scan failed:", pairError.message);
     }
