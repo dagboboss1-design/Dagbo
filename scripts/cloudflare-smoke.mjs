@@ -1,7 +1,8 @@
 const base = "http://127.0.0.1:8787";
 
 async function get(path, expectedStatus, check) {
-  const response = await fetch(base + path);
+  const options = path.startsWith("/api/cron-") || path === "/api/news-monitor" ? { headers: { Authorization: "Bearer xxxxxxxxxxxxxxxxx" } } : undefined;
+  const response = await fetch(base + path, options);
   const body = await response.text();
   if (response.status !== expectedStatus) {
     throw new Error(path + ": expected HTTP " + expectedStatus + ", received " + response.status + ": " + body.slice(0, 300));
@@ -25,7 +26,7 @@ await get("/", 200, (_response, body) => {
 });
 await get("/api/health", 200, (_response, body) => {
   const data = JSON.parse(body);
-  if (data.success !== true || !data.services) throw new Error("Health endpoint returned an invalid response");
+  if (data.success !== true || !data.services || data.services.cronSecret !== true) throw new Error("Health endpoint returned an invalid response or did not read the test secret from process.env");
 });
 await get("/api/cron-scan", 401);
 await get("/api/cron-signal", 401);
