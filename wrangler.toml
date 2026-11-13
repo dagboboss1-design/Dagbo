@@ -1,0 +1,9 @@
+name = "dagbo-signal"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-11-13"
+workers_dev = true
+
+[assets]
+directory = "."
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
