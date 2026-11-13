@@ -1,16 +1,5 @@
 const webpush = require("../lib/push-adapter.js");
-const { Redis } = require("@upstash/redis");
-
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
-});
-
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-);
+const redis = require("../lib/redis.js");
 
 // --- HELPERS ---
 function firstFriday(year, mIdx){
@@ -48,6 +37,7 @@ function getHighNewsEvents() {
 }
 
 async function sendPush(title, body, tag) {
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
   const payload = JSON.stringify({ title, body, url: "/boss1.html", tag });
   const ids = await redis.smembers("dagbo:push:subscriptions");
   for (const id of ids) {
