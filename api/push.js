@@ -260,11 +260,11 @@ module.exports = async function handler(req, res) {
             });
             if (rssResponse.ok) {
               const xml = await rssResponse.text();
-              const blocks = xml.match(/<item\\b[\\s\\S]*?<\\/item>/gi) || [];
+              const blocks = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
               const headlines = blocks.slice(0, 6).map(block => {
                 const read = tag => {
-                  const match = block.match(new RegExp("<" + tag + "(?:\\\\s[^>]*)?>([\\\\s\\S]*?)<\\/" + tag + ">", "i"));
-                  return match ? match[1].replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, "$1").replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\\s+/g, " ").trim() : "";
+                  const match = block.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + tag + ">", "i"));
+                  return match ? match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim() : "";
                 };
                 return { title: read("title"), published: read("pubDate"), summary: read("description").slice(0, 240) };
               }).filter(item => item.title);
