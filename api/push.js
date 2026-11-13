@@ -235,7 +235,7 @@ module.exports = async function handler(req, res) {
         }
       }
       let economicCalendarContext = "";
-      const asksNews = /\\b(news|headline|economic calendar|economic event|cpi|ppi|pce|nfp|nonfarm|payroll|inflation|interest rate|central bank|fomc|federal reserve|ecb|boe|boj|gdp|unemployment|actual|forecast|market spike|spike)\\b/i.test(String(question || ""));
+      const asksNews = /\b(news|headline|economic calendar|economic event|cpi|ppi|pce|nfp|nonfarm|payroll|inflation|interest rate|central bank|fomc|federal reserve|ecb|boe|boj|gdp|unemployment|actual|forecast|market spike|spike)\b/i.test(String(question || ""));
       if (asksNews) {
         try {
           const calendarUrl = "https://showmytrades.com/api/public/calendar/v1?currency=USD%2CEUR%2CGBP%2CJPY%2CAUD%2CNZD%2CCAD%2CCHF%2CCNY&impact=all&days=3";
