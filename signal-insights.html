@@ -78,6 +78,8 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
  async function loadPairIntelligence(){
   var hedge=document.getElementById('hedgeList'),htf=document.getElementById('htfList'),updated=document.getElementById('htfUpdated');
   try{
+   var macroByPair={};
+   try{var macroResponse=await fetch('/api/fundamentals',{cache:'no-store'});if(macroResponse.ok){var macroData=await macroResponse.json();macroByPair=Object.fromEntries((macroData.pairs||[]).map(function(x){return [x.pair,x]}));}}catch(e){}
    var response=await fetch('/api/cron-scan?view=pair-intelligence',{cache:'no-store'});
    var data=await response.json(),snap=data&&data.snapshot;
    hedge.textContent='';htf.textContent='';
@@ -89,7 +91,7 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
     var detail=document.createElement('div');detail.className='intel-muted';detail.textContent=(combo.relationship||'')+' correlation '+combo.correlation+' · HTF '+combo.agreement+' · USD exposure '+combo.sharedUsdExposure+' · DXY D '+(combo.dxyDirections&&combo.dxyDirections.Daily||'—')+' / 4H '+(combo.dxyDirections&&combo.dxyDirections['4H']||'—');
     card.appendChild(title);card.appendChild(detail);
     combo.legs.forEach(function(leg){
-     var line=document.createElement('div');line.className='intel-muted';line.textContent=leg.pair+' '+leg.direction+' · Entry '+leg.entry+' · SL '+leg.stopLoss+' · TP '+leg.takeProfit;card.appendChild(line);
+     var line=document.createElement('div');line.className='intel-muted';var macro=macroByPair[leg.pair];var macroText=macro&&macro.bias?(' · Macro '+macro.bias+' ('+macro.score+')'+(macro.bias!=='NEUTRAL'&&macro.bias!==leg.direction?' · DIVERGENCE':'') ):' · Macro unavailable';line.textContent=leg.pair+' '+leg.direction+' · Entry '+leg.entry+' · SL '+leg.stopLoss+' · TP '+leg.takeProfit+macroText;card.appendChild(line);
     });
     var note=document.createElement('div');note.className='intel-muted';note.style.marginTop='5px';note.textContent=combo.riskNote||'Check combined exposure and position sizing.';card.appendChild(note);hedge.appendChild(card);
    });
@@ -97,7 +99,7 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
    (snap.htfSignals||[]).forEach(function(signal){
     var row=document.createElement('div');row.className='intel-row';
     var left=document.createElement('div'),name=document.createElement('strong');name.textContent=signal.direction+' '+signal.pair;
-    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent='M '+signal.timeframes.Monthly+' · W '+signal.timeframes.Weekly+' · D '+signal.timeframes.Daily+' · 4H '+signal.timeframes['4H']+' · '+signal.agreement+' HTF · 4H methods '+(signal.methodAgreement||'—');
+    var detail=document.createElement('div');detail.className='intel-muted';var macro=macroByPair[signal.pair];var macroText=macro&&macro.bias?(' · Macro '+macro.bias+' ('+macro.score+')'+(macro.bias!=='NEUTRAL'&&macro.bias!==signal.direction?' · DIVERGENCE':'') ):' · Macro unavailable';detail.textContent='M '+signal.timeframes.Monthly+' · W '+signal.timeframes.Weekly+' · D '+signal.timeframes.Daily+' · 4H '+signal.timeframes['4H']+' · '+signal.agreement+' HTF · 4H methods '+(signal.methodAgreement||'—')+macroText;
     left.appendChild(name);left.appendChild(detail);
     var price=document.createElement('div');price.className='intel-muted';price.textContent='Entry '+signal.entry+' · SL '+signal.stopLoss+' · TP '+signal.takeProfit;
     row.appendChild(left);row.appendChild(price);htf.appendChild(row);
