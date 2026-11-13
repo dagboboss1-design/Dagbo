@@ -296,9 +296,7 @@ body{background:#050b14!important;color:#edf4ff!important}
   function loadHeadlines() {
     var target = document.getElementById('newsHeadlines');
     showMessage('Fetching latest market news...');
-    var feedUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' +
-      encodeURIComponent('https://www.fxstreet.com/rss/news');
-    fetch(feedUrl, { cache: 'no-store' })
+    fetch('/api/news-feed', { cache: 'no-store' })
       .then(function(res) {
         if (!res.ok) throw new Error('News service unavailable');
         return res.json();
