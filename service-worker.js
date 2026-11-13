@@ -1,4 +1,4 @@
-const VERSION = "dagbo-v21";
+const VERSION = "dagbo-v22";
 const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "market-heatmap.html", "replay.html", "settings.html", "icons/dagbo-icon.svg", "dagbo.css", "manifest.json", "pwa.js", "navigation.js"];
 
 self.addEventListener("install", (event) => {
@@ -19,14 +19,24 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+
+  const requestUrl = new URL(event.request.url);
+  // Leave external resources and live API responses to the network. In
+  // particular, never return the app shell as a substitute for an API/JS file.
+  if (requestUrl.origin !== self.location.origin || requestUrl.pathname.startsWith("/api/")) return;
+
   event.respondWith(
     fetch(event.request).then((response) => {
-      if (response && response.ok && new URL(event.request.url).origin === self.location.origin) {
+      if (response && response.ok && response.type === "basic") {
         const copy = response.clone();
         caches.open(VERSION).then((cache) => cache.put(event.request, copy));
       }
       return response;
-    }).catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
+    }).catch(() => caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      if (event.request.mode === "navigate") return caches.match("./index.html");
+      return Response.error();
+    }))
   );
 });
 
