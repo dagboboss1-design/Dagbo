@@ -31,10 +31,10 @@
     <div class="dg-card__head"><h2 class="dg-card__title">🛡️ Risk Guardian</h2><span class="dg-pill dg-pill--open">Personal risk</span></div>
     <p class="dg-muted" style="font-size:13px;margin:6px 0 12px">Your configured risk budget and current journal exposure overview.</p>
     <div class="dg-grid-2">
-      <div class="dg-level"><span>Risk budget / trade</span><strong id="riskBudget">$1.00</strong></div>
+      <div class="dg-level"><span>Risk budget / trade</span><strong id="riskBudget">$0.50</strong></div>
       <div class="dg-level"><span>Open journal trades</span><strong id="riskOpenTrades">0</strong></div>
       <div class="dg-level"><span>Today's closed P&amp;L</span><strong id="riskTodayPnl">—</strong></div>
-      <div class="dg-level"><span>Account risk setting</span><strong id="riskSetting">1%</strong></div>
+      <div class="dg-level"><span>Account risk setting</span><strong id="riskSetting">0.5%</strong></div>
     </div>
     <p class="dg-help">Money risk from a specific lot size requires the instrument's broker contract size, tick value and account currency. DAGBO will not guess those values.</p>
   </section>
@@ -182,7 +182,7 @@
 
   function renderRiskGuardian() {
     var account = Number(settings.accountSize) || initialBalance;
-    var riskPct = Number(settings.risk) || 1;
+    var riskPct = settings.risk === undefined ? 0.5 : (Number(settings.risk) || 0.5);
     var budget = account * riskPct / 100;
     var open = trades.filter(function(t){ return t.result === 'OPEN'; }).length;
     var today = new Date().toDateString();
@@ -278,7 +278,7 @@
     document.getElementById('fTimeframe').value = '';
     ['fEntry','fSl','fTp','fPnl'].forEach(function(id){document.getElementById(id).value='';});
     document.getElementById('fLot').value = '0.01';
-    document.getElementById('fRiskAmount').value = ((Number(settings.accountSize)||initialBalance)*(Number(settings.risk)||1)/100).toFixed(2);
+    document.getElementById('fRiskAmount').value = ((Number(settings.accountSize)||initialBalance)*(settings.risk===undefined?0.5:(Number(settings.risk)||0.5))/100).toFixed(2);
     document.getElementById('fExit').value = '';
     document.getElementById('tradeCalcHint').textContent = 'Standard FX and XAUUSD calculations are supported; broker-specific markets are not guessed.';
     document.getElementById('tradeModal').style.display = 'flex';
@@ -294,7 +294,7 @@
     document.getElementById('fResult').value = trade.result || 'OPEN';
     document.getElementById('fStrategy').value = trade.strategy || '';
     document.getElementById('fTimeframe').value = trade.timeframe || '';
-    document.getElementById('fRiskAmount').value = trade.riskAmount || ((Number(settings.accountSize)||initialBalance)*(Number(settings.risk)||1)/100).toFixed(2);
+    document.getElementById('fRiskAmount').value = trade.riskAmount || ((Number(settings.accountSize)||initialBalance)*(settings.risk===undefined?0.5:(Number(settings.risk)||0.5))/100).toFixed(2);
     document.getElementById('fEntry').value = trade.entry ?? '';
     document.getElementById('fSl').value = trade.stopLoss ?? '';
     document.getElementById('fTp').value = trade.takeProfit ?? '';
