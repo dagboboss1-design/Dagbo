@@ -19,9 +19,13 @@ jobs:
     steps:
       - name: Run five-minute news monitor
         env:
-          DAGBO_BASE_URL: https://dagbo-dagbo1.vercel.app
+          DAGBO_BASE_URL: ${{ vars.DAGBO_BASE_URL || 'https://dagbo-v9g7.vercel.app' }}
           SIGNAL_PUSH_SECRET: ${{ secrets.SIGNAL_PUSH_SECRET }}
         run: |
+          if [ -z "$DAGBO_BASE_URL" ]; then
+            echo "Missing repository variable DAGBO_BASE_URL (your current Vercel deployment URL)"
+            exit 1
+          fi
           if [ -z "$SIGNAL_PUSH_SECRET" ]; then
             echo "Missing repository secret SIGNAL_PUSH_SECRET"
             exit 1

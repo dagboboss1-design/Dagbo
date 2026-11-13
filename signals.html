@@ -7,7 +7,7 @@
 <title>Signals · DAGBO SIGNAL</title>
 
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="icons/dagbo-icon.svg">
 <link rel="stylesheet" href="dagbo.css">
 
 <script>
@@ -30,7 +30,7 @@
   </div>
   
   <h1 class="dg-title">Signal Board</h1>
-  <p class="dg-subtitle">3 Systems. Confluence Engine.</p>
+  <p class="dg-subtitle">ICT + SMC + Trendlines. Multi-Method Confluence.</p>
 
   <a class="dg-row dg-row--link dg-card" href="signal-insights.html" style="margin-top:16px;border-radius:16px">
     <span class="dg-row__icon dg-row__icon--amber">◈</span>
@@ -46,7 +46,7 @@
 
   <section class="dg-card" style="margin:14px 0">
     <div class="dg-card__head"><h2 class="dg-card__title">DAGBO Multi-Method Engine</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
-    <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">You do not select a strategy. Every scan checks the available trend and momentum indicators, candlestick behaviour, price-action structure, liquidity sweeps, BOS / CHoCH-style breaks and fair-value-gap conditions. A signal is shown only when enough independent evidence agrees.</p>
+    <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">You do not select a strategy. Every scan checks trend and momentum, candlesticks, confirmed swing structure (BOS / CHoCH), liquidity sweeps, fair-value gaps, order-block retests, premium/discount responses and swing-based trendline breakouts. A signal requires at least four agreeing method votes. Trendline breaks and ICT zones are counted only when confirmed by completed candles.</p>
     <p class="dg-help" style="margin-top:8px">Each result names the evidence that actually contributed. A method is marked unavailable when its required data is not present.</p>
   </section>
 
@@ -121,15 +121,21 @@
 
   // --- MATH ENGINES ---
   function calculateRSI(closes, period) {
-    if (closes.length <= period) return 50;
-    let gains = 0, losses = 0;
-    for (let i = 1; i <= period; i++) {
-      let diff = closes[i] - closes[i-1];
-      if (diff >= 0) gains += diff; else losses -= diff;
+    if (!Array.isArray(closes) || closes.length <= period) return 50;
+    // Use the latest completed price changes, not the oldest candles in the
+    // downloaded history. A flat market has a neutral RSI of 50.
+    var gains = 0, losses = 0;
+    var start = closes.length - period;
+    for (var i = start; i < closes.length; i++) {
+      var diff = Number(closes[i]) - Number(closes[i - 1]);
+      if (!Number.isFinite(diff)) return 50;
+      if (diff > 0) gains += diff;
+      else if (diff < 0) losses -= diff;
     }
-    let avgGain = gains / period, avgLoss = losses / period;
-    if (avgLoss === 0) return 100;
-    let rs = avgGain / avgLoss;
+    if (gains === 0 && losses === 0) return 50;
+    if (losses === 0) return 100;
+    if (gains === 0) return 0;
+    var rs = (gains / period) / (losses / period);
     return 100 - (100 / (1 + rs));
   }
 
@@ -191,10 +197,79 @@
     var currentVolume=Number(last.volume),avgVolume=volumes.length?volumes.reduce(function(sum,v){return sum+v},0)/volumes.length:0;
     var volumeDir=Number.isFinite(currentVolume)&&avgVolume>0&&currentVolume>avgVolume*1.5?(c>o?'BUY':c<o?'SELL':'WAIT'):'WAIT';
     add('Volume confirmation',volumeDir,'current volume '+(avgVolume>0?(currentVolume/avgVolume).toFixed(2)+'× 20-bar average':'not available'));
+    // Confirmed swing points: a pivot is only accepted after candles on both sides exist.
+    function pivots(values, side, wing) {
+      var out=[];
+      for(var p=wing;p<values.length-wing;p++){
+        var ok=true;
+        for(var q=p-wing;q<=p+wing;q++){
+          if(q===p) continue;
+          if(side==='high' ? values[q]>=values[p] : values[q]<=values[p]) { ok=false; break; }
+        }
+        if(ok) out.push({index:p,price:values[p]});
+      }
+      return out;
+    }
+    var swingHighs=pivots(highs,'high',2), swingLows=pivots(lows,'low',2);
+    var recentHigh=swingHighs.length?swingHighs[swingHighs.length-1]:null;
+    var priorHigh=swingHighs.length>1?swingHighs[swingHighs.length-2]:null;
+    var recentLow=swingLows.length?swingLows[swingLows.length-1]:null;
+    var priorLow=swingLows.length>1?swingLows[swingLows.length-2]:null;
+    var smcDir='WAIT',smcName='No confirmed swing break';
+    if(recentHigh&&c>recentHigh.price){
+      smcDir=priorTrend==='SELL'?'BUY':'BUY';
+      smcName=priorTrend==='SELL'?'Bullish CHoCH: closed above confirmed swing high':'Bullish BOS: closed above confirmed swing high';
+    } else if(recentLow&&c<recentLow.price){
+      smcDir=priorTrend==='BUY'?'SELL':'SELL';
+      smcName=priorTrend==='BUY'?'Bearish CHoCH: closed below confirmed swing low':'Bearish BOS: closed below confirmed swing low';
+    }
+    // Use the pivot-based structure as the authoritative SMC break when available.
+    add('SMC swing structure',smcDir,smcName);
+
+    // Premium/discount location uses the recent dealing range; location alone is
+    // not a vote unless the latest candle also rejects in that direction.
+    var dealingHigh=Math.max.apply(null,highs.slice(-50)), dealingLow=Math.min.apply(null,lows.slice(-50));
+    var midpoint=(dealingHigh+dealingLow)/2, rangePosition=(c-dealingLow)/Math.max(dealingHigh-dealingLow,1e-12);
+    var pdDir=rangePosition<0.4&&c>o?'BUY':rangePosition>0.6&&c<o?'SELL':'WAIT';
+    add('ICT premium / discount',pdDir,pdDir==='BUY'?'discount half with bullish candle response':pdDir==='SELL'?'premium half with bearish candle response':'no directional response at range extreme');
+
+    // Order block: last opposite-colour candle before a confirmed displacement.
+    var obDir='WAIT',obDetail='No confirmed order-block retest';
+    for(var oi=n-2;oi>=Math.max(1,n-12);oi--){
+      var ob=candles[oi], obOpen=candleNumber(ob,'open'), obClose=candleNumber(ob,'close');
+      var obHigh=candleNumber(ob,'high'), obLow=candleNumber(ob,'low');
+      if(smcDir==='BUY'&&obClose<obOpen&&c>=obLow&&c<=obHigh&&c>o){
+        obDir='BUY';obDetail='bullish order-block zone retest with bullish close';break;
+      }
+      if(smcDir==='SELL'&&obClose>obOpen&&c>=obLow&&c<=obHigh&&c<o){
+        obDir='SELL';obDetail='bearish order-block zone retest with bearish close';break;
+      }
+    }
+    add('ICT order block',obDir,obDetail);
+
+    // Trendline break: connect the two latest confirmed pivots and project
+    // that line to the latest candle. Require a close through the line.
+    var trendlineDir='WAIT',trendlineDetail='No confirmed trendline breakout';
+    if(swingLows.length>=2){
+      var lowA=swingLows[swingLows.length-2],lowB=swingLows[swingLows.length-1];
+      if(lowB.index>lowA.index){
+        var supportNow=lowB.price+(lowB.price-lowA.price)/(lowB.index-lowA.index)*(n-1-lowB.index);
+        if(c<supportNow&&pc>=supportNow){trendlineDir='SELL';trendlineDetail='closed below rising swing-low trendline';}
+      }
+    }
+    if(trendlineDir==='WAIT'&&swingHighs.length>=2){
+      var highA=swingHighs[swingHighs.length-2],highB=swingHighs[swingHighs.length-1];
+      if(highB.index>highA.index){
+        var resistanceNow=highB.price+(highB.price-highA.price)/(highB.index-highA.index)*(n-1-highB.index);
+        if(c>resistanceNow&&pc<=resistanceNow){trendlineDir='BUY';trendlineDetail='closed above falling swing-high trendline';}
+      }
+    }
+    add('Trendline breakout',trendlineDir,trendlineDetail);
+
     var buys=votes.filter(function(v){return v==='BUY'}).length,sells=votes.filter(function(v){return v==='SELL'}).length;
-    var direction=buys>=3&&buys>sells?'BUY':sells>=3&&sells>buys?'SELL':'WAIT';
-    var final=direction==='BUY'?(buys>=6?'STRONG BUY':'BUY'):direction==='SELL'?(sells>=6?'STRONG SELL':'SELL'):'NO TRADE';
-    return {final:final,direction:direction,buyScore:buys,sellScore:sells,totalMethods:9,evidence:evidence,rsi:rsi,emaTrend:trend,macd:macd,candleName:candleName,structure:structure,structureName:structureName,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir};
+    var direction=buys>=4&&buys>sells?'BUY':sells>=4&&sells>buys?'SELL':'WAIT';
+    var final=direction==='BUY'?(buys>=7?'STRONG BUY':'BUY'):direction==='SELL'?(sells>=7?'STRONG SELL':'SELL'):'NO TRADE';
+    return {final:final,direction:direction,buyScore:buys,sellScore:sells,totalMethods:13,evidence:evidence,rsi:rsi,emaTrend:trend,macd:macd,candleName:candleName,structure:smcName,structureName:smcName,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,orderBlock:obDir,premiumDiscount:pdDir,trendline:trendlineDir};
   }
 
   // --- FETCH REAL DATA ---
@@ -211,9 +286,18 @@
       }
 
       let candles = data.values;
-      if (!candles || candles.length < 20) return null;
+      if (!Array.isArray(candles) || candles.length < 20) return null;
 
-      candles = candles.reverse(); 
+      // Twelve Data timestamps mark candle opens. Exclude the still-forming
+      // candle so a signal cannot flip while its 5m/15m bar is incomplete.
+      var candleMs = Number(tf) * 60 * 1000;
+      var nowMs = Date.now();
+      candles = candles.slice().reverse().filter(function(candle) {
+        var stamp = String(candle.datetime || '').replace(' ', 'T');
+        var candleStart = Date.parse(stamp + (/[zZ]|[+-]\d{2}:\d{2}$/.test(stamp) ? '' : 'Z'));
+        return Number.isFinite(candleStart) && candleStart + candleMs <= nowMs - 1000;
+      });
+      if (candles.length < 20) return null;
 
       var analysis=analyseAllMethods(candles);
       var final=analysis.final;
@@ -235,7 +319,7 @@
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
         lastCandleOpen:Number(lastC.open).toFixed(2),lastCandleClose:Number(lastC.close).toFixed(2),
         rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
-        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName
+        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,orderBlock:analysis.orderBlock,premiumDiscount:analysis.premiumDiscount,trendline:analysis.trendline,candlePattern:analysis.candleName
       };
     } catch(e) {
       console.error(e);
@@ -269,7 +353,7 @@
       row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--dg-line)';
       var left = document.createElement('div');
       var name = document.createElement('strong'); name.textContent=(index+1)+'. '+item.pair;
-      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/9 method votes agree · '+(currentSignalTF==='5'?'Scalping scan':'Intraday scan');
+      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/13 method votes agree · '+(currentSignalTF==='5'?'Scalping scan':'Intraday scan');
       left.appendChild(name); left.appendChild(detail);
       var pill = document.createElement('span'); pill.className='dg-pill '+(item.direction==='BUY'?'dg-pill--buy':'dg-pill--sell'); pill.textContent=item.signal;
       row.appendChild(left); row.appendChild(pill); best.appendChild(row);
@@ -401,7 +485,7 @@
       // Visual Debug Box
       var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
         '<b>Automatic evidence scan</b><br>RSI: '+Number(s.rsiValue).toFixed(1)+' · EMA: '+s.emaTrend+' · MACD: '+Number(s.macdValue).toPrecision(4)+'<br>' +
-        'Structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+'<br>Bollinger: '+s.bb+' · Volume: '+s.volume+'<br>Candle: '+s.candlePattern+
+        'Structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+'<br>Order block: '+s.orderBlock+' · Premium/discount: '+s.premiumDiscount+'<br>Trendline: '+s.trendline+'<br>Bollinger: '+s.bb+' · Volume: '+s.volume+'<br>Candle: '+s.candlePattern+
         '<br><b>Votes:</b> BUY '+s.buyScore+'/'+s.totalMethods+' · SELL '+s.sellScore+'/'+s.totalMethods+'</div>';
       
       var cardInner = '';
@@ -557,7 +641,7 @@
       stopLoss:sl,
       takeProfit:tp,
       lotSize:Number(settings.lotSize)||0.01,
-      riskAmount:(Number(settings.accountSize)||100)*(Number(settings.risk)||1)/100,
+      riskAmount:(Number(settings.accountSize)||100)*(settings.risk===undefined?0.5:(Number(settings.risk)||0.5))/100,
       strategy:strategy||'3-System Confluence',
       timeframe:currentSignalTF+'m',
       result:'OPEN',

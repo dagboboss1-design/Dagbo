@@ -24,7 +24,7 @@ module.exports = async function handler(req, res) {
   try {
     const url = "https://api.twelvedata.com/time_series?symbol=" +
       encodeURIComponent(symbol) + "&interval=" + tf +
-      "min&outputsize=60&apikey=" + encodeURIComponent(apiKey);
+      "min&outputsize=60&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
     const response = await fetch(url);
     const data = await response.json();
 

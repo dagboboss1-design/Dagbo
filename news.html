@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#F5F5F7" id="themeColor">
 <title>News · DAGBO SIGNAL</title>
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="icons/dagbo-icon.svg">
 <link rel="stylesheet" href="dagbo.css">
 <script>
 (function(){
@@ -17,6 +17,12 @@
 })();
 </script>
 <style>
+.spike-engines{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.spike-engine{background:#081421;border:1px solid #29415b;border-radius:13px;padding:12px}
+.spike-engine strong{display:block;font-size:13px;color:#f4f8ff;margin-bottom:6px}
+.spike-engine p{font-size:12px;line-height:1.5;color:#9eb2cc;margin:0}
+.spike-factor-list{display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;margin:12px 0 0;padding-left:19px;color:#dce8f8;font-size:12px;line-height:1.45}
+@media(max-width:390px){.spike-engines,.spike-factor-list{grid-template-columns:1fr}}
 .news-headline{display:block;text-decoration:none;padding:16px;margin-bottom:10px}
 .news-headline__title{font-weight:700;font-size:15px;color:var(--dg-text);line-height:1.45;margin:7px 0}
 .news-headline__meta{font-size:12px;color:var(--dg-text-2)}
@@ -85,6 +91,30 @@ body{background:#050b14!important;color:#edf4ff!important}
     <p id="newsCountdownInfo" class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:10px">Event time is loaded automatically from the economic calendar and shown in Nigeria time (WAT). A countdown is not a directional trade signal.</p>
     <div id="newsEventMeta" class="dg-muted" style="font-size:12px;margin-top:10px">Calendar source: Forex Factory feed · Checking…</div>
     <button id="refreshCalendar" class="dg-btn" type="button" style="margin-top:12px">↻ Refresh calendar</button>
+  </section>
+  <section class="dg-card" style="margin:18px 0;padding:16px;border-color:#176b3c!important">
+    <div class="dg-section" style="margin-top:0">DAGBO Spike Intelligence</div>
+    <p class="dg-muted" style="font-size:12px;line-height:1.5;margin:7px 0 10px">DAGBO separates the chance of a sharp move from the direction of that move. One score must never pretend to answer both questions.</p>
+    <div class="spike-engines">
+      <div class="spike-engine">
+        <strong>⚡ 1. SPIKE LIKELIHOOD</strong>
+        <p>Checks whether conditions are building for a sharp move. The score is a weighted setup score, not a statistically calibrated probability.</p>
+      </div>
+      <div class="spike-engine">
+        <strong>↕ 2. SPIKE DIRECTION</strong>
+        <p>Independently checks completed 5-minute, 15-minute and 1-hour candles. UP or DOWN is shown only when the 15-minute move and 1-hour trend agree across at least two affected markets; otherwise DAGBO says WAIT.</p>
+      </div>
+    </div>
+    <ol class="spike-factor-list">
+      <li>Economic calendar and news</li>
+      <li>Volatility compression</li>
+      <li>Liquidity / stop clusters</li>
+      <li>Volume / order-flow proxy</li>
+      <li>Cross-market confirmation (15m + 1h agreement)</li>
+      <li>London / New York session</li>
+      <li>Implied volatility</li>
+    </ol>
+    <p class="dg-muted" style="font-size:11px;line-height:1.5;margin:12px 0 0">Price checks use completed 5-minute, 15-minute and 1-hour candles; unfinished candles are excluded. Unavailable feeds stay PENDING and are excluded from the score. Tick volume is only a proxy for Forex activity. DXY, Treasury-yield and options-implied-volatility feeds are not currently connected, so DAGBO will not invent those readings. Check push notifications for event-time analysis.</p>
   </section>
   <section class="dg-card" style="margin:18px 0;padding:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -296,9 +326,7 @@ body{background:#050b14!important;color:#edf4ff!important}
   function loadHeadlines() {
     var target = document.getElementById('newsHeadlines');
     showMessage('Fetching latest market news...');
-    var feedUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' +
-      encodeURIComponent('https://www.fxstreet.com/rss/news');
-    fetch(feedUrl, { cache: 'no-store' })
+    fetch('/api/news-feed', { cache: 'no-store' })
       .then(function(res) {
         if (!res.ok) throw new Error('News service unavailable');
         return res.json();
