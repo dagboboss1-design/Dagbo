@@ -1,4 +1,4 @@
-const webpush = require("web-push");
+const webpush = require("../lib/push-adapter.js");
 const { Redis } = require("@upstash/redis");
 
 const redis = new Redis({
