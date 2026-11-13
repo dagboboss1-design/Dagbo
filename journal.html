@@ -166,13 +166,16 @@
   };
   function persist() { localStorage.setItem('dagbo_journal', JSON.stringify(trades)); }
   function syncServerTrade(trade) {
-    if (!trade || !trade.serverTracked || trade.result === 'OPEN') return;
+    if (!trade || !trade.serverTracked || trade.result === 'OPEN' || !trade.serverTradeId) return;
     if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
     window.DagboPWA.getSubscription().then(function(subscription) {
       if (!subscription) return;
       return fetch('/api/trades?action=close', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({subscription:subscription,tradeId:trade.id,result:trade.result,pnl:Number(trade.pnl)||0})
+        body:JSON.stringify({subscription:subscription,tradeId:trade.serverTradeId,result:trade.result,pnl:Number(trade.pnl)||0})
+      }).then(function(response) {
+        if (!response.ok) throw new Error('Cloud close sync returned ' + response.status);
+        return response.json();
       });
     }).catch(function(err){ console.warn('Cloud trade close sync failed:', err); });
   }
@@ -402,6 +405,11 @@
               Math.abs(Number(t.entry) - Number(remote.entry)) <= Math.max(0.00001, Math.abs(Number(remote.entry)) * 0.000001);
           });
           if (candidates.length === 1) local = candidates[0];
+        }
+        if (local) {
+          // Link the device-local journal record to the server UUID before either side closes.
+          local.serverTracked = true;
+          local.serverTradeId = remote.id;
         }
         if (local && remote.status === 'CLOSED' && local.result === 'OPEN') {
           local.result = remote.result || 'CLOSED';
