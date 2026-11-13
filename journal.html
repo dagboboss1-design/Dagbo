@@ -407,7 +407,14 @@
           local.result = remote.result || 'CLOSED';
           local.exit = remote.exit;
           var autoRemotePnl=calculatePnlUsd(local.pair,local.direction,Number(local.entry),Number(remote.exit),Number(local.lotSize));
-          local.pnl=autoRemotePnl!==null?autoRemotePnl:(Number(remote.pnl)||0);\n          local.pnlNeedsBrokerReview=autoRemotePnl===null;\n          local.serverTradeId=remote.id;
+          local.pnl=autoRemotePnl!==null?autoRemotePnl:(Number(remote.pnl)||0);
+          // Count a closed trade from its verified P&L if the server did not return a WIN/LOSS label.
+          const remoteResult = String(remote.result || "").toUpperCase();
+          local.result = ["WIN","LOSS","BREAKEVEN"].includes(remoteResult)
+            ? remoteResult
+            : local.pnl > 0 ? "WIN" : local.pnl < 0 ? "LOSS" : "BREAKEVEN";
+          local.pnlNeedsBrokerReview=autoRemotePnl===null;
+          local.serverTradeId=remote.id;
           if (Number(local.riskAmount) > 0) {
             local.rMultiple = Math.round((local.pnl / Number(local.riskAmount)) * 10) / 10;
           } else {
