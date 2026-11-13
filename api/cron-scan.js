@@ -431,7 +431,7 @@ async function getHtfCandles(pair, frame, apiKey) {
   const candles = data.values.slice().reverse().map(c => ({
     datetime: String(c.datetime || ""),
     open: num(c.open), high: num(c.high), low: num(c.low), close: num(c.close)
-  })).filter(c => c.datetime && [c.open,c.high,c.low,c.close].every(v => v !== null));
+  })).filter(c => c.datetime && [c.open,c.high,c.low,c.close].every(v => v !== null)).slice(0, -1);
   if (candles.length < 55) throw new Error("Insufficient " + frame.label + " history");
   await redis.set(cacheKey, JSON.stringify(candles), { ex: frame.ttl });
   return candles;
@@ -501,7 +501,7 @@ async function getConfiguredForexPairs() {
       });
     } catch(e) {}
   }
-  return Array.from(selected).slice(0, 8);
+  return (selected.size ? Array.from(selected) : ["EURUSD","GBPUSD","USDCHF","AUDUSD","NZDUSD","USDJPY"]).slice(0, 8);
 }
 
 async function runPairIntelligence(pairs, apiKey) {
@@ -516,6 +516,11 @@ async function runPairIntelligence(pairs, apiKey) {
     }));
   }));
 
+  const dxyDirections={};
+  await Promise.all(HTF_FRAMES.map(async frame=>{
+    try { const candles=await getHtfCandles("DXY",frame,apiKey); dxyDirections[frame.label]=htfDirection(candles); }
+    catch(e) { dxyDirections[frame.label]="UNAVAILABLE"; }
+  }));
   const htfSignals=[];
   for(const pair of forexPairs){
     const directions={};
@@ -524,9 +529,14 @@ async function runPairIntelligence(pairs, apiKey) {
     const buys=valid.filter(d=>d==="BUY").length,sells=valid.filter(d=>d==="SELL").length;
     const direction=buys>=3&&buys>sells&&directions["4H"]==="BUY"?"BUY":
       sells>=3&&sells>buys&&directions["4H"]==="SELL"?"SELL":"WAIT";
-    if(direction!=="WAIT"){
+    const fourHourMethods=data[pair]["4h"]?analyze(data[pair]["4h"],pair):null;
+    const methodDirection=fourHourMethods&&fourHourMethods.signal.includes("BUY")?"BUY":
+      fourHourMethods&&fourHourMethods.signal.includes("SELL")?"SELL":"WAIT";
+    if(direction!=="WAIT"&&methodDirection===direction){
       const plan=tradePlan(pair,direction,data[pair]["4h"]);
-      if(plan) htfSignals.push({...plan,timeframes:directions,agreement:Math.max(buys,sells)+"/4"});
+      if(plan) htfSignals.push({...plan,timeframes:directions,agreement:Math.max(buys,sells)+"/4",
+        methodAgreement:(direction==="BUY"?fourHourMethods.buyScore:fourHourMethods.sellScore)+"/9",
+        methodEvidence:fourHourMethods.evidence.slice(0,5)});
     }
   }
 
@@ -541,17 +551,22 @@ async function runPairIntelligence(pairs, apiKey) {
     const expectedSame=corr>=0;
     if((expectedSame&&first.direction!==second.direction)||(!expectedSame&&first.direction===second.direction)) continue;
     const exposure=summarizeExposure(first,second);
+    const usdDirection=exposure.USD>0?"BUY":exposure.USD<0?"SELL":"NEUTRAL";
+    const dxyConfirms=dxyDirections["4H"]==="UNAVAILABLE"||dxyDirections["4H"]==="WAIT"||
+      (dxyDirections["4H"]===usdDirection&&
+       (dxyDirections.Daily==="UNAVAILABLE"||dxyDirections.Daily==="WAIT"||dxyDirections.Daily===usdDirection));
+    if(exposure.USD&& !dxyConfirms) continue;
     combos.push({
       id:p1+"-"+p2,correlation:Number(corr.toFixed(2)),
       relationship:expectedSame?"POSITIVE":"NEGATIVE",
       agreement:Math.min(Number(first.agreement.split("/")[0]),Number(second.agreement.split("/")[0]))+"/4",
       legs:[first,second],currencyExposure:exposure,
-      sharedUsdExposure:exposure.USD||0,
+      sharedUsdExposure:exposure.USD||0,dxyDirections,
       riskNote:Math.abs(exposure.USD)>=2?"Both legs add to the same USD exposure; this is a correlated two-trade basket, not a risk-reducing hedge.":"Review combined currency exposure and position sizes; correlation does not guarantee offsetting risk."
     });
   }
   combos.sort((x,y)=>Math.abs(y.correlation)-Math.abs(x.correlation));
-  const snapshot={updatedAt:new Date().toISOString(),source:"Twelve Data candles",timeframes:["Monthly","Weekly","Daily","4H"],htfSignals,combos:combos.slice(0,10),errors};
+  const snapshot={updatedAt:new Date().toISOString(),source:"Twelve Data candles",timeframes:["Monthly","Weekly","Daily","4H"],dxyDirections,htfSignals,combos:combos.slice(0,10),errors};
   await redis.set("dagbo:pair-intelligence:last",JSON.stringify(snapshot),{ex:60*60*24*3});
 
   // Notify only when a new direction/correlation combination is first detected.
@@ -565,7 +580,7 @@ async function runPairIntelligence(pairs, apiKey) {
         " · Weekly "+signal.timeframes.Weekly+" · Daily "+signal.timeframes.Daily+
         " · 4H "+signal.timeframes["4H"]+" · Entry "+signal.entry+
         " · SL "+signal.stopLoss+" · TP "+signal.takeProfit+
-        " · "+signal.agreement+" timeframe agreement. Source: Twelve Data candles; confirm before trading.",
+        " · "+signal.agreement+" HTF agreement; 4H multi-method "+signal.methodAgreement+". Sources: EMA trend, RSI, MACD, candles, ICT/SMC structure, liquidity sweep, FVG and volatility bands. Confirm before trading.",
         "htf-"+signal.pair);
       await redis.set(key,signature,{ex:60*60*24*14});
     }
@@ -578,7 +593,7 @@ async function runPairIntelligence(pairs, apiKey) {
       await broadcast("🔗 SMART PAIR HEDGE SETUP",
         legs+" · "+combo.relationship+" correlation "+combo.correlation+
         " · HTF agreement "+combo.agreement+" · Combined USD exposure "+combo.sharedUsdExposure+
-        ". "+combo.riskNote+" Not a guaranteed hedge or trade.",
+        ". DXY HTF: "+dxyDirections.Daily+" daily / "+dxyDirections["4H"]+" 4H. "+combo.riskNote+" Not a guaranteed hedge or trade.",
         "smart-hedge-"+combo.id);
       await redis.set(key,signature,{ex:60*60*24*14});
     }
