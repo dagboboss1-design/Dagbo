@@ -69,12 +69,13 @@ body{background:var(--dg-bg);color:var(--dg-text)}
 <script>
 (function(){
 'use strict';
+var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
+var enabledPairs=Array.isArray(settings.pairs)?settings.pairs:['XAUUSD','EURUSD','GBPUSD','US30','BTCUSD'];
 var groups=[
- {name:'Gold & Metals',items:['XAUUSD','XAGUSD']},
- {name:'Forex Majors',items:['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCHF','USDCAD','NZDUSD']},
- {name:'Forex Crosses',items:['GBPJPY','EURJPY','EURGBP']},
+ {name:'Gold',items:['XAUUSD']},
+ {name:'Forex Majors',items:['EURUSD','GBPUSD','USDJPY','AUDUSD','USDCHF']},
+ {name:'Forex Crosses',items:['GBPJPY']},
  {name:'Indices',items:['US30','US100','NAS100','US500']},
- {name:'Commodities',items:['WTI','BRENT']},
  {name:'Crypto',items:['BTCUSD','ETHUSD']}
 ];
 function direction(v){if(typeof v!=='string')return'WAIT';if(v.indexOf('BUY')>=0)return'BUY';if(v.indexOf('SELL')>=0)return'SELL';if(v==='NO TRADE'||v==='WAIT')return'FLAT';return'WAIT';}
@@ -84,12 +85,16 @@ function render(){
  var snaps={};try{snaps=JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots'))||{}}catch(e){}
  var five=snaps['5']||{},fifteen=snaps['15']||{},counts={bull:0,bear:0,side:0,other:0},root=document.getElementById('heatmapGroups');
  root.textContent='';
+ var visibleCount=0;
  groups.forEach(function(group){
+  var visibleItems=group.items.filter(function(pair){return enabledPairs.indexOf(pair)!==-1;});
+  if(!visibleItems.length)return;
+  visibleCount+=visibleItems.length;
   var section=document.createElement('section');section.className='hm-group';
   var title=document.createElement('h3');title.textContent=group.name;section.appendChild(title);
   var table=document.createElement('div');table.className='hm-table';
   var head=document.createElement('div');head.className='hm-row hm-head';head.innerHTML='<span>MARKET</span><span>5 MIN</span><span>15 MIN</span><span>BIAS</span>';table.appendChild(head);
-  group.items.forEach(function(pair){
+  visibleItems.forEach(function(pair){
    var a=direction(five[pair]),b=direction(fifteen[pair]),bias=a===b&&a!=='WAIT'?a:(a==='FLAT'&&b==='FLAT'?'FLAT':'WAIT');
    if(bias==='BUY')counts.bull++;else if(bias==='SELL')counts.bear++;else if(bias==='FLAT')counts.side++;else counts.other++;
    var row=document.createElement('div');row.className='hm-row';
@@ -101,6 +106,7 @@ function render(){
   });
   section.appendChild(table);root.appendChild(section);
  });
+ if(!visibleCount){var empty=document.createElement('p');empty.className='hm-muted';empty.textContent='No supported markets are selected. Choose markets in Settings, then refresh the heatmap.';root.appendChild(empty);}
  document.getElementById('bullCount').textContent=counts.bull;
  document.getElementById('bearCount').textContent=counts.bear;
  document.getElementById('sideCount').textContent=counts.side;
