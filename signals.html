@@ -121,15 +121,21 @@
 
   // --- MATH ENGINES ---
   function calculateRSI(closes, period) {
-    if (closes.length <= period) return 50;
-    let gains = 0, losses = 0;
-    for (let i = 1; i <= period; i++) {
-      let diff = closes[i] - closes[i-1];
-      if (diff >= 0) gains += diff; else losses -= diff;
+    if (!Array.isArray(closes) || closes.length <= period) return 50;
+    // Use the latest completed price changes, not the oldest candles in the
+    // downloaded history. A flat market has a neutral RSI of 50.
+    var gains = 0, losses = 0;
+    var start = closes.length - period;
+    for (var i = start; i < closes.length; i++) {
+      var diff = Number(closes[i]) - Number(closes[i - 1]);
+      if (!Number.isFinite(diff)) return 50;
+      if (diff > 0) gains += diff;
+      else if (diff < 0) losses -= diff;
     }
-    let avgGain = gains / period, avgLoss = losses / period;
-    if (avgLoss === 0) return 100;
-    let rs = avgGain / avgLoss;
+    if (gains === 0 && losses === 0) return 50;
+    if (losses === 0) return 100;
+    if (gains === 0) return 0;
+    var rs = (gains / period) / (losses / period);
     return 100 - (100 / (1 + rs));
   }
 
