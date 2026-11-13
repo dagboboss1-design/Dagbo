@@ -1,0 +1,31 @@
+name: DAGBO Market Scanner
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dagbo-market-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run 15-minute market scanner
+        env:
+          DAGBO_BASE_URL: https://dagbo-dagbo1.vercel.app
+          SIGNAL_PUSH_SECRET: ${{ secrets.SIGNAL_PUSH_SECRET }}
+        run: |
+          if [ -z "$SIGNAL_PUSH_SECRET" ]; then
+            echo "Missing repository secret SIGNAL_PUSH_SECRET"
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --retry 2 --retry-delay 5 \
+            -H "Authorization: Bearer $SIGNAL_PUSH_SECRET" \
+            "$DAGBO_BASE_URL/api/cron-scan"
