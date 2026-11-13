@@ -1,0 +1,24 @@
+name: Cloudflare compatibility check
+
+on:
+  push:
+    branches:
+      - cloudflare-compat
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  workers-dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install
+      - name: Validate Cloudflare Workers bundle without deploying
+        run: npx --yes wrangler@latest deploy --dry-run
