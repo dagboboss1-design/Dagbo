@@ -1,0 +1,46 @@
+name: DAGBO validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check server-side JavaScript syntax
+        run: |
+          for file in api/*.js lib/*.js; do
+            node --check "$file"
+          done
+      - name: Validate PWA manifest and precache assets
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const manifest = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+          if (!Array.isArray(manifest.icons) || manifest.icons.length === 0) {
+            throw new Error("PWA manifest has no icons");
+          }
+          for (const icon of manifest.icons) {
+            if (!fs.existsSync(icon.src)) throw new Error("Missing manifest icon: " + icon.src);
+          }
+          const sw = fs.readFileSync("service-worker.js", "utf8");
+          const match = sw.match(/const PRECACHE = (\[[\s\S]*?\]);/);
+          if (!match) throw new Error("Service worker PRECACHE list not found");
+          const assets = JSON.parse(match[1]);
+          for (const asset of assets) {
+            if (asset === "./") continue;
+            if (!fs.existsSync(asset)) throw new Error("Missing precache asset: " + asset);
+          }
+          console.log("Manifest and " + assets.length + " precache entries verified.");
+          NODE
