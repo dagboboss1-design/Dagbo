@@ -83,7 +83,7 @@ body{background:#050b14!important;color:#edf4ff!important}
     <div id="newsCountdown" style="font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;margin:8px 0">--:--:--</div>
     <div id="newsCountdownStatus" class="dg-pill dg-pill--wait">Connecting to calendar</div>
     <p id="newsCountdownInfo" class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:10px">Event time is loaded automatically from the economic calendar and shown in Nigeria time (WAT). A countdown is not a directional trade signal.</p>
-    <div id="newsEventMeta" class="dg-muted" style="font-size:12px;margin-top:10px">Calendar source: Forex Factory feed · Checking…</div>
+    <div id="newsEventMeta" class="dg-muted" style="font-size:12px;margin-top:10px">Calendar data by ShowMyTrades · Checking…</div>
     <button id="refreshCalendar" class="dg-btn" type="button" style="margin-top:12px">↻ Refresh calendar</button>
   </section>
   <section class="dg-card" style="margin:18px 0;padding:16px">
@@ -126,10 +126,10 @@ body{background:#050b14!important;color:#edf4ff!important}
 
   <h3 class="dg-section">Economic Calendar</h3>
   <div class="dg-card dg-card--flush">
-    <a class="news-calendar-link" href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener noreferrer">
+    <a class="news-calendar-link" href="https://showmytrades.com/tools/economic-calendar" target="_blank" rel="noopener noreferrer">
       <span>
-        <strong>High-impact events &amp; NFP</strong>
-        <small>Open the live calendar for confirmed release dates, times and impact levels. Event schedules can change.</small>
+        <strong>ShowMyTrades · Economic calendar</strong>
+        <small>Free economic calendar with actual, forecast, previous figures and impact levels. Verify major releases with the issuing institution.</small>
       </span>
       <span aria-hidden="true" style="font-size:20px;color:var(--dg-blue-ink)">↗</span>
     </a>
@@ -246,7 +246,7 @@ body{background:#050b14!important;color:#edf4ff!important}
         info.textContent = 'Scheduled: ' + new Date(nextCalendarEvent.date).toLocaleString('en-NG', {dateStyle:'medium',timeStyle:'short',timeZone:'Africa/Lagos'}) + ' WAT. Confirm the time with the official calendar.';
       }
     }
-    meta.textContent = 'Calendar source: Forex Factory feed · Updated ' +
+    meta.textContent = 'Calendar data by ShowMyTrades · Updated ' +
       (calendarFetchedAt ? new Date(calendarFetchedAt).toLocaleTimeString('en-NG') : 'just now') +
       ' · Forecast: ' + (nextCalendarEvent.forecast || '—') +
       ' · Previous: ' + (nextCalendarEvent.previous || '—');
