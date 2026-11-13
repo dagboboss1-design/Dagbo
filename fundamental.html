@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#080d15"><title>Fundamental Analysis · DAGBO SIGNAL</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="dagbo.css">
+<style>
+body{background:#080d15;color:#eff5ff}.fund-page{max-width:820px;margin:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 14px 90px}.fund-card{background:#111d2b;border:1px solid #2a4055;border-radius:15px;padding:15px;margin:13px 0}.fund-muted{font-size:12px;line-height:1.55;color:#a5b7ca}.fund-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.fund-country{background:#0b1723;border:1px solid #263c51;border-radius:10px;padding:11px;min-width:0}.fund-country strong{font-size:14px}.fund-country small{display:block;color:#a5b7ca;font-size:11px;margin-top:5px;line-height:1.5}.fund-score{font-size:21px;font-weight:850;margin-top:5px}.fund-row{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #2a4055;font-size:12px}.fund-buy{color:#65e69c}.fund-sell{color:#ff929d}.fund-neutral{color:#f2d47a}.fund-btn{border:1px solid #28794c;background:#0c6d3d;color:#fff;border-radius:9px;padding:10px 14px;font-weight:800}.fund-badge{font-size:10px;color:#72e5a0;border:1px solid #276a45;border-radius:20px;padding:5px 8px}@media(max-width:420px){.fund-grid{grid-template-columns:1fr}}
+</style></head><body><main class="fund-page">
+<div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">MACRO ENGINE</div></div>
+<h1 class="dg-title">Fundamental Analysis</h1><p class="dg-subtitle">Compare the economic strength of major currencies using published macroeconomic data.</p>
+<section class="fund-card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><strong>Currency strength overview</strong><span id="fundCoverage" class="fund-badge">Waiting</span></div><p class="fund-muted">Relative score combines interest-rate support (40%), GDP growth (35%) and inverse unemployment (25%). It compares covered economies with one another; it is not a probability of profit.</p><div id="fundCurrencies" class="fund-grid"><div class="fund-muted">Loading data…</div></div></section>
+<section class="fund-card"><strong>Pair fundamental bias</strong><p class="fund-muted">A BUY means the base currency scores stronger than the quote currency in this relative macro comparison. A SELL means the reverse. Neutral or insufficient data means no directional macro edge.</p><div id="fundPairs" class="fund-muted">Loading pair scores…</div></section>
+<section class="fund-card"><strong>What DAGBO checks</strong><div class="fund-muted" style="margin-top:8px">• Interest-rate level as a relative yield-support proxy<br>• GDP growth as an economic momentum proxy<br>• Unemployment rate as a labour-market proxy<br>• Inflation displayed as context, not automatically treated as bullish or bearish<br>• Data freshness, missing values and source coverage</div></section>
+<section class="fund-card"><strong>How it connects to other systems</strong><p class="fund-muted">Signals use it as a context filter; News uses it to explain the currency backdrop; HTF analysis uses it as a higher-level confirmation; Smart Pair Hedge can compare both legs' macro bias. Fundamental data never overrides price confirmation by itself.</p><div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px"><a class="fund-btn" href="signals.html" style="text-decoration:none">Signals</a><a class="fund-btn" href="news.html" style="text-decoration:none">News</a><a class="fund-btn" href="signal-insights.html" style="text-decoration:none">HTF & Hedge</a></div></section>
+<p id="fundUpdated" class="fund-muted"></p><button id="fundRefresh" class="fund-btn">↻ Refresh macro data</button>
+</main><script>
+(function(){
+function el(id){return document.getElementById(id)}
+function render(data){
+el('fundCoverage').textContent=data.coverage+' currencies covered';
+el('fundCurrencies').textContent='';
+(data.currencies||[]).forEach(function(c){
+var card=document.createElement('div');card.className='fund-country';
+var name=document.createElement('strong');name.textContent=c.currency+' · '+c.country;
+var score=document.createElement('div');score.className='fund-score';score.textContent=c.score==null?'—':c.score+'/100';
+var detail=document.createElement('small');detail.textContent='Rate '+(c.rate==null?'—':c.rate)+' · GDP '+(c.growth==null?'—':c.growth)+' · Unemployment '+(c.unemployment==null?'—':c.unemployment)+' · Inflation '+(c.inflation==null?'—':c.inflation);
+card.append(name,score,detail);el('fundCurrencies').appendChild(card);
+});
+el('fundPairs').textContent='';
+(data.pairs||[]).forEach(function(p){
+var row=document.createElement('div');row.className='fund-row';
+var name=document.createElement('strong');name.textContent=p.pair;
+var value=document.createElement('b');value.className=p.bias==='BUY'?'fund-buy':p.bias==='SELL'?'fund-sell':'fund-neutral';value.textContent=p.bias+(p.score==null?'':' · '+(p.score>0?'+':'')+p.score);
+row.append(name,value);el('fundPairs').appendChild(row);
+});
+el('fundUpdated').textContent='Updated '+new Date(data.updatedAt).toLocaleString()+' · Trading Economics';
+}
+async function load(){
+el('fundRefresh').disabled=true;el('fundRefresh').textContent='Loading…';
+try{var r=await fetch('/api/fundamentals',{cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Fundamental data unavailable');render(d)}
+catch(e){el('fundCoverage').textContent='Not connected';el('fundCurrencies').textContent=e.message;el('fundPairs').textContent='No macro bias is calculated until the provider is connected.'}
+finally{el('fundRefresh').disabled=false;el('fundRefresh').textContent='↻ Refresh macro data'}
+}
+el('fundRefresh').addEventListener('click',load);load();
+})();
+</script><script src="navigation.js" defer></script></body></html>
