@@ -56,7 +56,7 @@ function getId(endpoint) {
 }
 
 function authorized(req) {
-  const secret = process.env.SIGNAL_PUSH_SECURITY;
+  const secret = process.env.SIGNAL_PUSH_SECURITY || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET;
   const supplied = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(supplied);
