@@ -29,12 +29,12 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
 
  <section class="intel-card">
   <div class="dg-card__head"><h2 class="dg-card__title">Smart Pair Hedge</h2><span class="dg-pill">CORRELATION ENGINE</span></div>
-  <p class="intel-muted">Finds two-pair combinations using measured 4H return correlation (minimum ±0.65) and confirmation from Monthly, Weekly, Daily and 4H trends. Each leg has its own Entry, SL and TP.</p>
+  <p class="intel-muted">Finds two-pair combinations using measured 4H return correlation (minimum ±0.65), shared currency exposure and DXY confirmation when available. Each leg also needs Monthly, Weekly, Daily and 4H alignment plus 4H multi-method confirmation. Each leg has its own Entry, SL and TP.</p>
   <div id="hedgeList" class="intel-muted">Loading latest pair combinations…</div>
  </section>
  <section class="intel-card">
   <div class="dg-card__head"><h2 class="dg-card__title">Higher-Timeframe Scanner</h2><span class="dg-pill">MONTHLY → 4H</span></div>
-  <p class="intel-muted">A directional signal requires at least 3 of 4 timeframes to agree, including 4H. The scan uses EMA20/EMA50 trend structure on completed provider candles.</p>
+  <p class="intel-muted">A directional signal requires at least 3 of 4 timeframes to agree, including 4H, plus 4H confirmation from RSI, MACD, candlesticks, ICT/SMC structure, liquidity sweeps, FVG and volatility bands.</p>
   <div id="htfList" class="intel-muted">Loading latest higher-timeframe signals…</div>
   <div id="htfUpdated" class="intel-muted" style="margin-top:8px"></div>
  </section>
@@ -86,7 +86,7 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
    (snap.combos||[]).forEach(function(combo){
     var card=document.createElement('div');card.className='intel-row';card.style.display='block';
     var title=document.createElement('strong');title.textContent=combo.legs.map(function(x){return x.direction+' '+x.pair}).join('  +  ');
-    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent=(combo.relationship||'')+' correlation '+combo.correlation+' · HTF '+combo.agreement+' · USD exposure '+combo.sharedUsdExposure;
+    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent=(combo.relationship||'')+' correlation '+combo.correlation+' · HTF '+combo.agreement+' · USD exposure '+combo.sharedUsdExposure+' · DXY D '+(combo.dxyDirections&&combo.dxyDirections.Daily||'—')+' / 4H '+(combo.dxyDirections&&combo.dxyDirections['4H']||'—');
     card.appendChild(title);card.appendChild(detail);
     combo.legs.forEach(function(leg){
      var line=document.createElement('div');line.className='intel-muted';line.textContent=leg.pair+' '+leg.direction+' · Entry '+leg.entry+' · SL '+leg.stopLoss+' · TP '+leg.takeProfit;card.appendChild(line);
@@ -97,7 +97,7 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
    (snap.htfSignals||[]).forEach(function(signal){
     var row=document.createElement('div');row.className='intel-row';
     var left=document.createElement('div'),name=document.createElement('strong');name.textContent=signal.direction+' '+signal.pair;
-    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent='M '+signal.timeframes.Monthly+' · W '+signal.timeframes.Weekly+' · D '+signal.timeframes.Daily+' · 4H '+signal.timeframes['4H']+' · '+signal.agreement;
+    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent='M '+signal.timeframes.Monthly+' · W '+signal.timeframes.Weekly+' · D '+signal.timeframes.Daily+' · 4H '+signal.timeframes['4H']+' · '+signal.agreement+' HTF · 4H methods '+(signal.methodAgreement||'—');
     left.appendChild(name);left.appendChild(detail);
     var price=document.createElement('div');price.className='intel-muted';price.textContent='Entry '+signal.entry+' · SL '+signal.stopLoss+' · TP '+signal.takeProfit;
     row.appendChild(left);row.appendChild(price);htf.appendChild(row);
