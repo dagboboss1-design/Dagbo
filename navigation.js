@@ -2,7 +2,7 @@
   if(document.getElementById('dagboSideMenu')) return;
   var items=[
     ['⌂','Home','index.html'],['↗','Signals','signals.html'],['⌁','Chart','chart.html'],
-    ['▤','Market News','news.html'],['◈','BOSS1','boss1.html'],['✳','AI Commander','ai.html'],
+    ['▤','Market News','news.html'],['◉','Fundamental Analysis','fundamental.html'],['◈','BOSS1','boss1.html'],['✳','AI Commander','ai.html'],
     ['▧','Journal','journal.html'],['◎','Trader Score','trader-score.html'],
     ['⌘','Strategy Lab','strategy-lab.html'],['◉','Opportunity Intelligence','signal-insights.html'],
     ['⚙','Settings','settings.html']
