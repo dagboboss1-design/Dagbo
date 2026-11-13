@@ -234,6 +234,31 @@ module.exports = async function handler(req, res) {
             : "No pair could be identified from the question or saved chart context. Ask which pair the user means.";
         }
       }
+      let economicCalendarContext = "";
+      const asksNews = /\\b(news|headline|economic calendar|economic event|cpi|ppi|pce|nfp|nonfarm|payroll|inflation|interest rate|central bank|fomc|federal reserve|ecb|boe|boj|gdp|unemployment|actual|forecast|market spike|spike)\\b/i.test(String(question || ""));
+      if (asksNews) {
+        try {
+          const calendarUrl = "https://showmytrades.com/api/public/calendar/v1?currency=USD%2CEUR%2CGBP%2CJPY%2CAUD%2CNZD%2CCAD%2CCHF%2CCNY&impact=all&days=3";
+          const calendarResponse = await fetch(calendarUrl, { headers: { "Accept": "application/json", "User-Agent": "DAGBO-SIGNAL-AI/1.0" } });
+          const calendarData = calendarResponse.ok ? await calendarResponse.json() : null;
+          if (calendarData && Array.isArray(calendarData.events)) {
+            const events = calendarData.events.slice(0, 12).map(event => ({
+              time: event.time || (Number(event.ts) ? new Date(Number(event.ts) * 1000).toISOString() : ""),
+              currency: event.currency, impact: event.impact, title: event.title,
+              actual: event.actual || "", forecast: event.forecast || "", previous: event.previous || "",
+              status: event.status || "scheduled", confidence: event.confidence || ""
+            }));
+            economicCalendarContext = "ShowMyTrades economic calendar (fetched " + (calendarData.generated_at || new Date().toISOString()) +
+              "; event times are UTC; schedule/data can change): " + JSON.stringify(events) +
+              ". Use these as scheduled-event context only. Actual may be blank before release. Do not infer a price direction from event importance alone.";
+          } else {
+            economicCalendarContext = "ShowMyTrades economic calendar is temporarily unavailable; do not invent upcoming event details.";
+          }
+        } catch (error) {
+          economicCalendarContext = "ShowMyTrades economic calendar could not be reached; do not invent upcoming event details.";
+        }
+      }
+
       if (typeof question !== "string" || !question.trim() || question.length > 2000 || !groqKey) {
         return res.status(!groqKey ? 503 : 400).json({
           error: !groqKey ? "AI service is not configured on the server" : "A valid question is required"
@@ -258,10 +283,10 @@ module.exports = async function handler(req, res) {
           messages: [
             {
               role: "system",
-              content: "You are DAGBO AI Market Commander for " + (safeName || "Oga") + ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise: greetings get one short greeting, simple questions get one direct answer, and use bullets only when useful. Speak in clear Nigerian-friendly English or Pidgin when natural. For live-price questions, use only a verified live quote supplied in the context below; if unavailable, say so and ask which pair is meant. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When the user requests a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit, plus one brief reason. Entry, SL and TP must be derived from fresh market data and a clearly defined setup, with correct price ordering for the direction. If fresh data or a valid setup is missing, return WAIT and explicitly say entry/SL/TP are not available; never fabricate levels. Never guarantee profits. Keep ordinary answers to 1-3 short sentences."
+              content: "You are DAGBO AI Market Commander for " + (safeName || "Oga") + ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise: greetings get one short greeting, simple questions get one direct answer, and use bullets only when useful. Speak in clear Nigerian-friendly English or Pidgin when natural. For live-price questions, use only a verified live quote supplied in the context below; if unavailable, say so and ask which pair is meant. Never invent prices, news, indicators or market conditions. For news and economic-event questions, explain the topic freely using the live economic-calendar context when supplied; distinguish scheduled events, published actual/forecast figures and unverified breaking headlines. If live headline data is not supplied, say you cannot verify breaking news right now. Treat device snapshots as potentially stale. When the user requests a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit, plus one brief reason. Entry, SL and TP must be derived from fresh market data and a clearly defined setup, with correct price ordering for the direction. If fresh data or a valid setup is missing, return WAIT and explicitly say entry/SL/TP are not available; never fabricate levels. Never guarantee profits. Keep ordinary answers to 1-3 short sentences."
             },
             ...safeHistory,
-            { role: "user", content: question.trim() + (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") + (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "") }
+            { role: "user", content: question.trim() + (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") + (economicCalendarContext ? "\n\nECONOMIC CALENDAR CONTEXT: " + economicCalendarContext : "") + (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "") }
           ],
           temperature: 0.3,
           max_tokens: 220
