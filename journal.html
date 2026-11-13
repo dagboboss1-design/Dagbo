@@ -313,7 +313,9 @@
     var sl = Number(document.getElementById('fSl').value);
     var tp = Number(document.getElementById('fTp').value);
     var lot = Number(document.getElementById('fLot').value);
-    var pnl = Number(document.getElementById('fPnl').value) || 0;
+    var pnlInput = document.getElementById('fPnl').value.trim();
+    var pnl = pnlInput === '' ? 0 : Number(pnlInput);
+    var manualPnlProvided = pnlInput !== '' && Number.isFinite(pnl);
     var exitPrice = Number(document.getElementById('fExit').value);
     var riskAmount = Number(document.getElementById('fRiskAmount').value);
     if (![entry,sl,tp,lot,riskAmount].every(Number.isFinite) || entry<=0 || sl<=0 || tp<=0 || lot<=0 || riskAmount<=0) {
@@ -327,10 +329,14 @@
     }
     if(result!=='OPEN'&&(!Number.isFinite(exitPrice)||exitPrice<=0))exitPrice=result==='WIN'?tp:result==='LOSS'?sl:entry;
     var autoPnl=result==='OPEN'?null:calculatePnlUsd(pair,direction,entry,exitPrice,lot);
-    if(autoPnl!==null)pnl=autoPnl;
+    if(autoPnl!==null){
+      pnl=autoPnl;
+      // For supported contract types, derive the result from the actual exit price.
+      result=pnl>0?'WIN':pnl<0?'LOSS':'BREAKEVEN';
+    }
     var autoRisk=calculatePnlUsd(pair,direction,entry,sl,lot);
     if(autoRisk!==null)riskAmount=Math.abs(autoRisk);
-    if(result!=='OPEN'&&autoPnl===null&&!(Number.isFinite(pnl)&&pnl!==0)){alert('This market needs a verified broker P&L or contract specification. No guessed result was saved.');return;}
+    if(result!=='OPEN'&&autoPnl===null&&!manualPnlProvided){alert('This market needs a verified broker P&L or contract specification. Enter the broker P&L (including 0.00 for breakeven) rather than saving a guessed result.');return;}
     var existing = editingId ? trades.find(function(t){return t.id===editingId;}) : null;
     if (!editingId && result === 'OPEN' && trades.some(function(t){return t.pair===pair && t.result==='OPEN';})) {
       alert('You already have an OPEN trade for ' + pair + '.');
