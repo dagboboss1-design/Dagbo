@@ -20,6 +20,7 @@ This branch prepares a Cloudflare Workers deployment while keeping the existing 
 Add these in Cloudflare Dashboard → Workers & Pages → DAGBO Worker → Settings → Variables and Secrets. Mark credentials as secrets. Do not commit their values.
 
 Required for the main features:
+- `TRADING_ECONOMICS_API_KEY` (macro indicators and relative currency-strength analysis)
 - `UPSTASH_REDIS_REST_URL`
 - `UPSTASH_REDIS_REST_TOKEN`
 - `TWELVE_DATA_API_KEY`
@@ -39,6 +40,14 @@ Optional:
 - `SIGNAL_PUSH_SECRET`
 
 The optional Twelve Data spike keys are fallbacks; `TWELVE_DATA_API_KEY` is sufficient for the shared provider setup. Use one cron secret consistently where possible.
+
+## Fundamental analysis integration
+
+- `fundamental.html` provides the dedicated macro dashboard.
+- `/api/fundamentals` retrieves published macro snapshots for USD, EUR, GBP, JPY, CAD, AUD, CHF and NZD from Trading Economics.
+- The relative currency score uses interest-rate support (40%), GDP growth (35%) and inverse unemployment (25%); inflation is shown as context and is not mechanically scored.
+- Fundamental context widgets are added to Signals, Market News and Opportunity & Trend Intelligence. The dedicated page is linked in the main navigation and Home.
+- The macro score is contextual confirmation only. It must not override price action or independently trigger a trade. Missing or stale series are excluded.
 
 ## Validation status and remaining work
 
