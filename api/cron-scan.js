@@ -125,7 +125,7 @@ function analyze(candles, pair) {
 }
 
 function validAuth(req) {
-  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY;
+  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.SIGNAL_PUSH_SECRET;
   const auth = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(auth);
@@ -444,7 +444,7 @@ module.exports = async function handler(req, res) {
     }
 
     const tradeSummary = await monitorTrades(results);
-    const newsSummary = await sendNewsAlerts(apiKey);
+    const newsSummary = { delegatedTo: "/api/news-monitor", note: "Economic-news and spike alerts run in the dedicated 5-minute news monitor." };
     const errorKey = "dagbo:scan:error:last";
     const previousErrorRaw = await redis.get(errorKey);
     if (errors.length) {
@@ -471,7 +471,7 @@ module.exports = async function handler(req, res) {
       scanned: Object.keys(results), errors, signals: results,
       tradeMonitoring: tradeSummary,
       newsMonitoring: newsSummary,
-      note: "Pre-news analysis compares DXY, XAUUSD and correlated USD pairs using two completed 15-minute candles from the 30-minute window ending 15 minutes before high-impact news. It is a directional bias, not a prediction of the news result or a broker order."
+      note: "News alerts and spike analysis run separately for GBPUSD, GBPJPY, EURUSD and XAUUSD; pre-news bias is not a prediction or broker order."
     };
     await redis.set("dagbo:cron:scan:last", JSON.stringify({
       scannedAt: responseBody.scannedAt, scanned: responseBody.scanned, errors
