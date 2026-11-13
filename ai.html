@@ -93,7 +93,7 @@ var SETTINGS_KEY = 'dagbo_settings';
 function readSettings(){ try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch(e){ return {}; } }
 function getName(){ var s = readSettings(); return (s.name || 'Oga').replace(/^Oga\s+/i, ''); }
 function getAutoRead(){ return readSettings().autoRead === true; }
-function getRiskPct(){ return Number(readSettings().risk) || 1; }
+function getRiskPct(){ var s=readSettings(); return s.risk===undefined?0.5:(Number(s.risk)||0.5); }
 function getAccount(){ return Number(readSettings().accountSize) || 100; }
 function getGroqKey(){ return ''; }
 function hasGroqKey(){ return true; }
