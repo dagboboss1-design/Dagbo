@@ -211,9 +211,18 @@
       }
 
       let candles = data.values;
-      if (!candles || candles.length < 20) return null;
+      if (!Array.isArray(candles) || candles.length < 20) return null;
 
-      candles = candles.reverse(); 
+      // Twelve Data timestamps mark candle opens. Exclude the still-forming
+      // candle so a signal cannot flip while its 5m/15m bar is incomplete.
+      var candleMs = Number(tf) * 60 * 1000;
+      var nowMs = Date.now();
+      candles = candles.slice().reverse().filter(function(candle) {
+        var stamp = String(candle.datetime || '').replace(' ', 'T');
+        var candleStart = Date.parse(stamp + (/[zZ]|[+-]\\d{2}:\\d{2}$/.test(stamp) ? '' : 'Z'));
+        return Number.isFinite(candleStart) && candleStart + candleMs <= nowMs - 1000;
+      });
+      if (candles.length < 20) return null;
 
       var analysis=analyseAllMethods(candles);
       var final=analysis.final;
