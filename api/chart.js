@@ -13,7 +13,7 @@ module.exports = async function handler(req,res){
   const interval=String(req.query.interval||'15');
   if(!SYMBOLS[pair]||!INTERVALS[interval])return res.status(400).json({error:'Unsupported market or timeframe'});
   const key=process.env.TWELVE_DATA_API_KEY;
-  if(!key)return res.status(503).json({error:'Live chart data is not configured. Add TWELVE_DATA_API_KEY in Vercel environment variables.'});
+  if(!key)return res.status(503).json({error:'Live chart data is not configured. Add TWELVE_DATA_API_KEY in Cloudflare Worker secrets.'});
   const url='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(SYMBOLS[pair])+
     '&interval='+encodeURIComponent(INTERVALS[interval])+'&timezone=UTC&outputsize=250&apikey='+encodeURIComponent(key);
   try{
