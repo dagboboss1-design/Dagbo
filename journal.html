@@ -165,14 +165,58 @@
     renderFxStatus();
   };
   function persist() { localStorage.setItem('dagbo_journal', JSON.stringify(trades)); }
+  async function syncServerOpenTrade(trade) {
+    if (!trade || trade.result !== 'OPEN' || trade.serverTracked) return;
+    if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
+    try {
+      var subscription = await window.DagboPWA.getSubscription();
+      if (!subscription) return;
+      var response = await fetch('/api/trades?action=open', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          subscription:subscription,
+          journalTradeId:trade.id,
+          pair:trade.pair,
+          direction:trade.direction,
+          entry:Number(trade.entry),
+          stopLoss:Number(trade.stopLoss),
+          takeProfit:Number(trade.takeProfit),
+          lotSize:Number(trade.lotSize)||0.01
+        })
+      });
+      var data = await response.json().catch(function(){ return {}; });
+      if (!response.ok || !data.success || !data.trade || !data.trade.id) {
+        throw new Error(data.error || 'The server could not start monitoring this trade.');
+      }
+      var saved = trades.find(function(item){ return item.id === trade.id; });
+      if (saved && saved.result === 'OPEN') {
+        saved.serverTracked = true;
+        saved.serverTradeId = data.trade.id;
+        persist();
+        renderList();
+      }
+    } catch(err) {
+      console.warn('Cloud trade open sync failed; trade remains saved locally:', err);
+    }
+  }
+
   function syncServerTrade(trade) {
-    if (!trade || !trade.serverTracked || trade.result === 'OPEN') return;
+    if (!trade) return;
+    if (trade.result === 'OPEN') {
+      syncServerOpenTrade(trade);
+      return;
+    }
+    if (!trade.serverTracked || !trade.serverTradeId) return;
     if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
     window.DagboPWA.getSubscription().then(function(subscription) {
       if (!subscription) return;
       return fetch('/api/trades?action=close', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({subscription:subscription,tradeId:trade.id,result:trade.result,pnl:Number(trade.pnl)||0})
+        body:JSON.stringify({subscription:subscription,tradeId:trade.serverTradeId,result:trade.result,pnl:Number(trade.pnl)||0})
+      }).then(function(response) {
+        if (!response.ok) return response.json().then(function(data) {
+          throw new Error(data.error || 'Server trade close sync failed');
+        });
       });
     }).catch(function(err){ console.warn('Cloud trade close sync failed:', err); });
   }
