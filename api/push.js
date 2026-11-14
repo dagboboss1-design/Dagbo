@@ -102,7 +102,7 @@ module.exports = async function handler(req, res) {
     if (req.method === "POST" && action === "subscribe") {
       const subscription = req.body;
       if (!validSubscription(subscription)) return res.status(400).json({ error: "Invalid subscription" });
-      const redis = getRedis();
+      const redis = getRedis(req);
       const id = getId(subscription.endpoint);
       await redis.set("dagbo:push:sub:" + id, JSON.stringify(subscription));
       await redis.sadd(SUBSCRIPTIONS, id);
@@ -114,7 +114,7 @@ module.exports = async function handler(req, res) {
       if (typeof endpoint !== "string" || !endpoint.startsWith("https://")) {
         return res.status(400).json({ error: "Invalid endpoint" });
       }
-      const redis = getRedis();
+      const redis = getRedis(req);
       const id = getId(endpoint);
       await redis.del("dagbo:push:sub:" + id);
       await redis.srem(SUBSCRIPTIONS, id);
@@ -139,8 +139,8 @@ module.exports = async function handler(req, res) {
         ? String(timeframe).toLowerCase() : "unspecified";
       const dedupeSource = String(signalId || [normalizedPair, normalizedSignal, safeTimeframe, priceEntry, priceSL, priceTP].join("|")).slice(0, 300);
       const dedupeHash = crypto.createHash("sha256").update(dedupeSource).digest("hex");
-      configureVapid();
-      const redis = getRedis();
+      configureVapid(req);
+      const redis = getRedis(req);
       const claimed = await redis.set("dagbo:push:signal:" + dedupeHash, "sent", { nx: true, ex: 60 * 60 * 6 });
       if (claimed !== "OK") {
         return res.status(200).json({ success: true, duplicate: true, sent: 0, message: "This signal notification was already processed." });
@@ -333,7 +333,7 @@ module.exports = async function handler(req, res) {
       if (validSubscription(subscription)) {
         try {
           // Push is optional: a missing VAPID setup must not block the AI answer.
-          configureVapid();
+          configureVapid(req);
           await webpush.sendNotification(subscription, JSON.stringify({
             title: "🤖 Dagbo AI Answer",
             body: (rawAnswer.trim().replace(/\s+/g, " ").slice(0, 190) + (rawAnswer.trim().length > 190 ? "…" : "")),
@@ -343,7 +343,7 @@ module.exports = async function handler(req, res) {
         } catch (error) {
           if ([404, 410].includes(error.statusCode)) {
             try {
-              const redis = getRedis();
+              const redis = getRedis(req);
               const id = getId(subscription.endpoint);
               await redis.del("dagbo:push:sub:" + id);
               await redis.srem(SUBSCRIPTIONS, id);
