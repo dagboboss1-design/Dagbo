@@ -1,7 +1,8 @@
 module.exports=async function(req,res){
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   res.setHeader("Cache-Control","no-store");
   if(req.method!=="GET")return res.status(405).json({error:"GET required"});
-  const key=process.env.TWELVE_DATA_API_KEY;
+  const key=env.TWELVE_DATA_API_KEY;
   if(!key)return res.status(503).json({error:"Live FX rate unavailable: TWELVE_DATA_API_KEY is not configured"});
   try{
     const url="https://api.twelvedata.com/exchange_rate?symbol=USD%2FNGN&dp=6&apikey="+encodeURIComponent(key);
