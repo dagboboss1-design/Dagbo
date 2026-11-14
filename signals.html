@@ -136,7 +136,7 @@
         detail:'Regular NYSE/Nasdaq hours: 9:30am–4:00pm New York time, weekdays. Holidays and broker CFD hours may differ.' };
     }
     var openFx = (day>=1 && day<=4) || (day===5 && minutes<1020) || (day===0 && minutes>=1020);
-    var session = minutes>=1200 || minutes<240 ? 'ASIA' : minutes>=180 && minutes<720 ? 'LONDON' : minutes>=480 && minutes<720 ? 'LONDON–NEW YORK OVERLAP' : minutes>=480 && minutes<1020 ? 'NEW YORK' : 'QUIET HOURS';
+    var session = minutes>=480 && minutes<720 ? 'LONDON–NEW YORK OVERLAP' : minutes>=180 && minutes<480 ? 'LONDON' : minutes>=720 && minutes<1020 ? 'NEW YORK' : minutes>=1200 || minutes<240 ? 'ASIA' : 'QUIET HOURS';
     return { open:openFx, label:openFx?'FOREX MARKET OPEN':'FOREX MARKET CLOSED',
       detail:openFx ? ('Indicative session: '+session+'. FX normally closes Friday 5pm and reopens Sunday 5pm New York time.') : 'FX normally reopens Sunday at 5:00pm New York time. Broker hours can vary.' };
   }
@@ -552,6 +552,11 @@
   window.executeTrade = function(pair, signal, entry, sl, tp, strategy) {
     var dir = String(signal || '').includes('BUY') ? 'BUY' : String(signal || '').includes('SELL') ? 'SELL' : null;
     if (!dir) { alert('This is not an executable BUY or SELL setup. Wait for confirmation.'); return; }
+    var marketNow = marketStatus(pair);
+    if (!marketNow.open) {
+      alert('MARKET CLOSED — ANALYSIS ONLY. You can review this setup, but do not open a live trade until your broker market reopens.');
+      return;
+    }
     entry=Number(entry); sl=Number(sl); tp=Number(tp);
     if (![entry,sl,tp].every(Number.isFinite) || entry<=0 || sl<=0 || tp<=0 ||
         (dir==='BUY' && !(sl<entry && tp>entry)) ||
