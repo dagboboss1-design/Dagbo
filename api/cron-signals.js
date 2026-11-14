@@ -67,7 +67,6 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   const redis = redisModule.createRedis(env);
   const API_KEY = env.TWELVE_DATA_API_KEY;
   const now = new Date();
