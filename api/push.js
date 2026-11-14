@@ -7,6 +7,11 @@ const aiRateFallback = new Map();
 const AI_RATE_LIMIT = 15;
 const AI_RATE_WINDOW_SECONDS = 600;
 
+// Cloudflare Workers provide secrets on req.env; process.env is only a compatibility fallback.
+function envValue(req, name) {
+  return (req && req.env && req.env[name]) || (typeof process !== "undefined" && process.env && process.env[name]) || "";
+}
+
 async function checkAiRateLimit(req) {
   const forwarded = req.headers["x-real-ip"] ||
     (typeof req.headers["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"].split(",")[0].trim() : "");
@@ -14,9 +19,9 @@ async function checkAiRateLimit(req) {
   const id = crypto.createHash("sha256").update(ip).digest("hex");
   const key = "dagbo:ai:rate:" + id;
 
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (envValue(req, "UPSTASH_REDIS_REST_URL") && envValue(req, "UPSTASH_REDIS_REST_TOKEN")) {
     try {
-      const redis = getRedis();
+      const redis = getRedis(req);
       const count = await redis.incr(key);
       if (count === 1) await redis.expire(key, AI_RATE_WINDOW_SECONDS);
       return { allowed: count <= AI_RATE_LIMIT, remaining: Math.max(0, AI_RATE_LIMIT - count) };
@@ -36,17 +41,17 @@ async function checkAiRateLimit(req) {
   return { allowed: current.count <= AI_RATE_LIMIT, remaining: Math.max(0, AI_RATE_LIMIT - current.count) };
 }
 
-function getRedis() {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+function getRedis(req) {
+  const url = envValue(req, "UPSTASH_REDIS_REST_URL");
+  const token = envValue(req, "UPSTASH_REDIS_REST_TOKEN");
   if (!url || !token) throw new Error("Push storage is not configured");
   return new Redis({ url, token });
 }
 
-function configureVapid() {
-  const subject = process.env.VAPID_SUBJECT;
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
+function configureVapid(req) {
+  const subject = envValue(req, "VAPID_SUBJECT");
+  const publicKey = envValue(req, "VAPID_PUBLIC_KEY");
+  const privateKey = envValue(req, "VAPID_PRIVATE_KEY");
   if (!subject || !publicKey || !privateKey) throw new Error("VAPID keys are not configured");
   webpush.setVapidDetails(subject, publicKey, privateKey);
 }
@@ -56,7 +61,7 @@ function getId(endpoint) {
 }
 
 function authorized(req) {
-  const secret = process.env.SIGNAL_PUSH_SECURITY || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET;
+  const secret = envValue(req, "SIGNAL_PUSH_SECURITY") || envValue(req, "SIGNAL_PUSH_SECRET") || envValue(req, "DAGBO_CRON_SECRET") || envValue(req, "CRON_SECRET");
   const supplied = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(supplied);
@@ -76,16 +81,16 @@ module.exports = async function handler(req, res) {
 
   try {
     if (req.method === "GET" && action === "public-key") {
-      if (!process.env.VAPID_PUBLIC_KEY) {
+      if (!envValue(req, "VAPID_PUBLIC_KEY")) {
         return res.status(503).json({ error: "Push notifications are not configured on the server" });
       }
-      return res.status(200).json({ publicKey: process.env.VAPID_PUBLIC_KEY });
+      return res.status(200).json({ publicKey: envValue(req, "VAPID_PUBLIC_KEY") });
     }
 
     if (req.method === "POST" && action === "test") {
       const subscription = req.body;
       if (!validSubscription(subscription)) return res.status(400).json({ error: "Invalid subscription" });
-      configureVapid();
+      configureVapid(req);
       await webpush.sendNotification(subscription, JSON.stringify({
         title: "DAGBO SIGNAL — Test",
         body: "Your push notifications are working.",
@@ -182,7 +187,7 @@ module.exports = async function handler(req, res) {
       }).map(function(item) {
         return { role: item.role, content: item.content.slice(0, 1200) };
       }) : [];
-      const groqKey = process.env.GROQ_API_KEY;
+      const groqKey = envValue(req, "GROQ_API_KEY");
       // Fetch a real Twelve Data quote for explicit pair questions or the pair
       // selected in the user's saved chart snapshots. Never ask the model to guess.
       const pairSymbols = {
@@ -211,7 +216,7 @@ module.exports = async function handler(req, res) {
       }
       let liveQuoteContext = "";
       if (asksPrice) {
-        const quoteKey = process.env.TWELVE_DATA_API_KEY;
+        const quoteKey = envValue(req, "TWELVE_DATA_API_KEY");
         if (quotePair && quoteKey) {
           try {
             const quoteUrl = "https://api.twelvedata.com/quote?symbol=" +
