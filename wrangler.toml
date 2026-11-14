@@ -1,6 +1,7 @@
 name = "dagbo-signal"
 main = "cloudflare/worker.js"
 compatibility_date = "2026-11-13"
+compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
 [assets]
