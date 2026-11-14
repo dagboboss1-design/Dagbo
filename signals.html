@@ -120,6 +120,27 @@
   var currentSignalTF = '15';
   var latestNewsCandidate = null;
 
+  // Market hours are evaluated in New York time so US daylight-saving changes are handled.
+  function marketStatus(pair) {
+    var type = PAIR_TYPES[String(pair || '').toUpperCase()] || 'FX';
+    if (type === 'CRYPTO') return { open:true, label:'CRYPTO 24/7', detail:'Crypto markets trade continuously.' };
+    var parts = new Intl.DateTimeFormat('en-US', {
+      timeZone:'America/New_York', weekday:'short', hour:'2-digit', minute:'2-digit', hourCycle:'h23'
+    }).formatToParts(new Date());
+    var p = {}; parts.forEach(function(x){ p[x.type]=x.value; });
+    var day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(p.weekday);
+    var minutes = Number(p.hour)*60 + Number(p.minute);
+    if (type === 'INDEX') {
+      var open = day>=1 && day<=5 && minutes>=570 && minutes<960;
+      return { open:open, label:open?'US CASH SESSION OPEN':'US CASH SESSION CLOSED',
+        detail:'Regular NYSE/Nasdaq hours: 9:30am–4:00pm New York time, weekdays. Holidays and broker CFD hours may differ.' };
+    }
+    var openFx = (day>=1 && day<=4) || (day===5 && minutes<1020) || (day===0 && minutes>=1020);
+    var session = minutes>=1200 || minutes<240 ? 'ASIA' : minutes>=180 && minutes<720 ? 'LONDON' : minutes>=480 && minutes<720 ? 'LONDON–NEW YORK OVERLAP' : minutes>=480 && minutes<1020 ? 'NEW YORK' : 'QUIET HOURS';
+    return { open:openFx, label:openFx?'FOREX MARKET OPEN':'FOREX MARKET CLOSED',
+      detail:openFx ? ('Indicative session: '+session+'. FX normally closes Friday 5pm and reopens Sunday 5pm New York time.') : 'FX normally reopens Sunday at 5:00pm New York time. Broker hours can vary.' };
+  }
+
   // --- MATH ENGINES ---
   function calculateRSI(closes, period) {
     if (closes.length <= period) return 50;
@@ -442,16 +463,20 @@
           (newsConfirmed ? '<div style="font-size:12px;margin-top:8px;padding:9px;border-radius:9px;background:var(--dg-inset);color:var(--dg-text-2)"><b>News confirmation:</b> ' + escapeNewsText(latestNewsCandidate.event) + ' bias agrees with the technical scan. ' + escapeNewsText(latestNewsCandidate.evidence) + '</div>' : '');
       }
 
+      var market = marketStatus(s.pair);
+      var marketPill = '<span class="dg-pill" style="min-height:22px;font-size:10px;padding:0 8px;background:'+(market.open?'#153d2b':'#4a252b')+';color:'+(market.open?'#79e6a9':'#ffadb5')+'">'+market.label+'</span>';
       listHtml += 
         '<section class="dg-card" style="padding:16px;margin-bottom:12px">' +
           '<div class="dg-card__head" style="margin-bottom:8px">' +
             '<div style="display:flex;align-items:center;gap:8px">' +
               '<h2 class="dg-card__title" style="font-size:18px;margin:0">' + s.pair + '</h2>' +
               '<span class="dg-pill ' + pillCls + '" style="min-height:22px;font-size:11px;padding:0 8px">' + pillText + '</span>' +
+              marketPill +
               (newsConfirmed ? '<span class="dg-pill dg-pill--buy" style="min-height:22px;font-size:10px;padding:0 7px">NEWS CONFIRMED</span>' : '') +
             '</div>' +
             '<span style="font-size:11px;color:var(--dg-text-2)">' + currentSignalTF + 'm</span>' +
           '</div>' +
+          '<div style="font-size:11px;color:var(--dg-text-2);margin:-2px 0 10px;line-height:1.45">'+market.detail+'</div>' +
           cardInner +
           '<div style="margin-top:12px;display:flex;gap:7px;align-items:center;">' +
             (s.final === 'NO TRADE' ? '' :
