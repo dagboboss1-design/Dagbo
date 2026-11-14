@@ -1,5 +1,5 @@
 const webpush = require("../lib/push-adapter.js");
-const redis = require("../lib/redis.js");
+const redisModule = require("../lib/redis.js");
 const crypto = require("crypto");
 
 const BLS_CALENDAR_URL = "https://www.bls.gov/schedule/news_release/bls.ics";
@@ -7,8 +7,9 @@ const FF_CALENDAR_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json
 const EASTERN_TZ = "America/New_York";
 const LOOKAHEAD_DAYS = 75;
 
+function envValue(req, name) { const env = req.env || (typeof process !== "undefined" ? process.env : {}); return env[name]; }
 function authorized(req) {
-  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY;
+  const secret = envValue(req, "DAGBO_CRON_SECRET") || envValue(req, "CRON_SECRET") || envValue(req, "SIGNAL_PUSH_SECURITY");
   const supplied = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(supplied), b = Buffer.from("Bearer " + secret);
@@ -80,10 +81,10 @@ function parseBlsEvents(ics) {
   }
   return events;
 }
-async function sendPush(title, body, tag, url) {
-  const publicKey = process.env.VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT;
+async function sendPush(title, body, tag, url, redis, env) {
+  const publicKey = env.VAPID_PUBLIC_KEY;
+  const privateKey = env.VAPID_PRIVATE_KEY;
+  const subject = env.VAPID_SUBJECT;
   if (!publicKey || !privateKey || !subject) throw new Error("VAPID keys are not configured");
   webpush.setVapidDetails(subject, publicKey, privateKey);
   const ids = await redis.smembers("dagbo:push:subscriptions");
@@ -188,14 +189,16 @@ async function fetchQuote(symbol, apiKey) {
   }
   return {open,current};
 }
-async function claim(key) {
+async function claim(key, redis) {
   return (await redis.set(key,"1",{nx:true,ex:7*24*60*60})) === "OK";
 }
 
 module.exports = async function handler(req,res) {
   if (!authorized(req)) return res.status(401).json({error:"Unauthorized"});
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({error:"Method not allowed"});
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
+  const redis = redisModule.createRedis(env);
+  const apiKey = env.TWELVE_DATA_API_KEY;
   const lock = "dagbo:cron:news:lock";
   const acquired = await redis.set(lock,String(Date.now()),{nx:true,ex:4*60});
   if (acquired !== "OK") return res.status(200).json({skipped:true,reason:"News alert check already running"});
@@ -232,8 +235,8 @@ module.exports = async function handler(req,res) {
           }
         } catch (e) { console.error("Post-news gold check failed:",e.message); }
       }
-      await sendPush(title,detail,"news-release-" + released.currency,"/news.html");
-      await claim(releaseKey);
+      await sendPush(title,detail,"news-release-" + released.currency,"/news.html",redis,env);
+      await claim(releaseKey,redis);
       releasedNow.push({event:released.name,currency:released.currency});
     }
     if (releasedNow.length) return res.status(200).json({sent:"economic release alerts",events:releasedNow});
@@ -248,8 +251,8 @@ module.exports = async function handler(req,res) {
       if (!(await redis.get(key))) {
         await sendPush("⏰ " + next.currency + " NEWS IN 1 HOUR",
           next.name + " (" + next.currency + ") releases in about 60 minutes. Prepare and manage risk.",
-          "news-1hr-" + next.currency,"/news.html");
-        await claim(key);
+          "news-1hr-" + next.currency,"/news.html",redis,env);
+        await claim(key,redis);
         return res.status(200).json({sent:"1-hour alert",event:next.name,currency:next.currency});
       }
     }
@@ -309,7 +312,7 @@ module.exports = async function handler(req,res) {
           " Bias: "+bias.action+". Confidence: "+bias.confidence+
           ". This is pre-news market context, not a guaranteed spike prediction. Wait for post-release confirmation and manage risk.";
         await sendPush(title,body,"news-bias-"+encodeURIComponent(id),
-          newsCandidate ? "/signals.html" : "/news.html");
+          newsCandidate ? "/signals.html" : "/news.html",redis,env);
         await claim(key);
         return res.status(200).json({sent:"15-minute 30m correlation bias",event:next.name,currency:next.currency,bias});
       }
