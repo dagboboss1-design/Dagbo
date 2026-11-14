@@ -31,9 +31,10 @@ function percentile(values, value, reverse) {
   return reverse ? 100 - score : score;
 }
 module.exports = async function handler(req, res) {
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   res.setHeader("Cache-Control", "public, max-age=300, stale-while-revalidate=300");
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
-  const key = process.env.TRADING_ECONOMICS_API_KEY;
+  const key = env.TRADING_ECONOMICS_API_KEY;
   if (!key) return res.status(503).json({ configured: false, error: "Fundamental data provider is not configured. Add TRADING_ECONOMICS_API_KEY in Cloudflare Worker Secrets." });
   try {
     const snapshots = await Promise.all(COUNTRIES.map(async item => {
