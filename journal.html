@@ -390,6 +390,7 @@
       dateOpened: existing ? existing.dateOpened : new Date().toISOString(),
       dateClosed: result === 'OPEN' ? null : (existing && existing.result !== 'OPEN' ? existing.dateClosed : new Date().toISOString()),
       serverTracked: existing ? !!existing.serverTracked : false,
+      serverTradeId: existing ? (existing.serverTradeId || null) : null,
       closeReason: existing ? existing.closeReason : null
     };
     if (editingId) trades = trades.map(function(t){return t.id===editingId ? trade : t;});
