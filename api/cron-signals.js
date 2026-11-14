@@ -1,5 +1,5 @@
 const webpush = require("../lib/push-adapter.js");
-const redis = require("../lib/redis.js");
+const redisModule = require("../lib/redis.js");
 
 // --- HELPERS ---
 function firstFriday(year, mIdx){
@@ -36,8 +36,8 @@ function getHighNewsEvents() {
   return events;
 }
 
-async function sendPush(title, body, tag) {
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+async function sendPush(title, body, tag, redis, env) {
+  webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
   const payload = JSON.stringify({ title, body, url: "/boss1.html", tag });
   const ids = await redis.smembers("dagbo:push:subscriptions");
   for (const id of ids) {
@@ -60,13 +60,16 @@ async function sendPush(title, body, tag) {
 module.exports = async function handler(req, res) {
   // 1. SECURITY CHECK
   const supplied = req.headers.authorization || "";
-  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.SIGNAL_PUSH_SECRET;
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
+  const secret = env.DAGBO_CRON_SECRET || env.CRON_SECRET || env.SIGNAL_PUSH_SECURITY || env.SIGNAL_PUSH_SECRET;
   const expected = `Bearer ${secret || ""}`;
   if (!secret || supplied !== expected) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const API_KEY = process.env.TWELVE_DATA_API_KEY;
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
+  const redis = redisModule.createRedis(env);
+  const API_KEY = env.TWELVE_DATA_API_KEY;
   const now = new Date();
   const events = getHighNewsEvents();
   
@@ -89,7 +92,7 @@ module.exports = async function handler(req, res) {
 
   // --- TRIGGER 1: NEWS ALERT (30 Mins Before) ---
   if (minsToNews > 29 && minsToNews <= 31) {
-    await sendPush("⚠️ NEWS ALERT", `${nextEvent.name} drops in 30 minutes! Close all trades.`, "dagbo-news-alert");
+    await sendPush("⚠️ NEWS ALERT", `${nextEvent.name} drops in 30 minutes! Close all trades.`, "dagbo-news-alert", redis, env);
     actionTaken = "Sent 30m News Alert";
   }
 
@@ -112,7 +115,7 @@ module.exports = async function handler(req, res) {
 
       let biasText = score >= 58 ? `BUY GOLD (${score}%)` : (score <= 42 ? `SELL GOLD (${score}%)` : `WAIT (${score}%)`);
       
-      await sendPush("🎯 PRE-NEWS BIAS", `${nextEvent.name} in 15 mins. Bias: ${biasText}`, "dagbo-bias");
+      await sendPush("🎯 PRE-NEWS BIAS", `${nextEvent.name} in 15 mins. Bias: ${biasText}`, "dagbo-bias", redis, env);
       actionTaken = "Sent Pre-News Bias";
     }
   }
@@ -131,10 +134,10 @@ module.exports = async function handler(req, res) {
       let changePct = ((close - open) / open) * 100;
 
       if (changePct >= 0.30) {
-        await sendPush("🚀 SPIKE DETECTED", `GOLD jumped +${changePct.toFixed(2)}%! STRONG BUY SPIKE.`, "dagbo-spike");
+        await sendPush("🚀 SPIKE DETECTED", `GOLD jumped +${changePct.toFixed(2)}%! STRONG BUY SPIKE.`, "dagbo-spike", redis, env);
         actionTaken = "Sent BUY Spike";
       } else if (changePct <= -0.30) {
-        await sendPush("🔻 SPIKE DETECTED", `GOLD dropped ${changePct.toFixed(2)}%! STRONG SELL SPIKE.`, "dagbo-spike");
+        await sendPush("🔻 SPIKE DETECTED", `GOLD dropped ${changePct.toFixed(2)}%! STRONG SELL SPIKE.`, "dagbo-spike", redis, env);
         actionTaken = "Sent SELL Spike";
       }
     }
