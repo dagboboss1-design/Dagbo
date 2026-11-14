@@ -1,11 +1,12 @@
 const { Redis } = require("@upstash/redis");
 
 module.exports = async function handler(req, res) {
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = env.UPSTASH_REDIS_REST_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return res.status(503).json({ error: "News signal storage is not configured" });
 
   try {
