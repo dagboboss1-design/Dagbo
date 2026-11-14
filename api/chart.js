@@ -7,12 +7,13 @@ const SYMBOLS = {
 };
 const INTERVALS = {'5':'5min','15':'15min','60':'1h','240':'4h','D':'1day'};
 module.exports = async function handler(req,res){
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
   const pair=String(req.query.pair||'XAUUSD').toUpperCase();
   const interval=String(req.query.interval||'15');
   if(!SYMBOLS[pair]||!INTERVALS[interval])return res.status(400).json({error:'Unsupported market or timeframe'});
-  const key=process.env.TWELVE_DATA_API_KEY;
+  const key=env.TWELVE_DATA_API_KEY;
   if(!key)return res.status(503).json({error:'Live chart data is not configured. Add TWELVE_DATA_API_KEY in Cloudflare Worker secrets.'});
   const url='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(SYMBOLS[pair])+
     '&interval='+encodeURIComponent(INTERVALS[interval])+'&timezone=UTC&outputsize=250&apikey='+encodeURIComponent(key);
