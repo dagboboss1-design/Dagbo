@@ -3,14 +3,15 @@ const webpush = require("../lib/push-adapter.js");
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   const checks = {
-    ai: !!process.env.GROQ_API_KEY,
-    pushPublicKey: !!process.env.VAPID_PUBLIC_KEY,
-    pushPrivateKey: !!process.env.VAPID_PRIVATE_KEY,
-    pushSubject: !!process.env.VAPID_SUBJECT,
-    pushStorage: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
-    marketData: !!process.env.TWELVE_DATA_API_KEY,
-    cronSecret: !!(process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.SIGNAL_PUSH_SECRET)
+    ai: !!env.GROQ_API_KEY,
+    pushPublicKey: !!env.VAPID_PUBLIC_KEY,
+    pushPrivateKey: !!env.VAPID_PRIVATE_KEY,
+    pushSubject: !!env.VAPID_SUBJECT,
+    pushStorage: !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN),
+    marketData: !!env.TWELVE_DATA_API_KEY,
+    cronSecret: !!(env.DAGBO_CRON_SECRET || env.CRON_SECRET || env.SIGNAL_PUSH_SECURITY || env.SIGNAL_PUSH_SECRET)
   };
   if (req.query && req.query.check === "push-runtime") {
     try {
