@@ -8,6 +8,7 @@ const SYMBOLS = {
 };
 const INTERVALS = { "5":"5min", "15":"15min", "60":"1h", "240":"4h", "D":"1day" };
 module.exports = async function handler(req, res) {
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
   const pair = String(req.query.pair || "XAUUSD").toUpperCase();
@@ -22,7 +23,7 @@ module.exports = async function handler(req, res) {
   if (!Number.isFinite(from) || !Number.isFinite(to) || from > to || to > Date.now() + 86400000)
     return res.status(400).json({ error: "Invalid date range" });
   if (to - from > 31 * 86400000) return res.status(400).json({ error: "Choose a range of 31 days or less" });
-  const key = process.env.TWELVE_DATA_API_KEY;
+  const key = env.TWELVE_DATA_API_KEY;
   if (!key) return res.status(503).json({ error: "Historical data is not configured on the server" });
   const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(SYMBOLS[pair]) +
     "&interval=" + encodeURIComponent(INTERVALS[interval]) + "&start_date=" + encodeURIComponent(start) +
