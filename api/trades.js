@@ -14,6 +14,7 @@ function validSubscription(sub) {
 function positive(v) { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; }
 
 module.exports = async function handler(req, res) {
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "POST required" });
   try {
@@ -68,8 +69,8 @@ module.exports = async function handler(req, res) {
 
       // Notify only the device that added this trade to the DAGBO tracker.
       try {
-        if (process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-          webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+        if (env.VAPID_SUBJECT && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) {
+          webpush.setVapidDetails(env.VAPID_SUBJECT, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
           await webpush.sendNotification(subscription, JSON.stringify({
             title: "📌 TRADE ADDED TO DAGBO",
             body: pair + " " + direction + " has been added to your trade tracker. This does not place a broker order.",
