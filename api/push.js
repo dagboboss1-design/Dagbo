@@ -75,6 +75,27 @@ module.exports = async function handler(req, res) {
   const action = req.query && req.query.action;
 
   try {
+    if (req.method === "GET" && action === "health") {
+      const checks = {
+        ai: !!process.env.GROQ_API_KEY,
+        pushPublicKey: !!process.env.VAPID_PUBLIC_KEY,
+        pushPrivateKey: !!process.env.VAPID_PRIVATE_KEY,
+        pushSubject: !!process.env.VAPID_SUBJECT,
+        pushStorage: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
+        marketData: !!process.env.TWELVE_DATA_API_KEY,
+        cronSecret: !!(process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY)
+      };
+      return res.status(200).json({
+        success: true,
+        services: checks,
+        ready: {
+          ai: checks.ai,
+          push: checks.pushPublicKey && checks.pushPrivateKey && checks.pushSubject && checks.pushStorage,
+          scanner: checks.marketData && checks.pushPublicKey && checks.pushPrivateKey && checks.pushSubject && checks.pushStorage && checks.cronSecret
+        },
+        note: "This endpoint reports whether required environment variables exist. It does not test third-party API calls or scheduled job execution."
+      });
+    }
     if (req.method === "GET" && action === "public-key") {
       if (!process.env.VAPID_PUBLIC_KEY) {
         return res.status(503).json({ error: "Push notifications are not configured on the server" });
