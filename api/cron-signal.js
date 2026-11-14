@@ -313,7 +313,7 @@ module.exports = async function handler(req,res) {
           ". This is pre-news market context, not a guaranteed spike prediction. Wait for post-release confirmation and manage risk.";
         await sendPush(title,body,"news-bias-"+encodeURIComponent(id),
           newsCandidate ? "/signals.html" : "/news.html",redis,env);
-        await claim(key);
+        await claim(key,redis);
         return res.status(200).json({sent:"15-minute 30m correlation bias",event:next.name,currency:next.currency,bias});
       }
       return res.status(200).json({message:"15-minute alert already sent.",event:next.name});
