@@ -8,6 +8,7 @@ const SYMBOLS = {
 };
 
 module.exports = async function handler(req, res) {
+  const env = req.env || (typeof process !== "undefined" ? process.env : {});
   res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=20");
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
@@ -18,7 +19,7 @@ module.exports = async function handler(req, res) {
   if (!symbol) return res.status(400).json({ error: "Unsupported market pair" });
   if (tf !== "5" && tf !== "15") return res.status(400).json({ error: "Timeframe must be 5 or 15 minutes" });
 
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
+  const apiKey = env.TWELVE_DATA_API_KEY;
   if (!apiKey) return res.status(503).json({ error: "Market data is not configured. Add TWELVE_DATA_API_KEY in the Cloudflare Worker environment." });
 
   try {
