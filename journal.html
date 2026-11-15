@@ -281,7 +281,8 @@
       var card = document.createElement('button');
       card.type = 'button';
       card.className = 'dg-card';
-      card.style.cssText = 'display:block;width:100%;text-align:left;padding:16px;margin-bottom:12px;color:var(--dg-text);cursor:pointer';
+      var cardTone = t.result === 'OPEN' ? 'background:#fff2c6;border:1px solid #e5bb4d;color:#604600;' : (t.closeReason === 'STOP_LOSS' || t.result === 'LOSS') ? 'background:#fde0e0;border:1px solid #e6a0a0;color:#7d2525;' : (t.closeReason === 'TAKE_PROFIT' || t.result === 'WIN') ? 'background:#ddf4e3;border:1px solid #91cba1;color:#205b35;' : 'background:var(--dg-card);border:1px solid var(--dg-line);color:var(--dg-text);';
+      card.style.cssText = 'display:block;width:100%;text-align:left;padding:16px;margin-bottom:12px;cursor:pointer;border-radius:16px;' + cardTone;
       card.addEventListener('click',function(){ window.editTrade(t.id); });
       var head = document.createElement('div');
       head.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px';
