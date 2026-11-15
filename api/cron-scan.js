@@ -679,7 +679,7 @@ module.exports = async function handler(req, res) {
 
     let pairIntelligence = null;
     try {
-      pairIntelligence = await runPairIntelligence(await getConfiguredForexPairs(), apiKey);
+      pairIntelligence = await runPairIntelligence((await getConfiguredForexPairs()).filter(pair => isMarketOpen(pair)), apiKey);
     } catch (pairError) {
       console.error("DAGBO pair-intelligence scan failed:", pairError.message);
     }
