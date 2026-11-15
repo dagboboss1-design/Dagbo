@@ -55,7 +55,7 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
    saved.items.forEach(function(item,index){
     var row=document.createElement('div');row.className='intel-row';
     var left=document.createElement('div');var name=document.createElement('strong');name.textContent=(index+1)+'. '+item.pair;
-    var detail=document.createElement('div');detail.className='intel-muted';detail.textContent=item.score+'/9 method votes agree';
+    var detail=document.createElement('div');detail.className='intel-muted';var lv=levels[String(saved.timeframe)+':'+item.pair]||item;detail.textContent=item.score+'/9 method votes agree · Entry '+(lv.entry??'—')+' · SL '+(lv.sl??'—')+' · TP '+(lv.tp??'—');
     left.appendChild(name);left.appendChild(detail);
     var pill=document.createElement('span');pill.className='intel-pill'+(item.direction==='SELL'?' sell':'');pill.textContent=item.signal;
     row.appendChild(left);row.appendChild(pill);best.appendChild(row);
