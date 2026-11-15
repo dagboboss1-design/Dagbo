@@ -119,6 +119,17 @@
   var currentSignalTF = '15';
   var latestNewsCandidate = null;
 
+  // Use New York market-session time so daylight-saving changes are handled.
+  function marketSessionOpen(pair) {
+    var p=String(pair||'').toUpperCase();
+    if (p.includes('BTC') || p.includes('ETH')) return true;
+    var parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+    var v={};parts.forEach(function(x){v[x.type]=x.value;});
+    var day={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[v.weekday], minute=Number(v.hour)*60+Number(v.minute);
+    if (/^(US30|US100|NAS100|US500)$/.test(p)) return day>=1&&day<=5&&minute>=570&&minute<960;
+    return (day===0&&minute>=1020)||(day>=1&&day<=4)||(day===5&&minute<1020);
+  }
+
   // --- MATH ENGINES ---
   function calculateRSI(closes, period) {
     if (closes.length <= period) return 50;
@@ -199,6 +210,7 @@
 
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
+    if (!marketSessionOpen(pair)) return {pair:pair,final:'MARKET CLOSED',marketClosed:true,buyScore:0,sellScore:0,strategy:'Market session is closed. Historical candles are not an executable signal.'};
     let url = `/api/market-data?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}`;
     
     try {
@@ -256,7 +268,7 @@
       return { pair:pair, signal:item.final, score:score, direction:buys > sells ? 'BUY' : sells > buys ? 'SELL' : 'WAIT' };
     }).filter(function(x){ return x.score >= 3 && x.direction !== 'WAIT'; }).sort(function(a,b){ return b.score-a.score; }).slice(0,3);
 
-    try { localStorage.setItem('dagbo_best_opportunities', JSON.stringify({timeframe:currentSignalTF,updatedAt:new Date().toISOString(),items:ranked})); } catch(e) {}
+    try { localStorage.setItem('dagbo_best_opportunities', JSON.stringify({timeframe:currentSignalTF,updatedAt:new Date().toISOString(),items:ranked})); var levels=JSON.parse(localStorage.getItem('dagbo_signal_trade_levels')||'{}'); Object.keys(signalsData).forEach(function(pair){var s=signalsData[pair];if(s&&!s.marketClosed&&s.final!=='NO TRADE') levels[currentSignalTF+':'+pair]={direction:s.final,entry:s.entry,sl:s.sl,tp:s.tp1,updatedAt:new Date().toISOString()};}); localStorage.setItem('dagbo_signal_trade_levels',JSON.stringify(levels)); } catch(e) {}
     var best = document.getElementById('bestOpportunityList');
     var monitor = document.getElementById('trendAgreementList');
     // Insights are rendered on a separate page; their absence must not break Signals.
@@ -388,6 +400,7 @@
       var s = signalsData[pair];
       if (!s) return;
 
+      if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
       var isBuy = s.final.includes('BUY');
       var isSell = s.final.includes('SELL');
       var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
