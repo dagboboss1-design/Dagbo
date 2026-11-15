@@ -23,6 +23,16 @@ const SYMBOLS = {
 const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
 const MAX_PAIRS = 6;
 
+function isMarketOpen(pair, now = new Date()) {
+  const p=String(pair||'').toUpperCase();
+  if (p.includes('BTC') || p.includes('ETH')) return true;
+  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
+  const v=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+  const day={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[v.weekday], minute=Number(v.hour)*60+Number(v.minute);
+  if (/^(US30|US100|NAS100|US500)$/.test(p)) return day>=1&&day<=5&&minute>=570&&minute<960;
+  return (day===0&&minute>=1020)||(day>=1&&day<=4)||(day===5&&minute<1020);
+}
+
 async function getConfiguredPairs() {
   const ids = await redis.smembers("dagbo:push:subscriptions");
   const selected = new Set();
@@ -625,6 +635,7 @@ module.exports = async function handler(req, res) {
     const results = {}, errors = [];
     const pairsToScan = await getConfiguredPairs();
     const fetched = await Promise.all(pairsToScan.map(async pair => {
+      if (!isMarketOpen(pair)) return { pair, closed: true };
       const symbol = SYMBOLS[pair];
       const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
         "&interval=15min&outputsize=60&apikey=" + encodeURIComponent(apiKey);
@@ -643,6 +654,7 @@ module.exports = async function handler(req, res) {
     }));
 
     for (const item of fetched) {
+      if (item.closed) { results[item.pair] = { signal:'MARKET CLOSED', marketClosed:true }; continue; }
       if (item.error) { errors.push({ pair: item.pair, error: item.error }); continue; }
       const pair = item.pair, analysis = item.analysis;
       results[pair] = analysis;
