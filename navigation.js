@@ -40,5 +40,18 @@
   function close(){document.body.classList.remove('dagbo-menu-open');button.setAttribute('aria-expanded','false')}
   button.addEventListener('click',open);shade.addEventListener('click',close);panel.querySelector('.dm-close').addEventListener('click',close);
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
-  document.body.appendChild(button);document.body.appendChild(shade);document.body.appendChild(panel);\n  document.querySelectorAll(".dg-brand").forEach(function(el){if(!el.querySelector(".dagbo-inline-mark")){var img=document.createElement("img");img.className="dagbo-inline-mark";img.src="icons/dagbo-orbit.svg";img.alt="";img.style.cssText="width:24px;height:24px;vertical-align:middle;margin-right:8px;border-radius:50%";el.prepend(img)}});
+  document.body.appendChild(button);document.body.appendChild(shade);document.body.appendChild(panel);
+  document.querySelectorAll(".dg-brand").forEach(function(el){if(!el.querySelector(".dagbo-inline-mark")){var img=document.createElement("img");img.className="dagbo-inline-mark";img.src="icons/dagbo-orbit.svg";img.alt="";img.style.cssText="width:24px;height:24px;vertical-align:middle;margin-right:8px;border-radius:50%";el.prepend(img)}});
+  /* DAGBO orbit loading mark: shown only while the page is loading. */
+  if(document.readyState!=="complete"&&!document.getElementById("dagboOrbitLoader")){
+    var loaderStyle=document.createElement("style");
+    loaderStyle.textContent="@keyframes dagboOrbitSpin{to{transform:rotate(360deg)}}#dagboOrbitLoader{position:fixed;inset:0;z-index:10050;background:#000;display:grid;place-items:center;opacity:1;transition:opacity .22s ease}#dagboOrbitLoader .orbit{width:66px;height:66px;border:2px solid #292a2d;border-radius:50%;position:relative;animation:dagboOrbitSpin 1.15s linear infinite}#dagboOrbitLoader .orbit:before{content:'';position:absolute;width:19px;height:19px;background:#fff;border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%)}#dagboOrbitLoader .orbit:after{content:'';position:absolute;width:7px;height:7px;background:#fff;border-radius:50%;right:2px;bottom:7px;box-shadow:0 0 9px #fff8}@media(prefers-reduced-motion:reduce){#dagboOrbitLoader .orbit{animation:none}}";
+    document.head.appendChild(loaderStyle);
+    var loader=document.createElement("div");loader.id="dagboOrbitLoader";loader.setAttribute("aria-label","Loading DAGBO");loader.innerHTML='<div class="orbit" role="img" aria-label="DAGBO loading"></div>';
+    document.body.appendChild(loader);
+    function hideDagboLoader(){loader.style.opacity="0";setTimeout(function(){if(loader.parentNode)loader.parentNode.removeChild(loader)},240)}
+    window.addEventListener("load",hideDagboLoader,{once:true});
+    setTimeout(hideDagboLoader,7000);
+  }
+
 })();
