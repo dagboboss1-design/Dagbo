@@ -17,7 +17,7 @@
   body.dagbo-menu-open #dagboSideMenu{transform:translateX(0)}
   #dagboSideMenu .dm-head{display:flex;align-items:center;justify-content:space-between;padding:0 18px 16px;font-size:16px;font-weight:750;letter-spacing:.3px}
   #dagboSideMenu .dm-brand{display:flex;align-items:center;gap:10px}
-  #dagboSideMenu .dm-mark{color:#e9bd53;font-size:20px}
+  #dagboSideMenu .dm-mark{width:27px;height:27px;display:block;border-radius:50%;overflow:hidden}#dagboSideMenu .dm-mark img{width:100%;height:100%;display:block}
   #dagboSideMenu .dm-close{width:38px;height:38px;border:0;border-radius:50%;background:#292a2d;color:#fff;font-size:25px;line-height:1;cursor:pointer}
   #dagboSideMenu .dm-list{overflow-y:auto;padding:2px 0 16px;overscroll-behavior:contain}
   #dagboSideMenu .dm-link{min-height:47px;display:flex;align-items:center;gap:15px;padding:0 19px;color:#e5e5e5;text-decoration:none;font-size:14px;font-weight:500;letter-spacing:.05px;border-left:2px solid transparent}
@@ -35,10 +35,10 @@
   var panel=document.createElement('aside');panel.id='dagboSideMenu';panel.setAttribute('aria-label','Main navigation');
   var current=location.pathname.split('/').pop()||'index.html';
   var links=items.map(function(item){return '<a class="dm-link '+(current===item[2]?'dm-current':'')+'" href="'+item[2]+'"><span class="dm-icon">'+item[0]+'</span><span>'+item[1]+'</span></a>'}).join('');
-  panel.innerHTML='<div class="dm-head"><div class="dm-brand"><span class="dm-mark">◈</span><span>DAGBO SIGNAL</span></div><button class="dm-close" type="button" aria-label="Close navigation">×</button></div><nav class="dm-list">'+links+'</nav><div class="dm-separator"></div><div class="dm-foot">SIGNAL WEY NO DEY LIE</div>';
+  panel.innerHTML='<div class="dm-head"><div class="dm-brand"><span class="dm-mark"><img src="icons/dagbo-orbit.svg" alt=""></span><span>DAGBO SIGNAL</span></div><button class="dm-close" type="button" aria-label="Close navigation">×</button></div><nav class="dm-list">'+links+'</nav><div class="dm-separator"></div><div class="dm-foot">SIGNAL WEY NO DEY LIE</div>';
   function open(){document.body.classList.add('dagbo-menu-open');button.setAttribute('aria-expanded','true')}
   function close(){document.body.classList.remove('dagbo-menu-open');button.setAttribute('aria-expanded','false')}
   button.addEventListener('click',open);shade.addEventListener('click',close);panel.querySelector('.dm-close').addEventListener('click',close);
   document.addEventListener('keydown',function(e){if(e.key==='Escape')close()});
-  document.body.appendChild(button);document.body.appendChild(shade);document.body.appendChild(panel);
+  document.body.appendChild(button);document.body.appendChild(shade);document.body.appendChild(panel);\n  document.querySelectorAll(".dg-brand").forEach(function(el){if(!el.querySelector(".dagbo-inline-mark")){var img=document.createElement("img");img.className="dagbo-inline-mark";img.src="icons/dagbo-orbit.svg";img.alt="";img.style.cssText="width:24px;height:24px;vertical-align:middle;margin-right:8px;border-radius:50%";el.prepend(img)}});
 })();
