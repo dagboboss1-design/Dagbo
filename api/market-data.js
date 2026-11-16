@@ -11,7 +11,8 @@ module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "s-maxage=20, stale-while-revalidate=20");
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
-  const pair = String(req.query && req.query.pair || "").toUpperCase();
+  const rawPair = String(req.query && req.query.pair || "").toUpperCase().trim();
+  const pair = rawPair.replace(/[^A-Z0-9]/g, "");
   const tf = String(req.query && req.query.tf || "15");
   const symbol = SYMBOLS[pair];
 
