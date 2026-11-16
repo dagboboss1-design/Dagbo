@@ -270,7 +270,6 @@ module.exports = async function handler(req, res) {
         return res.status(429).json({ error: "Dagbo AI is receiving too many requests. Please wait a few minutes and try again." });
       }
 
-      const asksFundamentals = /\b(fundamental|macro|economic|inflation|cpi|pce|gdp|unemployment|interest rate|treasury|yield|central bank|fed|fomc|rate decision|economic calendar)\b/i.test(question);
       const fmpKey = process.env.FMP_API_KEY;
       if (asksFundamentals && fmpKey) {
         try {
