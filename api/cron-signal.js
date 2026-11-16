@@ -136,12 +136,36 @@ async function getHighImpactEvents(now) {
       }))
       .filter(e => !Number.isNaN(e.date.getTime()));
   } catch (error) {
-    console.error("DAGBO calendar feed fallback:", error.message);
-    const response = await fetch(BLS_CALENDAR_URL, { headers: { "User-Agent": "DAGBO-SIGNAL-News-Alerts/1.0" } });
-    if (!response.ok) throw new Error("Both economic calendar sources failed");
-    events = parseBlsEvents(await response.text()).map(e => ({
-      ...e, currency: "USD", impact: "High", forecast: "", previous: "", actual: ""
-    }));
+    console.error("DAGBO Forex Factory calendar failed; trying FMP:", error.message);
+    const fmpKey = process.env.FMP_API_KEY;
+    let fmpLoaded = false;
+    if (fmpKey) {
+      try {
+        const from = now.toISOString().slice(0, 10);
+        const to = new Date(now.getTime() + LOOKAHEAD_DAYS * 86400000).toISOString().slice(0, 10);
+        const url = "https://financialmodelingprep.com/stable/economic-calendar?from=" + from +
+          "&to=" + to + "&apikey=" + encodeURIComponent(fmpKey);
+        const response = await fetch(url);
+        const rows = await response.json();
+        if (!response.ok || !Array.isArray(rows)) throw new Error("FMP economic calendar unavailable");
+        events = rows.filter(row => String(row.impact || "").toLowerCase() === "high").map(row => ({
+          name: String(row.event || "High-impact economic event"),
+          currency: String(row.currency || row.country || "GLOBAL").toUpperCase(),
+          date: new Date(String(row.date || "").replace(" ", "T") + (String(row.date || "").includes("Z") ? "" : "Z")),
+          impact: "High", forecast: row.estimate || "", previous: row.previous || "", actual: row.actual || ""
+        })).filter(e => !Number.isNaN(e.date.getTime()));
+        fmpLoaded = true;
+      } catch (fmpError) {
+        console.error("DAGBO FMP calendar fallback:", fmpError.message);
+      }
+    }
+    if (!fmpLoaded) {
+      const response = await fetch(BLS_CALENDAR_URL, { headers: { "User-Agent": "DAGBO-SIGNAL-News-Alerts/1.0" } });
+      if (!response.ok) throw new Error("Forex Factory, FMP and BLS calendar sources failed");
+      events = parseBlsEvents(await response.text()).map(e => ({
+        ...e, currency: "USD", impact: "High", forecast: "", previous: "", actual: ""
+      }));
+    }
   }
   const unique = new Map();
   for (const event of events) {
