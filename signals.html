@@ -91,6 +91,7 @@
 
 
 <script src="pwa.js" defer></script>
+<script src="dagbo-confluence.js"></script>
 <script>
 (function(){
   'use strict';
@@ -161,51 +162,19 @@
   }
   function candleNumber(c, key){return Number(c[key]);}
   function analyseAllMethods(candles) {
-    var n=candles.length, closes=candles.map(function(c){return candleNumber(c,'close')});
-    var highs=candles.map(function(c){return candleNumber(c,'high')});
-    var lows=candles.map(function(c){return candleNumber(c,'low')});
-    var last=candles[n-1], prev=candles[n-2], o=candleNumber(last,'open'), c=candleNumber(last,'close');
-    var h=candleNumber(last,'high'), l=candleNumber(last,'low'), po=candleNumber(prev,'open'), pc=candleNumber(prev,'close');
-    var votes=[], evidence=[];
-    function add(name,dir,detail){if(dir==='BUY'||dir==='SELL'){votes.push(dir);evidence.push(name+': '+detail+' ('+dir+')');}}
-    var rsi=calculateRSI(closes,14), e20=calculateEMA(closes,20), e50=calculateEMA(closes,50);
-    var trend=e20>e50&&c>e20?'BUY':e20<e50&&c<e20?'SELL':'WAIT';
-    add('EMA trend',trend,'EMA20 '+(e20>e50?'above':'below')+' EMA50');
-    var rsiDir=rsi<32?'BUY':rsi>68?'SELL':'WAIT';
-    add('RSI(14)',rsiDir,'RSI '+rsi.toFixed(1)+(rsi<32?' oversold':rsi>68?' overbought':''));
-    var e12=emaSeries(closes,12),e26=emaSeries(closes,26),macd=e12[n-1]-e26[n-1],macdPrev=e12[n-2]-e26[n-2];
-    var macdDir=macd>0&&macd>macdPrev?'BUY':macd<0&&macd<macdPrev?'SELL':'WAIT';
-    add('MACD momentum',macdDir,'MACD '+macd.toPrecision(4)+(macd>macdPrev?' rising':' falling'));
-    var body=Math.abs(c-o),range=Math.max(h-l,1e-12),lower=Math.min(o,c)-l,upper=h-Math.max(o,c);
-    var candleDir='WAIT',candleName='No clear reversal pattern';
-    if(c>o&&pc<po&&c>=po&&o<=pc){candleDir='BUY';candleName='Bullish engulfing';}
-    else if(c<o&&pc>po&&c<=po&&o>=pc){candleDir='SELL';candleName='Bearish engulfing';}
-    else if(lower>Math.max(body*2,range*.45)&&c>o){candleDir='BUY';candleName='Bullish rejection / pin bar';}
-    else if(upper>Math.max(body*2,range*.45)&&c<o){candleDir='SELL';candleName='Bearish rejection / pin bar';}
-    add('Candlestick reading',candleDir,candleName);
-    var look=candles.slice(-21,-1),sHigh=Math.max.apply(null,look.map(function(x){return candleNumber(x,'high')})),sLow=Math.min.apply(null,look.map(function(x){return candleNumber(x,'low')}));
-    var priorTrend=calculateEMA(closes.slice(0,-1),20)>calculateEMA(closes.slice(0,-1),50)?'BUY':'SELL';
-    var structure=c>sHigh?'BUY':c<sLow?'SELL':'WAIT';
-    var structureName=structure==='WAIT'?'No confirmed break':structure===priorTrend?'BOS':'CHoCH';
-    add('ICT / SMC '+structureName,structure,structure==='BUY'?'close broke recent swing high':structure==='SELL'?'close broke recent swing low':'no confirmed swing break');
-    var sweepDir=(h>sHigh&&c<sHigh)?'SELL':(l<sLow&&c>sLow)?'BUY':'WAIT';
-    add('ICT liquidity sweep',sweepDir,sweepDir==='SELL'?'swept prior high and closed back below':sweepDir==='BUY'?'swept prior low and closed back above':'no sweep-and-reclaim');
-    var a=candles[n-3],fvgDir='WAIT';
-    if(a&&l>candleNumber(a,'high'))fvgDir='BUY';
-    else if(a&&h<candleNumber(a,'low'))fvgDir='SELL';
-    add('ICT fair value gap',fvgDir,fvgDir==='BUY'?'bullish 3-candle imbalance':fvgDir==='SELL'?'bearish 3-candle imbalance':'no 3-candle gap');
-    var recent=closes.slice(-20),mean=recent.reduce(function(sum,v){return sum+v},0)/recent.length;
-    var variance=recent.reduce(function(sum,v){return sum+Math.pow(v-mean,2)},0)/recent.length,dev=Math.sqrt(variance);
-    var bbDir=c<mean-2*dev&&c>o?'BUY':c>mean+2*dev&&c<o?'SELL':'WAIT';
-    add('Bollinger Bands(20,2)',bbDir,bbDir==='BUY'?'lower-band rejection':bbDir==='SELL'?'upper-band rejection':'no band-rejection setup');
-    var volumes=candles.slice(-21,-1).map(function(x){return Number(x.volume)}).filter(Number.isFinite);
-    var currentVolume=Number(last.volume),avgVolume=volumes.length?volumes.reduce(function(sum,v){return sum+v},0)/volumes.length:0;
-    var volumeDir=Number.isFinite(currentVolume)&&avgVolume>0&&currentVolume>avgVolume*1.5?(c>o?'BUY':c<o?'SELL':'WAIT'):'WAIT';
-    add('Volume confirmation',volumeDir,'current volume '+(avgVolume>0?(currentVolume/avgVolume).toFixed(2)+'× 20-bar average':'not available'));
-    var buys=votes.filter(function(v){return v==='BUY'}).length,sells=votes.filter(function(v){return v==='SELL'}).length;
-    var direction=buys>=3&&buys>sells?'BUY':sells>=3&&sells>buys?'SELL':'WAIT';
-    var final=direction==='BUY'?(buys>=6?'STRONG BUY':'BUY'):direction==='SELL'?(sells>=6?'STRONG SELL':'SELL'):'NO TRADE';
-    return {final:final,direction:direction,buyScore:buys,sellScore:sells,totalMethods:9,evidence:evidence,rsi:rsi,emaTrend:trend,macd:macd,candleName:candleName,structure:structure,structureName:structureName,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir};
+    var result = window.DagboConfluence.analyze(candles, '');
+    if (!result) return null;
+    return {
+      final: result.signal,
+      direction: result.signal.indexOf('BUY') >= 0 ? 'BUY' : result.signal.indexOf('SELL') >= 0 ? 'SELL' : 'WAIT',
+      buyScore: result.buyScore, sellScore: result.sellScore, totalMethods: result.totalMethods,
+      evidence: result.evidence, rsi: result.rsi, emaTrend: result.emaTrend, macd: result.macd,
+      candleName: 'Candlestick confirmation is secondary to grouped confluence',
+      structure: result.structure, structureName: result.structure, sweep: result.sweep, fvg: result.fvg,
+      bb: result.bb, volume: result.volume, pattern: result.pattern,
+      patternDirection: result.patternDirection, patternConfirmed: result.patternConfirmed,
+      groups: result.groups
+    };
   }
 
   // --- FETCH REAL DATA ---
