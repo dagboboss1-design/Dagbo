@@ -21,7 +21,7 @@ const SYMBOLS = {
   US30: "DJI", US100: "NDX", NAS100: "NDX", US500: "SPX",
   BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
 };
-const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
+const DEFAULT_PAIRS = ["XAUUSD","XAGUSD","EURUSD","GBPUSD","US30","BTCUSD"];
 const MAX_PAIRS = 6;
 
 function isMarketOpen(pair, now = new Date()) {
