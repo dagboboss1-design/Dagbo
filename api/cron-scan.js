@@ -638,7 +638,7 @@ module.exports = async function handler(req, res) {
         }
         const closedCandles = data.values.filter(c => {
           const raw = String(c.datetime || "");
-          const stamp = Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? "" : "Z"));
+          const stamp = Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? "" : "Z"));
           return Number.isFinite(stamp) && stamp + 15 * 60 * 1000 <= Date.now();
         }).slice(0, 60).reverse();
         if (closedCandles.length < 60) throw new Error("Waiting for 60 fully closed candles");
