@@ -30,13 +30,7 @@
   </div>
   
   <h1 class="dg-title">Signal Board</h1>
-  <p class="dg-subtitle">3 Systems. Confluence Engine.</p>
-
-  <a class="dg-row dg-row--link dg-card" href="signal-insights.html" style="margin-top:16px;border-radius:16px">
-    <span class="dg-row__icon dg-row__icon--amber">◈</span>
-    <span class="dg-row__body"><span class="dg-row__title">Opportunity & Trend Intelligence</span><span class="dg-row__sub">Open Best Opportunity Finder and Trend Agreement Monitor</span></span>
-    <span aria-hidden="true">›</span>
-  </a>
+  <p class="dg-subtitle">Intraday · Scalping · Higher-Timeframe Trend</p>
 
   <a class="dg-row dg-row--link dg-card" href="alerts.html" style="margin-bottom:18px;border-radius:16px">
     <span class="dg-row__icon dg-row__icon--amber">🔔</span>
@@ -53,11 +47,24 @@
   <!-- TIMEFRAME TOGGLE -->
   <div class="dg-seg" role="radiogroup" style="margin-bottom:16px">
     <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_15" value="15" checked onchange="changeSignalTF('15')">
-    <label class="dg-seg__lb" for="tf_15">15m (Intraday)</label>
-    
+    <label class="dg-seg__lb" for="tf_15">15m Intraday</label>
     <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_5" value="5" onchange="changeSignalTF('5')">
-    <label class="dg-seg__lb" for="tf_5">5m (Scalping)</label>
+    <label class="dg-seg__lb" for="tf_5">5m Scalping</label>
+    <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_trend" value="trend" onchange="changeSignalTF('trend')">
+    <label class="dg-seg__lb" for="tf_trend">Trend</label>
   </div>
+  <section class="dg-card" id="trendSignalsPanel" style="display:none;margin:-4px 0 16px">
+    <div class="dg-card__head"><h2 class="dg-card__title">4H Higher-Timeframe Signals</h2><span class="dg-pill dg-pill--open">MONTHLY → 4H</span></div>
+    <p class="dg-muted" style="font-size:12px;line-height:1.55;margin:6px 0 10px">Individual directional trades. A setup needs at least 3 of 4 timeframe directions (Monthly, Weekly, Daily, 4H), including 4H, plus matching 4H multi-method confirmation. Entry and targets use 4H ATR.</p>
+    <div id="trendSignalsUpdated" class="dg-muted" style="font-size:11px;margin-bottom:8px">Loading latest scheduled Trend scan…</div>
+    <div id="trendSignalsGrid" class="dg-stack"></div>
+    <div class="dg-divider" style="margin:18px 0"></div>
+    <div class="dg-card__head"><h2 class="dg-card__title">Smart Pair Hedge</h2><span class="dg-pill">SEPARATE STRATEGY</span></div>
+    <p class="dg-muted" style="font-size:12px;line-height:1.55;margin:6px 0 10px">This is not a single 4H signal. It is a separate two-pair setup based on measured 4H correlation, currency exposure and available DXY confirmation. Each leg has its own direction, Entry, SL and targets. Correlation does not guarantee a hedge or reduce risk.</p>
+    <div id="trendHedgeUpdated" class="dg-muted" style="font-size:11px;margin-bottom:8px">Loading pair correlation scan…</div>
+    <div id="trendHedgeGrid" class="dg-stack"></div>
+    <button type="button" class="dg-btn" onclick="loadTrendSignals()" style="width:100%;margin-top:12px">↻ Refresh Trend & Hedge</button>
+  </section>
   <section class="dg-card" id="scalpStats" style="margin:-4px 0 16px;padding:13px;display:none">
     <div style="font-weight:800;font-size:14px">5m SCALP PROFILE · LOWER THRESHOLD</div>
     <div id="scalpStatsText" class="dg-muted" style="font-size:12px;line-height:1.6;margin-top:6px">Loading today's signal and risk figures…</div>
@@ -69,6 +76,7 @@
     <button class="dg-chip is-active" data-filter="ALL">All Signals</button>
     <button class="dg-chip" data-filter="FX">Forex</button>
     <button class="dg-chip" data-filter="GOLD">Gold</button>
+    <button class="dg-chip" data-filter="METAL">Silver</button>
     <button class="dg-chip" data-filter="INDEX">Indices</button>
     <button class="dg-chip" data-filter="CRYPTO">Crypto</button>
   </div>
@@ -104,17 +112,17 @@
 
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
-  var enabledPairs = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : ['XAUUSD', 'EURUSD', 'GBPUSD', 'US30', 'BTCUSD'];
+  var enabledPairs = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : ['XAUUSD', 'XAGUSD', 'EURUSD', 'GBPUSD', 'US30', 'BTCUSD'];
   
   var PAIR_TYPES = {
-    XAUUSD: 'GOLD', GOLD: 'GOLD',
+    XAUUSD: 'GOLD', GOLD: 'GOLD', XAGUSD: 'METAL', SILVER: 'METAL',
     EURUSD: 'FX', GBPUSD: 'FX', USDJPY: 'FX', GBPJPY: 'FX', AUDUSD: 'FX', USDCHF: 'FX', USDCAD: 'FX', NZDUSD: 'FX', EURJPY: 'FX', EURGBP: 'FX',
     US30: 'INDEX', US100: 'INDEX', NAS100: 'INDEX', US500: 'INDEX',
     BTCUSD: 'CRYPTO', BTCUSDT: 'CRYPTO', BTC: 'CRYPTO', ETHUSD: 'CRYPTO', ETHUSDT: 'CRYPTO', ETH: 'CRYPTO'
   };
 
   var API_SYMBOLS = {
-    XAUUSD: 'XAU/USD', GOLD: 'XAU/USD',
+    XAUUSD: 'XAU/USD', GOLD: 'XAU/USD', XAGUSD: 'XAG/USD', SILVER: 'XAG/USD',
     EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', GBPJPY: 'GBP/JPY',
     AUDUSD: 'AUD/USD', USDCHF: 'USD/CHF', USDCAD: 'USD/CAD', NZDUSD: 'NZD/USD', EURJPY: 'EUR/JPY', EURGBP: 'EUR/GBP',
     US30: 'DJI', US100: 'NDX', NAS100: 'NDX', US500: 'SPX',
@@ -135,8 +143,17 @@
     var parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
     var v={};parts.forEach(function(x){v[x.type]=x.value;});
     var day={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[v.weekday], minute=Number(v.hour)*60+Number(v.minute);
+    // Spot metals (including XAGUSD) close for daily maintenance, 17:00–18:00 New York.
+    if (/^(XAUUSD|GOLD|XAGUSD|SILVER)$/.test(p)) {
+      if(day===0)return minute>=1080;
+      if(day>=1&&day<=4)return minute>=1080||minute<1020;
+      if(day===5)return minute<1020;
+      return false;
+    }
+    // Twelve Data's DJI/NDX/SPX symbols are cash indices: use their cash session.
     if (/^(US30|US100|NAS100|US500)$/.test(p)) return day>=1&&day<=5&&minute>=570&&minute<960;
-    return (day===0&&minute>=1020)||(day>=1&&day<=4)||(day===5&&minute<1020);
+    // FX weekly session, with the 17:00–17:05 ET rollover excluded.
+    return (day===0&&minute>=1025)||(day>=1&&day<=4&&(minute<1020||minute>=1025))||(day===5&&minute<1020);
   }
 
   // --- MATH ENGINES ---
@@ -380,8 +397,129 @@
   }
 
   // --- RENDER UI ---
+  function renderTrendCards(snapshot) {
+    var grid=document.getElementById('trendSignalsGrid'),updated=document.getElementById('trendSignalsUpdated');
+    if(!grid||!updated)return;
+    grid.innerHTML='';
+    function canonicalPair(value){
+      var p=String(value||'').toUpperCase();
+      return p==='GOLD'?'XAUUSD':p==='SILVER'?'XAGUSD':p==='NAS100'?'US100':p;
+    }
+    var selected=enabledPairs.map(canonicalPair);
+    var rows=(snapshot&&Array.isArray(snapshot.htfSignals)?snapshot.htfSignals:[]).filter(function(x){return selected.includes(canonicalPair(x.pair));});
+    if(!rows.length){
+      var empty=document.createElement('div');empty.className='dg-muted';empty.style.cssText='padding:16px 8px;text-align:center';
+      empty.textContent='No selected pair currently meets the Trend confirmation rules. The scanner will wait instead of forcing a trade.';grid.appendChild(empty);
+    }
+    rows.forEach(function(signal){
+      var isBuy=signal.direction==='BUY',direction=isBuy?'BUY':'SELL';
+      var card=document.createElement('section');card.className='dg-card';card.style.cssText='padding:14px;margin-bottom:10px';
+      var title=document.createElement('div');title.className='dg-card__head';
+      var name=document.createElement('strong');name.style.fontSize='17px';name.textContent=signal.pair;
+      var pill=document.createElement('span');pill.className='dg-pill '+(isBuy?'dg-pill--buy':'dg-pill--sell');pill.textContent=direction;
+      title.appendChild(name);title.appendChild(pill);card.appendChild(title);
+      var sub=document.createElement('div');sub.className='dg-muted';sub.style.cssText='font-size:11px;margin:4px 0 10px';
+      sub.textContent='4H Trend · '+(signal.quality||'CONFIRMED')+' · '+(signal.confidence||0)+'% confluence · '+signal.agreement+' timeframe agreement';card.appendChild(sub);
+      var dp=String(signal.pair).includes('JPY')?3:(/XAU|GOLD/.test(signal.pair)?2:(/XAG|SILVER/.test(signal.pair)?3:(/BTC|ETH/.test(signal.pair)?1:5)));
+      var levels=[['Entry',signal.entry,''],['Stop Loss',signal.stopLoss,'dg-neg'],['TP 1',signal.takeProfit,'dg-pos'],['TP 2',signal.takeProfit2,'dg-pos']];
+      var box=document.createElement('div');box.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px';
+      levels.forEach(function(item){var cell=document.createElement('div');cell.className='dg-level';cell.style.padding='8px 10px';var label=document.createElement('span');label.style.fontSize='11px';label.textContent=item[0];var value=document.createElement('strong');value.style.fontSize='14px';if(item[2])value.className=item[2];value.textContent=Number(item[1]).toFixed(dp);cell.appendChild(label);cell.appendChild(value);box.appendChild(cell);});
+      card.appendChild(box);
+      var detail=document.createElement('div');detail.className='dg-muted';detail.style.cssText='font-size:11px;line-height:1.5;margin-top:9px';
+      detail.textContent='Monthly '+signal.timeframes.Monthly+' · Weekly '+signal.timeframes.Weekly+' · Daily '+signal.timeframes.Daily+' · 4H '+signal.timeframes['4H']+' · 4H methods '+signal.methodAgreement+'/12';
+      card.appendChild(detail);
+      var evidence=document.createElement('div');evidence.className='dg-muted';evidence.style.cssText='font-size:11px;line-height:1.5;margin-top:6px';
+      evidence.textContent='Evidence: '+(Array.isArray(signal.methodEvidence)?signal.methodEvidence.join(' · '):'4H multi-method confirmation');card.appendChild(evidence);
+      var actions=document.createElement('div');actions.style.cssText='display:flex;gap:7px;margin-top:12px';
+      var journal=document.createElement('button');journal.type='button';journal.textContent='Add to Journal';journal.style.cssText='flex:1;padding:10px 5px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:0;font-size:12px';
+      journal.addEventListener('click',function(){window.executeTrade(signal.pair,direction,signal.entry,signal.stopLoss,signal.takeProfit,'Higher-Timeframe Trend · '+signal.agreement+' agreement',signal.takeProfit2);});
+      var copy=document.createElement('button');copy.type='button';copy.textContent='Copy Trade';copy.style.cssText='flex:1;padding:10px 5px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;border:1px solid var(--dg-line);font-size:12px';
+      copy.addEventListener('click',function(){window.copySignalTrade(signal.pair,direction,signal.entry,signal.stopLoss,signal.takeProfit,signal.takeProfit2);});
+      var chart=document.createElement('a');chart.href='chart.html?pair='+encodeURIComponent(signal.pair);chart.textContent='View Chart';chart.style.cssText='flex:1;text-align:center;padding:10px 5px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:12px';
+      actions.appendChild(journal);actions.appendChild(copy);actions.appendChild(chart);card.appendChild(actions);grid.appendChild(card);
+    });
+    updated.textContent=snapshot?'Updated '+new Date(snapshot.updatedAt).toLocaleString()+' · Source: '+(snapshot.source||'Twelve Data'):'No scheduled Trend scan has completed yet.';
+    renderHedgeCards(snapshot);
+  }
+
+  function renderHedgeCards(snapshot){
+    var grid=document.getElementById('trendHedgeGrid'),updated=document.getElementById('trendHedgeUpdated');
+    if(!grid||!updated)return;
+    grid.innerHTML='';
+    function canonicalPair(value){var p=String(value||'').toUpperCase();return p==='GOLD'?'XAUUSD':p==='SILVER'?'XAGUSD':p==='NAS100'?'US100':p;}
+    var selected=enabledPairs.map(canonicalPair);
+    var combos=(snapshot&&Array.isArray(snapshot.combos)?snapshot.combos:[]).filter(function(combo){
+      return Array.isArray(combo.legs)&&combo.legs.length===2&&combo.legs.every(function(leg){return selected.includes(canonicalPair(leg.pair));});
+    });
+    if(!combos.length){
+      var empty=document.createElement('div');empty.className='dg-muted';empty.style.cssText='padding:14px 8px;text-align:center';
+      empty.textContent='No qualifying two-pair hedge combination at this scan. Correlation and confirmation rules are not relaxed to force a setup.';grid.appendChild(empty);
+    }
+    combos.forEach(function(combo){
+      var card=document.createElement('section');card.className='dg-card';card.style.cssText='padding:13px;margin-bottom:10px';
+      var heading=document.createElement('div');heading.className='dg-card__head';
+      var title=document.createElement('strong');title.textContent='SMART HEDGE · '+combo.relationship+' CORRELATION';
+      var corr=document.createElement('span');corr.className='dg-pill';corr.textContent='r = '+combo.correlation;
+      heading.appendChild(title);heading.appendChild(corr);card.appendChild(heading);
+      combo.legs.forEach(function(leg,index){
+        var legBox=document.createElement('div');legBox.style.cssText='padding:10px 0;border-top:1px solid var(--dg-line);margin-top:8px';
+        var legHead=document.createElement('div');legHead.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px';
+        var pair=document.createElement('strong');pair.textContent='LEG '+(index+1)+' · '+leg.pair;
+        var dir=document.createElement('span');dir.className='dg-pill '+(leg.direction==='BUY'?'dg-pill--buy':'dg-pill--sell');dir.textContent=leg.direction;
+        legHead.appendChild(pair);legHead.appendChild(dir);legBox.appendChild(legHead);
+        var levels=document.createElement('div');levels.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px';
+        [['Entry',leg.entry],['Stop Loss',leg.stopLoss],['TP 1',leg.takeProfit],['TP 2',leg.takeProfit2]].forEach(function(item){
+          var cell=document.createElement('div');cell.className='dg-level';cell.style.padding='7px 9px';
+          var label=document.createElement('span');label.style.fontSize='10px';label.textContent=item[0];
+          var value=document.createElement('strong');value.style.fontSize='13px';var pairName=String(leg.pair);
+          var dp=pairName.includes('JPY')?3:(/XAU|GOLD/.test(pairName)?2:(/XAG|SILVER/.test(pairName)?3:(/BTC|ETH/.test(pairName)?1:5)));
+          value.textContent=Number(item[1]).toFixed(dp);cell.appendChild(label);cell.appendChild(value);levels.appendChild(cell);
+        });
+        legBox.appendChild(levels);
+        var actions=document.createElement('div');actions.style.cssText='display:flex;gap:7px;margin-top:8px';
+        var journal=document.createElement('button');journal.type='button';journal.textContent='Add Leg to Journal';journal.style.cssText='flex:1;padding:9px 5px;border-radius:9px;background:var(--dg-green);color:#fff;font-weight:bold;border:0;font-size:11px';
+        journal.addEventListener('click',function(){window.executeTrade(leg.pair,leg.direction,leg.entry,leg.stopLoss,leg.takeProfit,'Smart Pair Hedge · '+combo.id,leg.takeProfit2);});
+        var copy=document.createElement('button');copy.type='button';copy.textContent='Copy Leg';copy.style.cssText='flex:1;padding:9px 5px;border-radius:9px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;border:1px solid var(--dg-line);font-size:11px';
+        copy.addEventListener('click',function(){window.copySignalTrade(leg.pair,leg.direction,leg.entry,leg.stopLoss,leg.takeProfit,leg.takeProfit2);});
+        actions.appendChild(journal);actions.appendChild(copy);legBox.appendChild(actions);card.appendChild(legBox);
+      });
+      var meta=document.createElement('div');meta.className='dg-muted';meta.style.cssText='font-size:11px;line-height:1.5;margin-top:8px';
+      meta.textContent='4H correlation '+combo.correlation+' · HTF agreement '+combo.agreement+' · Combined USD exposure '+combo.sharedUsdExposure+'. '+(combo.riskNote||'Check combined risk before entering both legs.');
+      card.appendChild(meta);grid.appendChild(card);
+    });
+    updated.textContent=snapshot?'Correlation scan updated '+new Date(snapshot.updatedAt).toLocaleString():'No correlation scan available yet.';
+  }
+
+  async function loadTrendSignals(){
+    var grid=document.getElementById('trendSignalsGrid'),updated=document.getElementById('trendSignalsUpdated');
+    if(grid)grid.textContent='Loading latest Monthly / Weekly / Daily / 4H scan…';
+    if(updated)updated.textContent='Checking the latest scheduled scan…';
+    try{
+      var response=await fetch('/api/cron-scan?view=pair-intelligence',{cache:'no-store'});
+      var data=await response.json();
+      if(!response.ok||!data||!data.snapshot)throw new Error(data&&data.message||'The scheduled Trend scan has not completed yet.');
+      renderTrendCards(data.snapshot);
+    }catch(error){
+      if(grid)grid.textContent=error.message||'Trend data is temporarily unavailable.';
+      if(updated)updated.textContent='Try again after the scheduled scanner has run.';
+    }
+  }
+
   function renderCards() {
     var grid = document.getElementById('signals-grid');
+    var trendPanel=document.getElementById('trendSignalsPanel');
+    if(trendPanel)trendPanel.style.display=currentSignalTF==='trend'?'block':'none';
+    if(currentSignalTF==='trend'){
+      if(grid)grid.style.display='none';
+      var chips=document.getElementById('filterChips');if(chips)chips.style.display='none';
+      var refresh=document.getElementById('lastUpdated');if(refresh&&refresh.parentElement)refresh.parentElement.style.display='none';
+      loadTrendSignals();
+      return;
+    }
+    if(grid)grid.style.display='';
+    var chips=document.getElementById('filterChips');if(chips)chips.style.display='';
+    var refresh=document.getElementById('lastUpdated');if(refresh&&refresh.parentElement)refresh.parentElement.style.display='';
+
     if (grid && !grid.dataset.dagboTradeActionsBound) {
       grid.dataset.dagboTradeActionsBound = '1';
       grid.addEventListener('click', function(event) {
@@ -425,7 +563,7 @@
       }
 
       if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
-      if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
+      if (s.marketClosed) { return; }
       var isBuy = s.final.includes('BUY');
       var isSell = s.final.includes('SELL');
       var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
@@ -459,6 +597,7 @@
         var pUpper = String(s.pair || '').toUpperCase();
         if (pUpper.includes('JPY')) dp = 3;
         else if (pUpper === 'XAUUSD' || pUpper === 'GOLD') dp = 2;
+        else if (pUpper === 'XAGUSD' || pUpper === 'SILVER') dp = 3;
         else if (pUpper.includes('BTC') || pUpper.includes('ETH')) dp = 1;
         else if (pUpper.includes('US30') || pUpper.includes('US100') || pUpper.includes('NAS') || pUpper.includes('US500')) dp = 1;
         else if (pUpper.includes('USD') || pUpper.includes('EUR') || pUpper.includes('GBP') || pUpper.includes('CHF') || pUpper.includes('CAD') || pUpper.includes('AUD') || pUpper.includes('NZD')) dp = 5;
@@ -566,7 +705,7 @@
     }
   };
 
-  window.executeTrade = function(pair, signal, entry, sl, tp, strategy) {
+  window.executeTrade = function(pair, signal, entry, sl, tp, strategy, tp2) {
     var dir = String(signal || '').includes('BUY') ? 'BUY' : String(signal || '').includes('SELL') ? 'SELL' : null;
     if (!dir) { alert('This is not an executable BUY or SELL setup. Wait for confirmation.'); return; }
     entry=Number(entry); sl=Number(sl); tp=Number(tp);
@@ -599,10 +738,11 @@
       entry:entry,
       stopLoss:sl,
       takeProfit:tp,
+      takeProfit2:Number.isFinite(Number(tp2))&&Number(tp2)>0?Number(tp2):null,
       lotSize:Number(settings.lotSize)||0.01,
       riskAmount:(Number(settings.accountSize)||100)*(Number(settings.risk)||1)/100,
       strategy:strategy||'3-System Confluence',
-      timeframe:currentSignalTF+'m',
+      timeframe:currentSignalTF==='trend'?'4H Trend':currentSignalTF+'m',
       result:'OPEN',
       status:'OPEN',
       pnl:0,
@@ -662,8 +802,21 @@
 
   window.changeSignalTF = function(tf) {
     currentSignalTF = tf;
+    document.getElementById('scalpStats').style.display=tf==='5'?'block':'none';
+    if(tf==='trend'){
+      var grid=document.getElementById('signals-grid');if(grid)grid.style.display='none';
+      var chips=document.getElementById('filterChips');if(chips)chips.style.display='none';
+      var refresh=document.getElementById('lastUpdated');if(refresh&&refresh.parentElement)refresh.parentElement.style.display='none';
+      var panel=document.getElementById('trendSignalsPanel');if(panel)panel.style.display='block';
+      loadTrendSignals();return;
+    }
+    var panel=document.getElementById('trendSignalsPanel');if(panel)panel.style.display='none';
+    var grid=document.getElementById('signals-grid');if(grid)grid.style.display='';
+    var chips=document.getElementById('filterChips');if(chips)chips.style.display='';
+    var refresh=document.getElementById('lastUpdated');if(refresh&&refresh.parentElement)refresh.parentElement.style.display='';
     loadAllSignals();
   };
+  window.loadTrendSignals=loadTrendSignals;
 
   // --- INITIALIZE ---
   async function loadAllSignals() {

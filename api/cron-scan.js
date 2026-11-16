@@ -9,7 +9,7 @@ const redis = new Redis({
 });
 
 const SYMBOLS = {
-  XAUUSD: "XAU/USD", GOLD: "XAU/USD", DXY: "DXY",
+  XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD", DXY: "DXY",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY",
   GBPJPY: "GBP/JPY", AUDUSD: "AUD/USD", USDCHF: "USD/CHF",
   USDCAD: "USD/CAD", NZDUSD: "NZD/USD", EURJPY: "EUR/JPY", EURGBP: "EUR/GBP",
@@ -21,17 +21,43 @@ const SYMBOLS = {
   US30: "DJI", US100: "NDX", NAS100: "NDX", US500: "SPX",
   BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
 };
-const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
+const DEFAULT_PAIRS = ["XAUUSD","XAGUSD","EURUSD","GBPUSD","US30","BTCUSD"];
 const MAX_PAIRS = 6;
 
 function isMarketOpen(pair, now = new Date()) {
-  const p=String(pair||'').toUpperCase();
-  if (p.includes('BTC') || p.includes('ETH')) return true;
-  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
-  const v=Object.fromEntries(parts.map(x=>[x.type,x.value]));
-  const day={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[v.weekday], minute=Number(v.hour)*60+Number(v.minute);
-  if (/^(US30|US100|NAS100|US500)$/.test(p)) return day>=1&&day<=5&&minute>=570&&minute<960;
-  return (day===0&&minute>=1020)||(day>=1&&day<=4)||(day===5&&minute<1020);
+  const p = String(pair || "").toUpperCase();
+  // Crypto trades continuously, including weekends.
+  if (p.includes("BTC") || p.includes("ETH")) return true;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", weekday: "short", hour: "2-digit",
+    minute: "2-digit", hourCycle: "h23"
+  }).formatToParts(now);
+  const v = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  const day = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[v.weekday];
+  const minute = Number(v.hour) * 60 + Number(v.minute);
+
+  // US cash-index proxies (DJI / NDX / SPX) only publish executable candles
+  // during the underlying cash-index session: 09:30–16:00 New York weekdays.
+  if (/^(US30|US100|NAS100|US500)$/.test(p)) {
+    return day >= 1 && day <= 5 && minute >= 570 && minute < 960;
+  }
+
+  // Spot gold and silver, including XAGUSD, have a daily maintenance break, 17:00–18:00 ET.
+  // Weekly session: Sunday 18:00 through Friday 17:00 ET.
+  if (/^(XAUUSD|GOLD|XAGUSD|SILVER)$/.test(p)) {
+    if (day === 0) return minute >= 1080;
+    if (day >= 1 && day <= 4) return minute >= 1080 || minute < 1020;
+    if (day === 5) return minute < 1020;
+    return false;
+  }
+
+  // FX weekly session: Sunday 17:00 through Friday 17:00 ET.
+  // Skip the short 17:00–17:05 ET daily rollover window.
+  if (day === 0) return minute >= 1025;
+  if (day >= 1 && day <= 4) return minute < 1020 || minute >= 1025;
+  if (day === 5) return minute < 1020;
+  return false;
 }
 
 async function getConfiguredPairs() {
@@ -400,7 +426,12 @@ const HTF_FRAMES = [
 ];
 
 function pairDecimals(pair) {
-  return pair.includes("JPY") ? 3 : (pair === "XAUUSD" || pair === "GOLD" ? 2 : 5);
+  const p=String(pair||"").toUpperCase();
+  if(p.includes("JPY")) return 3;
+  if(p==="XAUUSD"||p==="GOLD") return 2;
+  if(p==="XAGUSD"||p==="SILVER") return 3;
+  if(p.includes("BTC")||p.includes("ETH")) return 1;
+  return 5;
 }
 function htfDirection(candles) {
   if (!Array.isArray(candles) || candles.length < 55) return "WAIT";
@@ -470,11 +501,12 @@ function tradePlan(pair, direction, candles) {
   }
   if(!count) return null;
   atr/=count;
-  const risk=atr*1.5, reward=risk*2, buy=direction==="BUY", d=pairDecimals(pair);
+  const risk=atr*1.5, reward1=risk*2, reward2=risk*3.5, buy=direction==="BUY", d=pairDecimals(pair);
   return {
     pair,direction,entry:Number(entry.toFixed(d)),
     stopLoss:Number((buy?entry-risk:entry+risk).toFixed(d)),
-    takeProfit:Number((buy?entry+reward:entry-reward).toFixed(d)),
+    takeProfit:Number((buy?entry+reward1:entry-reward1).toFixed(d)),
+    takeProfit2:Number((buy?entry+reward2:entry-reward2).toFixed(d)),
     timeframe:"4H", candleTime:last.datetime
   };
 }
@@ -537,7 +569,8 @@ async function runPairIntelligence(pairs, apiKey) {
       const plan=tradePlan(pair,direction,data[pair]["4h"]);
       if(plan) htfSignals.push({...plan,timeframes:directions,agreement:Math.max(buys,sells)+"/4",
         methodAgreement:(direction==="BUY"?fourHourMethods.buyScore:fourHourMethods.sellScore)+"/12",
-        methodEvidence:fourHourMethods.evidence.slice(0,5)});
+        methodEvidence:fourHourMethods.evidence.slice(0,5),
+        confidence:fourHourMethods.confidence,quality:fourHourMethods.quality});
     }
   }
 
@@ -642,6 +675,12 @@ module.exports = async function handler(req, res) {
           return Number.isFinite(stamp) && stamp + 15 * 60 * 1000 <= Date.now();
         }).slice(0, 60).reverse();
         if (closedCandles.length < 60) throw new Error("Waiting for 60 fully closed candles");
+        const newestClosed = closedCandles[closedCandles.length - 1];
+        const newestRaw = String(newestClosed.datetime || "");
+        const newestStamp = Date.parse(newestRaw.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(newestRaw) ? "" : "Z"));
+        if (!Number.isFinite(newestStamp) || Date.now() - (newestStamp + 15 * 60 * 1000) > 35 * 60 * 1000) {
+          throw new Error("Market candles are stale; suppressing signal until fresh data arrives");
+        }
         const analysis = analyze(closedCandles, pair);
         if (!analysis) throw new Error("Could not calculate indicators");
         return { pair, analysis };

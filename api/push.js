@@ -83,6 +83,7 @@ module.exports = async function handler(req, res) {
         pushSubject: !!process.env.VAPID_SUBJECT,
         pushStorage: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
         marketData: !!process.env.TWELVE_DATA_API_KEY,
+        fmp: !!process.env.FMP_API_KEY,
         cronSecret: !!(process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY)
       };
       return res.status(200).json({
@@ -207,7 +208,7 @@ module.exports = async function handler(req, res) {
       // Fetch a real Twelve Data quote for explicit pair questions or the pair
       // selected in the user's saved chart snapshots. Never ask the model to guess.
       const pairSymbols = {
-        XAUUSD:"XAU/USD", GOLD:"XAU/USD", EURUSD:"EUR/USD", GBPUSD:"GBP/USD",
+        XAUUSD:"XAU/USD", GOLD:"XAU/USD", XAGUSD:"XAG/USD", SILVER:"XAG/USD", EURUSD:"EUR/USD", GBPUSD:"GBP/USD",
         USDJPY:"USD/JPY", GBPJPY:"GBP/JPY", AUDUSD:"AUD/USD", USDCHF:"USD/CHF",
         USDCAD:"USD/CAD", NZDUSD:"NZD/USD", EURJPY:"EUR/JPY", EURGBP:"EUR/GBP",
         BTCUSD:"BTC/USD", ETHUSD:"ETH/USD", US30:"DJI", US100:"NDX", NAS100:"NDX", US500:"SPX"
@@ -230,6 +231,8 @@ module.exports = async function handler(req, res) {
           quotePair = walk(snapshot);
         } catch (_) {}
       }
+      let fundamentalContext = "";
+      const asksFundamentals = /\b(fundamental|macro|economic|inflation|cpi|pce|gdp|unemployment|interest rate|treasury|yield|central bank|fed|fomc|rate decision|economic calendar)\b/i.test(question);
       let liveQuoteContext = "";
       if (asksPrice) {
         const quoteKey = process.env.TWELVE_DATA_API_KEY;
@@ -267,6 +270,27 @@ module.exports = async function handler(req, res) {
         return res.status(429).json({ error: "Dagbo AI is receiving too many requests. Please wait a few minutes and try again." });
       }
 
+      const fmpKey = process.env.FMP_API_KEY;
+      if (asksFundamentals && fmpKey) {
+        try {
+          const from = new Date().toISOString().slice(0, 10);
+          const to = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+          const calendarUrl = "https://financialmodelingprep.com/stable/economic-calendar?from=" + from + "&to=" + to + "&apikey=" + encodeURIComponent(fmpKey);
+          const macroUrl = "https://financialmodelingprep.com/stable/treasury-rates?apikey=" + encodeURIComponent(fmpKey);
+          const results = await Promise.all([fetch(calendarUrl), fetch(macroUrl)]);
+          const payloads = await Promise.all(results.map(r => r.ok ? r.json() : Promise.resolve(null)));
+          const events = Array.isArray(payloads[0]) ? payloads[0].slice(0, 12).map(e => ({
+            date: e.date, country: e.country, currency: e.currency, event: e.event,
+            impact: e.impact, estimate: e.estimate, previous: e.previous, actual: e.actual
+          })) : [];
+          const rates = Array.isArray(payloads[1]) && payloads[1].length ? payloads[1][0] : null;
+          fundamentalContext = "FMP FUNDAMENTAL DATA (may be plan-limited; missing fields are unknown): " +
+            JSON.stringify({ upcomingEconomicEvents: events, latestTreasuryRates: rates });
+        } catch (error) {
+          console.error("DAGBO FMP fundamentals context unavailable:", error.message);
+        }
+      }
+
       // Keep the Groq API key on the server; never accept it from the browser.
       const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -282,7 +306,7 @@ module.exports = async function handler(req, res) {
               content: "You are DAGBO AI Market Commander for " + (safeName || "Oga") + ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise: greetings get one short greeting, simple questions get one direct answer, and use bullets only when useful. Speak in clear Nigerian-friendly English or Pidgin when natural. For live-price questions, use only a verified live quote supplied in the context below; if unavailable, say so and ask which pair is meant. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When the user requests a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit, plus one brief reason. Entry, SL and TP must be derived from fresh market data and a clearly defined setup, with correct price ordering for the direction. If fresh data or a valid setup is missing, return WAIT and explicitly say entry/SL/TP are not available; never fabricate levels. Never guarantee profits. Keep ordinary answers to 1-3 short sentences."
             },
             ...safeHistory,
-            { role: "user", content: question.trim() + (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") + (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "") }
+            { role: "user", content: question.trim() + (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") + (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "") + (fundamentalContext ? "\n\n" + fundamentalContext + "\nUse these verified fields as context only; distinguish actual, estimate and previous, state dates, and say when a dataset is missing. Do not infer a market direction from one data point." : "") }
           ],
           temperature: 0.3,
           max_tokens: 220
