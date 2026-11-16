@@ -59,7 +59,7 @@ else if(wrPrev>=-20&&wrNow<-20&&close<breakoutLow&&close<open){dir="SELL";source
 if(!dir)dir="WAIT";
 var signal=dir==="WAIT"?"NO TRADE":(leadConfidence>=85&&source==="MAIN CONFLUENCE"?"HIGH CONFIDENCE ":"")+dir;
 var confidenceValue=source==="FAST MOMENTUM CHANNEL"?65:leadConfidence;
-var quality=confidenceValue>=85?"HIGH":confidenceValue>=75?"MEDIUM":"LOW";
+var quality=confidenceValue>=85?"HIGH":confidenceValue>=70?"MEDIUM":"LOW";
 var buy=dir==="BUY";
 return {pair:pair,profile:profile,signal:signal,direction:dir,source:source,confidence:confidenceValue,quality:quality,threshold:threshold,entry:close,stopLoss:buy?close-atr*1.5:close+atr*1.5,takeProfit:buy?close+atr*2:close-atr*2,tp2:buy?close+atr*3.5:close-atr*3.5,atr:atr,atrPct:atrPct,atrOk:atrOk,rsi:Number(rv.toFixed(1)),stochasticK:Number(stoch.k.toFixed(1)),williamsR:wrNow===null?null:Number(wrNow.toFixed(1)),momentumTrigger:momentumTrigger,evidence:evidence,buyScore:score.BUY,sellScore:score.SELL,totalMethods:12,groups:groups,pattern:pattern.name,patternDirection:pattern.direction,patternConfirmed:pattern.confirmed,structure:structureDir,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,candleHigh:high,candleLow:low,candleTime:last.datetime||null,macd:macd,emaTrend:trendDir};}
 
