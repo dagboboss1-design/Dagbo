@@ -495,11 +495,12 @@ function tradePlan(pair, direction, candles) {
   }
   if(!count) return null;
   atr/=count;
-  const risk=atr*1.5, reward=risk*2, buy=direction==="BUY", d=pairDecimals(pair);
+  const risk=atr*1.5, reward1=risk*2, reward2=risk*3.5, buy=direction==="BUY", d=pairDecimals(pair);
   return {
     pair,direction,entry:Number(entry.toFixed(d)),
     stopLoss:Number((buy?entry-risk:entry+risk).toFixed(d)),
-    takeProfit:Number((buy?entry+reward:entry-reward).toFixed(d)),
+    takeProfit:Number((buy?entry+reward1:entry-reward1).toFixed(d)),
+    takeProfit2:Number((buy?entry+reward2:entry-reward2).toFixed(d)),
     timeframe:"4H", candleTime:last.datetime
   };
 }
@@ -562,7 +563,8 @@ async function runPairIntelligence(pairs, apiKey) {
       const plan=tradePlan(pair,direction,data[pair]["4h"]);
       if(plan) htfSignals.push({...plan,timeframes:directions,agreement:Math.max(buys,sells)+"/4",
         methodAgreement:(direction==="BUY"?fourHourMethods.buyScore:fourHourMethods.sellScore)+"/12",
-        methodEvidence:fourHourMethods.evidence.slice(0,5)});
+        methodEvidence:fourHourMethods.evidence.slice(0,5),
+        confidence:fourHourMethods.confidence,quality:fourHourMethods.quality});
     }
   }
 
