@@ -314,9 +314,32 @@ async function sendNewsAlerts(apiKey) {
   }
   return { eventsChecked, newsAlerts, preNewsSignals };
 }
-async function monitorTrades(marketData) {
+async function fetchTradeMarket(pair, apiKey) {
+  const symbol = SYMBOLS[pair];
+  if (!symbol) throw new Error("Unsupported trade pair " + pair);
+  const url = "https://api.twelvedata.com/time_series?symbol=" +
+    encodeURIComponent(symbol) + "&interval=15min&outputsize=3&timezone=UTC&apikey=" +
+    encodeURIComponent(apiKey);
+  const response = await fetch(url);
+  const data = await response.json();
+  if (!response.ok || data.status === "error" || !Array.isArray(data.values) || !data.values.length) {
+    throw new Error(data.message || "No trade-monitor candles");
+  }
+  // Twelve Data returns newest candles first. The newest candle's high/low
+  // captures an intrabar touch even if price later moves away before close.
+  const candle = data.values[0];
+  const high = num(candle.high), low = num(candle.low), close = num(candle.close);
+  if ([high, low, close].some(v => v === null)) throw new Error("Invalid trade-monitor candle");
+  return {
+    pair, entry: close, candleHigh: high, candleLow: low,
+    candleTime: candle.datetime || null, signal: null
+  };
+}
+
+async function monitorTrades(marketData, apiKey) {
   const devices = await redis.smembers("dagbo:trades:devices");
-  let closed = 0, warnings = 0;
+  let closed = 0, warnings = 0, checked = 0, dataErrors = [];
+  const openTrades = [];
   for (const deviceId of devices) {
     const ids = await redis.smembers("dagbo:trades:device:" + deviceId);
     for (const tradeId of ids) {
@@ -324,78 +347,107 @@ async function monitorTrades(marketData) {
       const raw = await redis.get(key);
       if (!raw) { await redis.srem("dagbo:trades:device:" + deviceId, tradeId); continue; }
       const trade = typeof raw === "string" ? JSON.parse(raw) : raw;
-      if (trade.status !== "OPEN") continue;
-      const market = marketData[trade.pair];
-      if (!market) continue;
-      const buy = trade.direction === "BUY";
-      const sl = num(trade.stopLoss), tp = num(trade.takeProfit);
-      if (sl === null || tp === null) continue;
-      const hitSL = buy ? market.candleLow <= sl : market.candleHigh >= sl;
-      const hitTP = buy ? market.candleHigh >= tp : market.candleLow <= tp;
-      if (hitSL && hitTP) {
-        const flag = "both-hit:" + market.candleTime;
-        if (trade.lastWarning !== flag) {
-          await sendToDevice(deviceId, "⚠️ TRADE REVIEW NEEDED", trade.pair + ": TP and SL both fell inside the same 15m candle. Order is unknown; check your broker/chart manually.", "trade-review-" + tradeId, "/journal.html");
-          trade.lastWarning = flag;
-          await redis.set(key, JSON.stringify(trade));
-          warnings++;
-        }
-        continue;
-      }
-      if (hitSL || hitTP) {
-        trade.status = "CLOSED";
-        trade.result = hitTP ? "WIN" : "LOSS";
-        trade.exit = hitTP ? tp : sl;
-        trade.closeReason = hitTP ? "TAKE_PROFIT" : "STOP_LOSS";
-        trade.dateClosed = new Date().toISOString();
-        await sendToDevice(deviceId, hitTP ? "🎯 TAKE PROFIT HIT" : "🛑 STOP LOSS HIT",
-          trade.pair + " " + trade.direction + " reached " + (hitTP ? "Take Profit" : "Stop Loss") + " at " + trade.exit + ". Review and update your journal.",
-          "trade-close-" + tradeId, "/journal.html");
+      if (trade.status === "OPEN") openTrades.push({ deviceId, tradeId, key, trade });
+    }
+  }
+
+  // Do not depend on the user's normal signal-watchlist: every distinct pair
+  // with an OPEN tracked trade must have market data for its TP/SL check.
+  const neededPairs = Array.from(new Set(openTrades.map(x => String(x.trade.pair || "").toUpperCase())))
+    .filter(pair => SYMBOLS[pair] && !marketData[pair]);
+  const extraMarkets = await Promise.all(neededPairs.map(async pair => {
+    try {
+      if (!isMarketOpen(pair)) return { pair, closed: true };
+      return { pair, market: await fetchTradeMarket(pair, apiKey) };
+    } catch (error) {
+      return { pair, error: error.message };
+    }
+  }));
+  for (const item of extraMarkets) {
+    if (item.market) marketData[item.pair] = item.market;
+    if (item.error) dataErrors.push({ pair: item.pair, error: item.error });
+  }
+
+  for (const item of openTrades) {
+    const { deviceId, tradeId, key, trade } = item;
+    const pair = String(trade.pair || "").toUpperCase();
+    if (!isMarketOpen(pair)) continue;
+    const market = marketData[pair];
+    if (!market || market.marketClosed) continue;
+    const buy = String(trade.direction).toUpperCase() === "BUY";
+    const sl = num(trade.stopLoss), tp = num(trade.takeProfit);
+    if (sl === null || tp === null) continue;
+    checked++;
+    const high = num(market.candleHigh), low = num(market.candleLow);
+    if (high === null || low === null) continue;
+    const hitSL = buy ? low <= sl : high >= sl;
+    const hitTP = buy ? high >= tp : low <= tp;
+    if (hitSL && hitTP) {
+      const flag = "both-hit:" + (market.candleTime || "unknown");
+      if (trade.lastWarning !== flag) {
+        await sendToDevice(deviceId, "⚠️ TRADE REVIEW NEEDED", trade.pair + ": TP and SL both fell inside the same 15m candle. The order is unknown; check your broker/chart manually. DAGBO has not guessed the result.", "trade-review-" + tradeId, "/journal.html");
+        trade.lastWarning = flag;
         await redis.set(key, JSON.stringify(trade));
-        closed++;
-        continue;
+        warnings++;
       }
-      const current = num(market.entry);
-      const riskDistance = Math.abs(trade.entry - sl);
-      const rewardDistance = Math.abs(tp - trade.entry);
-      if (current !== null && riskDistance > 0 && rewardDistance > 0) {
-        const adverseRemaining = buy ? current - sl : sl - current;
-        const targetRemaining = buy ? tp - current : current - tp;
-        if (adverseRemaining > 0 && adverseRemaining / riskDistance <= 0.20 && !trade.nearSlAlerted) {
-          await sendToDevice(deviceId, "⚠️ PRICE NEAR STOP LOSS",
-            trade.pair + " is within about 20% of the remaining distance to your Stop Loss. Review risk and your broker position.",
-            "trade-near-sl-" + tradeId, "/journal.html");
-          trade.nearSlAlerted = true;
-          await redis.set(key, JSON.stringify(trade));
-          warnings++;
-        }
-        if (targetRemaining > 0 && targetRemaining / rewardDistance <= 0.20 && !trade.nearTpAlerted) {
-          await sendToDevice(deviceId, "🎯 PRICE NEAR TAKE PROFIT",
-            trade.pair + " is within about 20% of your Take Profit distance. Consider your trade-management plan.",
-            "trade-near-tp-" + tradeId, "/journal.html");
-          trade.nearTpAlerted = true;
-          await redis.set(key, JSON.stringify(trade));
-          warnings++;
-        }
+      continue;
+    }
+    if (hitSL || hitTP) {
+      trade.status = "CLOSED";
+      trade.result = hitTP ? "WIN" : "LOSS";
+      trade.exit = hitTP ? tp : sl;
+      trade.closeReason = hitTP ? "TAKE_PROFIT" : "STOP_LOSS";
+      trade.dateClosed = new Date().toISOString();
+      await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
+      closed++;
+      try {
+        await sendToDevice(deviceId, hitTP ? "🎯 TAKE PROFIT HIT" : "🛑 STOP LOSS HIT",
+          trade.pair + " " + trade.direction + " reached " + (hitTP ? "Take Profit" : "Stop Loss") + " at " + trade.exit + ". Open Journal to see the recorded result.",
+          "trade-close-" + tradeId, "/journal.html");
+      } catch (pushError) {
+        console.error("Trade result saved; push notification failed:", pushError.message);
       }
-      const opposite = market.signal && market.signal !== "NO TRADE" &&
-        ((buy && market.signal.includes("SELL")) || (!buy && market.signal.includes("BUY")));
-      if (opposite) {
-        const flag = "opposite:" + market.signal;
-        if (trade.lastWarning !== flag) {
-          await sendToDevice(deviceId, "⚠️ TRADE DIRECTION WARNING",
-            market.signal + " signal appeared for " + trade.pair + " while your " + trade.direction + " trade is open. Review your risk; this does not close the trade.",
-            "trade-opposite-" + tradeId, "/journal.html");
-          trade.lastWarning = flag;
-          await redis.set(key, JSON.stringify(trade));
-          warnings++;
-        }
+      continue;
+    }
+    const current = num(market.entry);
+    const riskDistance = Math.abs(Number(trade.entry) - sl);
+    const rewardDistance = Math.abs(tp - Number(trade.entry));
+    if (current !== null && riskDistance > 0 && rewardDistance > 0) {
+      const adverseRemaining = buy ? current - sl : sl - current;
+      const targetRemaining = buy ? tp - current : current - tp;
+      if (adverseRemaining > 0 && adverseRemaining / riskDistance <= 0.20 && !trade.nearSlAlerted) {
+        await sendToDevice(deviceId, "⚠️ PRICE NEAR STOP LOSS",
+          trade.pair + " is within about 20% of the remaining distance to your Stop Loss. Review risk and your broker position.",
+          "trade-near-sl-" + tradeId, "/journal.html");
+        trade.nearSlAlerted = true;
+        await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
+        warnings++;
+      }
+      if (targetRemaining > 0 && targetRemaining / rewardDistance <= 0.20 && !trade.nearTpAlerted) {
+        await sendToDevice(deviceId, "🎯 PRICE NEAR TAKE PROFIT",
+          trade.pair + " is within about 20% of your Take Profit distance. Consider your trade-management plan.",
+          "trade-near-tp-" + tradeId, "/journal.html");
+        trade.nearTpAlerted = true;
+        await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
+        warnings++;
+      }
+    }
+    const opposite = market.signal && market.signal !== "NO TRADE" &&
+      ((buy && market.signal.includes("SELL")) || (!buy && market.signal.includes("BUY")));
+    if (opposite) {
+      const flag = "opposite:" + market.signal;
+      if (trade.lastWarning !== flag) {
+        await sendToDevice(deviceId, "⚠️ TRADE DIRECTION WARNING",
+          market.signal + " signal appeared for " + trade.pair + " while your " + trade.direction + " trade is open. Review your risk; this does not close the trade.",
+          "trade-opposite-" + tradeId, "/journal.html");
+        trade.lastWarning = flag;
+        await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
+        warnings++;
       }
     }
   }
-  return { closed, warnings };
+  return { closed, warnings, checked, monitoredPairs: Array.from(new Set(openTrades.map(x => x.trade.pair))), dataErrors };
 }
-
 
 
 // --- SMART PAIR HEDGE + HIGHER-TIMEFRAME ENGINE ---
@@ -684,7 +736,7 @@ module.exports = async function handler(req, res) {
       console.error("DAGBO pair-intelligence scan failed:", pairError.message);
     }
 
-    const tradeSummary = await monitorTrades(results);
+    const tradeSummary = await monitorTrades(results, apiKey);
     const newsSummary = { delegatedTo: "/api/news-monitor", note: "Economic-news and spike alerts run in the dedicated 5-minute news monitor." };
     const errorKey = "dagbo:scan:error:last";
     const previousErrorRaw = await redis.get(errorKey);
