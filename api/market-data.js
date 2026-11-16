@@ -4,7 +4,8 @@ const SYMBOLS = {
   AUDUSD: "AUD/USD", USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
   EURJPY: "EUR/JPY", EURGBP: "EUR/GBP",
   US30: "DJI", US100: "NDX", NAS100: "NDX", US500: "SPX",
-  BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
+  BTCUSD: "BTC/USDT", BTCUSDT: "BTC/USDT", BTC: "BTC/USDT",
+  ETHUSD: "ETH/USDT", ETHUSDT: "ETH/USDT", ETH: "ETH/USDT"
 };
 
 module.exports = async function handler(req, res) {
@@ -15,6 +16,7 @@ module.exports = async function handler(req, res) {
   const pair = rawPair.replace(/[^A-Z0-9]/g, "");
   const tf = String(req.query && req.query.tf || "15");
   const symbol = SYMBOLS[pair];
+  const isCrypto = /^(BTC|BTCUSD|BTCUSDT|ETH|ETHUSD|ETHUSDT)$/.test(pair);
 
   if (!symbol) return res.status(400).json({ error: "Unsupported market pair" });
   if (tf !== "5" && tf !== "15") return res.status(400).json({ error: "Timeframe must be 5 or 15 minutes" });
@@ -24,8 +26,8 @@ module.exports = async function handler(req, res) {
 
   try {
     const url = "https://api.twelvedata.com/time_series?symbol=" +
-      encodeURIComponent(symbol) + "&interval=" + tf +
-      "min&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+      encodeURIComponent(symbol) + (isCrypto ? "&exchange=Binance" : "") +
+      "&interval=" + tf + "min&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
     const response = await fetch(url);
     const data = await response.json();
 
@@ -33,7 +35,15 @@ module.exports = async function handler(req, res) {
       return res.status(502).json({ error: data.message || "Market data provider did not return candles" });
     }
 
-    return res.status(200).json({ pair, timeframe: tf, values: data.values });
+    if (isCrypto && data.meta && data.meta.exchange && String(data.meta.exchange).toLowerCase() !== "binance") {
+      return res.status(502).json({ error: "Binance market data was not confirmed by the provider.", providerExchange: data.meta.exchange });
+    }
+
+    return res.status(200).json({
+      pair, timeframe: tf, provider: isCrypto ? "Twelve Data · Binance" : "Twelve Data",
+      providerExchange: data.meta && data.meta.exchange ? data.meta.exchange : (isCrypto ? "Binance (requested)" : null),
+      values: data.values
+    });
   } catch (error) {
     console.error("DAGBO market data proxy error:", error.message);
     return res.status(502).json({ error: "Could not retrieve market candles" });
