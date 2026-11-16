@@ -1,4 +1,4 @@
-const VERSION = "dagbo-v21";
+const VERSION = "dagbo-v22";
 const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "settings.html", "dagbo.css", "manifest.json", "icons/dagbo-orbit.svg", "pwa.js", "navigation.js"];
 
 self.addEventListener("install", (event) => {
