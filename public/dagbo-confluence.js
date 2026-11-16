@@ -4,7 +4,7 @@ function n(v){var x=Number(v);return Number.isFinite(x)?x:null;}
 function ema(a,p){if(!a.length)return 0;var k=2/(p+1),v=a[0];for(var i=1;i<a.length;i++)v=a[i]*k+v*(1-k);return v;}
 function rsi(a,p){if(a.length<=p)return 50;var g=0,l=0;for(var i=a.length-p;i<a.length;i++){var d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}if(!l)return 100;return 100-100/(1+g/l);}
 function pivots(candles,radius){var out=[];for(var i=radius;i<candles.length-radius;i++){var hi=n(candles[i].high),lo=n(candles[i].low),isH=true,isL=true;for(var j=i-radius;j<=i+radius;j++){if(j===i)continue;if(n(candles[j].high)>=hi)isH=false;if(n(candles[j].low)<=lo)isL=false;}if(isH)out.push({i,type:"H",price:hi});if(isL)out.push({i,type:"L",price:lo});}return out.sort(function(a,b){return a.i-b.i;});}
-function patternScan(candles,closes){var p=pivots(candles.slice(-100),3),last=closes[closes.length-1],prior=closes[closes.length-2],out={direction:"WAIT",name:"No confirmed chart pattern",confirmed:false};
+function patternScan(candles,closes){candles=candles.slice(-100);closes=closes.slice(-100);var p=pivots(candles,3),last=closes[closes.length-1],prior=closes[closes.length-2],out={direction:"WAIT",name:"No confirmed chart pattern",confirmed:false};
 function near(a,b,t){return Math.abs(a-b)/Math.max(Math.abs(a),Math.abs(b),1e-9)<=t;}
 for(var i=Math.max(0,p.length-9);i<=p.length-5;i++){var q=p.slice(i,i+5);if(q.length<5)continue;
 if(q[0].type==="H"&&q[1].type==="L"&&q[2].type==="H"&&q[3].type==="L"&&q[4].type==="H"&&q[2].price>q[0].price*1.002&&q[2].price>q[4].price*1.002&&near(q[0].price,q[4].price,0.012)){var neck=(q[1].price+q[3].price)/2;if(prior>=neck&&last<neck){out={direction:"SELL",name:"Head and Shoulders neckline breakdown",confirmed:true};}}
