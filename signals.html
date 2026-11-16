@@ -112,7 +112,7 @@
 
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
-  var enabledPairs = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : ['XAUUSD', 'EURUSD', 'GBPUSD', 'US30', 'BTCUSD'];
+  var enabledPairs = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : ['XAUUSD', 'XAGUSD', 'EURUSD', 'GBPUSD', 'US30', 'BTCUSD'];
   
   var PAIR_TYPES = {
     XAUUSD: 'GOLD', GOLD: 'GOLD', XAGUSD: 'METAL', SILVER: 'METAL',
