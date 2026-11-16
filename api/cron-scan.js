@@ -1,6 +1,7 @@
 const webpush = require("web-push");
 const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
+const confluence = require("../public/dagbo-confluence.js");
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
@@ -70,69 +71,7 @@ function rsi(values, period) {
   const rs = (gain / period) / (loss / period);
   return 100 - 100 / (1 + rs);
 }
-function analyze(candles, pair) {
-  const closes = candles.map(c => num(c.close));
-  if (closes.some(v => v === null) || closes.length < 50) return null;
-  const last = candles[candles.length - 1], prev = candles[candles.length - 2];
-  const o=num(last.open), c=num(last.close), h=num(last.high), l=num(last.low);
-  const po=num(prev.open), pc=num(prev.close);
-  if ([o,c,h,l,po,pc].some(v=>v===null)) return null;
-  const votes=[], evidence=[];
-  const add=(name,dir,detail)=>{if(dir==="BUY"||dir==="SELL"){votes.push(dir);evidence.push(name+": "+detail+" ("+dir+")");}};
-  const rv=rsi(closes,14), e20=ema(closes,20), e50=ema(closes,50);
-  const trend=e20>e50&&c>e20?"BUY":e20<e50&&c<e20?"SELL":"WAIT";
-  add("EMA trend",trend,"EMA20 "+(e20>e50?"above":"below")+" EMA50");
-  const rsiDir=rv<32?"BUY":rv>68?"SELL":"WAIT";
-  add("RSI(14)",rsiDir,"RSI "+rv.toFixed(1));
-  const e12=ema(closes,12), e26=ema(closes,26);
-  const prev12=ema(closes.slice(0,-1),12), prev26=ema(closes.slice(0,-1),26);
-  const macd=e12-e26, prevMacd=prev12-prev26;
-  const macdDir=macd>0&&macd>prevMacd?"BUY":macd<0&&macd<prevMacd?"SELL":"WAIT";
-  add("MACD momentum",macdDir,"MACD "+macd.toPrecision(4));
-  const body=Math.abs(c-o), range=Math.max(h-l,1e-12), lower=Math.min(o,c)-l, upper=h-Math.max(o,c);
-  let candleDir="WAIT", candleName="No clear reversal pattern";
-  if(c>o&&pc<po&&c>=po&&o<=pc){candleDir="BUY";candleName="Bullish engulfing";}
-  else if(c<o&&pc>po&&c<=po&&o>=pc){candleDir="SELL";candleName="Bearish engulfing";}
-  else if(lower>Math.max(body*2,range*.45)&&c>o){candleDir="BUY";candleName="Bullish rejection / pin bar";}
-  else if(upper>Math.max(body*2,range*.45)&&c<o){candleDir="SELL";candleName="Bearish rejection / pin bar";}
-  add("Candlestick reading",candleDir,candleName);
-  const prior=candles.slice(-21,-1);
-  const swingHigh=Math.max(...prior.map(x=>num(x.high))), swingLow=Math.min(...prior.map(x=>num(x.low)));
-  const structure=c>swingHigh?"BUY":c<swingLow?"SELL":"WAIT";
-  const priorTrend=ema(closes.slice(0,-1),20)>ema(closes.slice(0,-1),50)?"BUY":"SELL";
-  const structureName=structure==="WAIT"?"No confirmed break":structure===priorTrend?"BOS":"CHoCH";
-  add("ICT / SMC "+structureName,structure,structure==="BUY"?"close broke recent swing high":structure==="SELL"?"close broke recent swing low":"no confirmed swing break");
-  const sweep=(h>swingHigh&&c<swingHigh)?"SELL":(l<swingLow&&c>swingLow)?"BUY":"WAIT";
-  add("ICT liquidity sweep",sweep,sweep==="SELL"?"swept prior high and closed back below":sweep==="BUY"?"swept prior low and closed back above":"no sweep-and-reclaim");
-  const twoBack=candles[candles.length-3];
-  const fvg=twoBack&&l>num(twoBack.high)?"BUY":twoBack&&h<num(twoBack.low)?"SELL":"WAIT";
-  add("ICT fair value gap",fvg,fvg==="BUY"?"bullish 3-candle imbalance":fvg==="SELL"?"bearish 3-candle imbalance":"no 3-candle gap");
-  const recent=closes.slice(-20),mean=recent.reduce((sum,v)=>sum+v,0)/recent.length;
-  const variance=recent.reduce((sum,v)=>sum+Math.pow(v-mean,2),0)/recent.length,dev=Math.sqrt(variance);
-  const bb=c<mean-2*dev&&c>o?"BUY":c>mean+2*dev&&c<o?"SELL":"WAIT";
-  add("Bollinger Bands(20,2)",bb,bb==="BUY"?"lower-band rejection":bb==="SELL"?"upper-band rejection":"no band-rejection setup");
-  const vols=candles.slice(-21,-1).map(x=>num(x.volume)).filter(v=>v!==null);
-  const currentVol=num(last.volume),avgVol=vols.length?vols.reduce((sum,v)=>sum+v,0)/vols.length:0;
-  const volume= currentVol!==null&&avgVol>0&&currentVol>avgVol*1.5?(c>o?"BUY":c<o?"SELL":"WAIT"):"WAIT";
-  add("Volume confirmation",volume,avgVol>0&&currentVol!==null?(currentVol/avgVol).toFixed(2)+"x 20-bar average":"volume unavailable");
-  const buys=votes.filter(v=>v==="BUY").length,sells=votes.filter(v=>v==="SELL").length;
-  const direction=buys>=3&&buys>sells?"BUY":sells>=3&&sells>buys?"SELL":"WAIT";
-  const signal=direction==="BUY"?(buys>=6?"STRONG BUY":"BUY"):direction==="SELL"?(sells>=6?"STRONG SELL":"SELL"):"NO TRADE";
-  let atr=0;
-  for(let i=candles.length-14;i<candles.length;i++){
-    const x=candles[i],p=candles[i-1],hi=num(x.high),lo=num(x.low),previousClose=num(p.close);
-    atr+=Math.max(hi-lo,Math.abs(hi-previousClose),Math.abs(lo-previousClose));
-  }
-  atr/=14;
-  const buy=signal.includes("BUY");
-  return {
-    pair,signal,entry:c,stopLoss:buy?c-atr*1.5:c+atr*1.5,
-    takeProfit:buy?c+atr*2:c-atr*2,tp2:buy?c+atr*3.5:c-atr*3.5,
-    rsi:Number(rv.toFixed(1)),evidence,buyScore:buys,sellScore:sells,totalMethods:9,
-    structure:structureName,sweep,fvg,bb,volume,candlePattern:candleName,
-    candleHigh:h,candleLow:l,candleTime:last.datetime||null
-  };
-}
+function analyze(candles, pair) { return confluence.analyze(candles, pair); }
 
 function validAuth(req) {
   const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.SIGNAL_PUSH_SECRET;
