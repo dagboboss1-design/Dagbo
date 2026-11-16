@@ -247,7 +247,7 @@
       var buys = Number(item.buyScore)||0, sells = Number(item.sellScore)||0;
       var score = Math.max(buys,sells);
       return { pair:pair, signal:item.final, score:score, direction:buys > sells ? 'BUY' : sells > buys ? 'SELL' : 'WAIT' };
-    }).filter(function(x){ return x.score >= 3 && x.direction !== 'WAIT'; }).sort(function(a,b){ return b.score-a.score; }).slice(0,3);
+    }).filter(function(x){ return x.direction !== 'WAIT' && (String(x.signal).includes('BUY') || String(x.signal).includes('SELL')); }).sort(function(a,b){ return b.score-a.score; }).slice(0,3);
 
     try { localStorage.setItem('dagbo_best_opportunities', JSON.stringify({timeframe:currentSignalTF,updatedAt:new Date().toISOString(),items:ranked})); var levels=JSON.parse(localStorage.getItem('dagbo_signal_trade_levels')||'{}'); Object.keys(signalsData).forEach(function(pair){var s=signalsData[pair];if(s&&!s.marketClosed&&s.final!=='NO TRADE') levels[currentSignalTF+':'+pair]={direction:s.final,entry:s.entry,sl:s.sl,tp:s.tp1,updatedAt:new Date().toISOString()};}); localStorage.setItem('dagbo_signal_trade_levels',JSON.stringify(levels)); } catch(e) {}
     var best = document.getElementById('bestOpportunityList');
@@ -256,13 +256,13 @@
     if (!best || !monitor) return;
     best.textContent = '';
     if (!ranked.length) {
-      var empty = document.createElement('p'); empty.className='dg-muted'; empty.textContent='No setup currently has at least 3 agreeing method votes. Wait for confirmation.'; best.appendChild(empty);
+      var empty = document.createElement('p'); empty.className='dg-muted'; empty.textContent='No setup currently meets the active profile threshold. Wait for confirmation.'; best.appendChild(empty);
     } else ranked.forEach(function(item,index) {
       var row = document.createElement('div');
       row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--dg-line)';
       var left = document.createElement('div');
       var name = document.createElement('strong'); name.textContent=(index+1)+'. '+item.pair;
-      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/9 method votes agree · '+(currentSignalTF==='5'?'Scalping scan':'Intraday scan');
+      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/12 confluence points · '+(currentSignalTF==='5'?'Scalping scan':'Intraday scan');
       left.appendChild(name); left.appendChild(detail);
       var pill = document.createElement('span'); pill.className='dg-pill '+(item.direction==='BUY'?'dg-pill--buy':'dg-pill--sell'); pill.textContent=item.signal;
       row.appendChild(left); row.appendChild(pill); best.appendChild(row);
