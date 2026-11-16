@@ -252,7 +252,7 @@
       var item = signalsData[pair];
       var buys = Number(item.buyScore)||0, sells = Number(item.sellScore)||0;
       var score = Math.max(buys,sells);
-      return { pair:pair, signal:item.final, score:score, direction:buys > sells ? 'BUY' : sells > buys ? 'SELL' : 'WAIT' };
+      return { pair:pair, signal:item.final, score:score, confidence:item.confidence, quality:item.quality, source:item.source, direction:buys > sells ? 'BUY' : sells > buys ? 'SELL' : 'WAIT' };
     }).filter(function(x){ return x.direction !== 'WAIT' && (String(x.signal).includes('BUY') || String(x.signal).includes('SELL')); }).sort(function(a,b){ return b.score-a.score; }).slice(0,3);
 
     try { localStorage.setItem('dagbo_best_opportunities', JSON.stringify({timeframe:currentSignalTF,updatedAt:new Date().toISOString(),items:ranked})); var levels=JSON.parse(localStorage.getItem('dagbo_signal_trade_levels')||'{}'); Object.keys(signalsData).forEach(function(pair){var s=signalsData[pair];if(s&&!s.marketClosed&&s.final!=='NO TRADE') levels[currentSignalTF+':'+pair]={direction:s.final,entry:s.entry,sl:s.sl,tp:s.tp1,updatedAt:new Date().toISOString()};}); localStorage.setItem('dagbo_signal_trade_levels',JSON.stringify(levels)); } catch(e) {}
