@@ -4,8 +4,8 @@ const SYMBOLS = {
   AUDUSD: "AUD/USD", USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
   EURJPY: "EUR/JPY", EURGBP: "EUR/GBP",
   US30: "DJI", US100: "NDX", NAS100: "NDX", US500: "SPX",
-  BTCUSD: "BTC/USDT", BTCUSDT: "BTC/USDT", BTC: "BTC/USDT",
-  ETHUSD: "ETH/USDT", ETHUSDT: "ETH/USDT", ETH: "ETH/USDT"
+  BTCUSD: "BTC/USD", BTCUSDT: "BTC/USD", BTC: "BTC/USD",
+  ETHUSD: "ETH/USD", ETHUSDT: "ETH/USD", ETH: "ETH/USD"
 };
 
 module.exports = async function handler(req, res) {
@@ -35,8 +35,8 @@ module.exports = async function handler(req, res) {
       return res.status(502).json({ error: data.message || "Market data provider did not return candles" });
     }
 
-    if (isCrypto && data.meta && data.meta.exchange && String(data.meta.exchange).toLowerCase() !== "binance") {
-      return res.status(502).json({ error: "Binance market data was not confirmed by the provider.", providerExchange: data.meta.exchange });
+    if (isCrypto && (!data.meta || !data.meta.exchange || String(data.meta.exchange).trim().toLowerCase() !== "binance")) {
+      return res.status(502).json({ error: "Twelve Data did not confirm Binance as the source exchange.", providerExchange: data.meta && data.meta.exchange ? data.meta.exchange : null });
     }
 
     return res.status(200).json({
