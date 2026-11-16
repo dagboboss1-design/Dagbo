@@ -3,15 +3,5 @@
     "deploymentEnabled": {
       "*": false
     }
-  },
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/api/health",
-      "destination": "/api/push?action=health"
-    }
-  ]
+  }
 }
