@@ -58,6 +58,12 @@
     <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_5" value="5" onchange="changeSignalTF('5')">
     <label class="dg-seg__lb" for="tf_5">5m (Scalping)</label>
   </div>
+  <section class="dg-card" id="scalpStats" style="margin:-4px 0 16px;padding:13px;display:none">
+    <div style="font-weight:800;font-size:14px">5m SCALP PROFILE · LOWER THRESHOLD</div>
+    <div id="scalpStatsText" class="dg-muted" style="font-size:12px;line-height:1.6;margin-top:6px">Loading today's signal and risk figures…</div>
+    <div class="dg-help" style="margin-top:6px">Scalping uses RSI(7), Stochastic(5,3,3), EMA20/50 and an ATR activity filter. Signals are for reference; only journal trades you actually execute. Lower threshold means more signals, not higher accuracy.</div>
+    <div class="dg-help" style="margin-top:5px">Scalp session: 13:00–17:00 UTC. No new 5m signals outside this window.</div>
+  </section>
 
   <div class="dg-chips" id="filterChips">
     <button class="dg-chip is-active" data-filter="ALL">All Signals</button>
@@ -121,6 +127,8 @@
   var latestNewsCandidate = null;
 
   // Use New York market-session time so daylight-saving changes are handled.
+  function isScalpSessionNow() { var d=new Date(),m=d.getUTCHours()*60+d.getUTCMinutes(); return m>=780&&m<1020; }
+
   function marketSessionOpen(pair) {
     var p=String(pair||'').toUpperCase();
     if (p.includes('BTC') || p.includes('ETH')) return true;
@@ -161,8 +169,8 @@
     return out;
   }
   function candleNumber(c, key){return Number(c[key]);}
-  function analyseAllMethods(candles) {
-    var result = window.DagboConfluence.analyze(candles, '');
+  function analyseAllMethods(candles, profile) {
+    var result = window.DagboConfluence.analyze(candles, '', profile);
     if (!result) return null;
     return {
       final: result.signal,
@@ -173,12 +181,15 @@
       structure: result.structure, structureName: result.structure, sweep: result.sweep, fvg: result.fvg,
       bb: result.bb, volume: result.volume, pattern: result.pattern,
       patternDirection: result.patternDirection, patternConfirmed: result.patternConfirmed,
+      confidence: result.confidence, quality: result.quality, source: result.source, threshold: result.threshold,
+      momentumTrigger: result.momentumTrigger, atrOk: result.atrOk, candleTime: result.candleTime,
       groups: result.groups
     };
   }
 
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
+    if (tf === '5' && !isScalpSessionNow()) return {pair:pair,final:'SESSION FILTER',sessionFiltered:true,buyScore:0,sellScore:0,strategy:'Scalping is restricted to the 13:00–17:00 UTC high-liquidity window.'};
     if (!marketSessionOpen(pair)) return {pair:pair,final:'MARKET CLOSED',marketClosed:true,buyScore:0,sellScore:0,strategy:'Market session is closed. Historical candles are not an executable signal.'};
     let url = `/api/market-data?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}`;
     
@@ -196,7 +207,7 @@
 
       candles = candles.reverse(); 
 
-      var analysis=analyseAllMethods(candles);
+      var analysis=analyseAllMethods(candles, tf === '5' ? 'scalp' : 'intraday');
       if (!analysis) return null;
       var final=analysis.final;
       var entry=parseFloat(candles[candles.length-1].close);
@@ -217,7 +228,7 @@
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
         lastCandleOpen:Number(lastC.open).toFixed(2),lastCandleClose:Number(lastC.close).toFixed(2),
         rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
-        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed
+        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed,confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,momentumTrigger:analysis.momentumTrigger,atrOk:analysis.atrOk,candleTime:analysis.candleTime
       };
     } catch(e) {
       console.error(e);
@@ -275,6 +286,408 @@
       value.textContent='5m: '+(snapshots['5']&&snapshots['5'][pair]||'—')+' · 15m: '+(snapshots['15']&&snapshots['15'][pair]||'—')+' · '+(a===b&&a!=='WAIT'?'Aligned':a==='WAIT'||b==='WAIT'?'Incomplete':'Conflict');
       line.appendChild(label); line.appendChild(value); monitor.appendChild(line);
     });
+  }
+
+  function localDateKey(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function getDailyRiskQuota(){
+    var journal=[];try{journal=JSON.parse(localStorage.getItem('dagbo_journal'))||[];}catch(e){}
+    var today=localDateKey(),realized=0;
+    (Array.isArray(journal)?journal:[]).forEach(function(t){var closed=String(t.dateClosed||'').slice(0,10);if(t.result!=='OPEN'&&closed===today)realized+=Number(t.pnl)||0;});
+    var limit=(Number(settings.accountSize)||100)*(Number(settings.maxDailyLossPct)||3)/100;
+    var used=Math.max(0,-realized),remaining=Math.max(0,limit-used);
+    return {limit:limit,used:used,remaining:remaining,exhausted:remaining<=0};
+  }
+  function updateScalpStats(){
+    var panel=document.getElementById('scalpStats');if(!panel)return;
+    panel.style.display=currentSignalTF==='5'?'block':'none';
+    if(currentSignalTF!=='5')return;
+    var stored={};try{stored=JSON.parse(localStorage.getItem('dagbo_scalp_signal_count'))||{};}catch(e){}
+    var count=stored.date===localDateKey()&&Array.isArray(stored.items)?stored.items.length:0;
+    var quota=getDailyRiskQuota(),money='
+    var snapshots = {}, history = [];
+    try { snapshots = JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots')) || {}; } catch(e) {}
+    try { history = JSON.parse(localStorage.getItem('dagbo_alert_history')) || []; } catch(e) {}
+    var previous = snapshots[currentSignalTF] || {};
+    Object.keys(signalsData).forEach(function(pair) {
+      var next = signalsData[pair].final;
+      if(currentSignalTF==='5' && directionOf(next)!=='WAIT' && !signalsData[pair].sessionFiltered){
+        var daily={};try{daily=JSON.parse(localStorage.getItem('dagbo_scalp_signal_count'))||{};}catch(e){}
+        if(daily.date!==localDateKey())daily={date:localDateKey(),items:[]};
+        var stamp=String(signalsData[pair].candleTime||'')||String(Date.now());
+        var unique=pair+'|'+directionOf(next)+'|'+stamp;
+        if(!daily.items.includes(unique)){daily.items.push(unique);daily.items=daily.items.slice(-500);localStorage.setItem('dagbo_scalp_signal_count',JSON.stringify(daily));}
+      }
+      if (previous[pair] && previous[pair] !== next) {
+        history.push({ id:String(Date.now())+'-'+pair, pair:pair, previous:previous[pair], current:next, timeframe:currentSignalTF+'m', at:new Date().toISOString(), type:'SIGNAL_CHANGE' });
+      }
+      previous[pair] = next;
+    });
+    snapshots[currentSignalTF] = previous;
+    localStorage.setItem('dagbo_signal_tf_snapshots',JSON.stringify(snapshots));
+    localStorage.setItem('dagbo_alert_history',JSON.stringify(history.slice(-100)));
+  }
+
+  function escapeNewsText(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+    });
+  }
+
+  // Fetch the latest short-lived news context from the server.
+  async function loadNewsSignalContext() {
+    var panel = document.getElementById('newsSignalContext');
+    if (!panel) return;
+    try {
+      var response = await fetch('/api/news-signal', { cache: 'no-store' });
+      if (!response.ok) throw new Error('News context unavailable');
+      var data = await response.json();
+      latestNewsCandidate = data && data.candidate ? data.candidate : null;
+      if (!latestNewsCandidate) {
+        panel.style.display = 'none';
+        return;
+      }
+      var age = Math.max(0, Math.round((Date.now() - new Date(latestNewsCandidate.createdAt).getTime()) / 60000));
+      panel.style.display = 'block';
+      panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<strong style="font-size:14px">📰 NEWS MARKET BIAS · ' + escapeNewsText(latestNewsCandidate.pair) + '</strong>' +
+        '<span class="dg-pill dg-pill--wait">CONTEXT ONLY</span></div>' +
+        '<div style="font-size:15px;font-weight:800;margin-top:8px">' + escapeNewsText(latestNewsCandidate.action) + ' · ' + latestNewsCandidate.confidence + ' confidence</div>' +
+        '<div class="dg-muted" style="font-size:12px;margin-top:5px">' + escapeNewsText(latestNewsCandidate.event) + ' · ' + age + ' min ago</div>' +
+        '<div class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:6px">' + escapeNewsText(latestNewsCandidate.evidence) + '</div>' +
+        '<div style="font-size:11px;color:var(--dg-text-2);margin-top:7px">A trade signal appears only if the independent technical scan agrees. Check the ' + escapeNewsText(latestNewsCandidate.pair) + ' card below.</div>';
+    } catch (error) {
+      latestNewsCandidate = null;
+      panel.style.display = 'none';
+      console.warn('News signal context unavailable:', error);
+    }
+  }
+
+  // --- RENDER UI ---
+  function renderCards() {
+    var grid = document.getElementById('signals-grid');
+    if (grid && !grid.dataset.dagboTradeActionsBound) {
+      grid.dataset.dagboTradeActionsBound = '1';
+      grid.addEventListener('click', function(event) {
+        var button = event.target.closest('button[data-dagbo-action]');
+        if (!button || !grid.contains(button)) return;
+        var read = function(name) {
+          try { return decodeURIComponent(button.getAttribute('data-' + name) || ''); }
+          catch (e) { return ''; }
+        };
+        var pair = read('pair'), signal = read('signal');
+        var entry = Number(button.getAttribute('data-entry'));
+        var sl = Number(button.getAttribute('data-sl'));
+        var tp = Number(button.getAttribute('data-tp'));
+        if (button.getAttribute('data-dagbo-action') === 'journal') {
+          window.executeTrade(pair, signal, entry, sl, tp, read('strategy'));
+        } else if (button.getAttribute('data-dagbo-action') === 'copy') {
+          window.copySignalTrade(pair, signal, entry, sl, tp, Number(button.getAttribute('data-tp2')));
+        }
+      });
+    }
+    var listHtml = '';
+
+    var sortedPairs = enabledPairs.slice().sort(function(a,b){
+      var typeA = PAIR_TYPES[String(a).toUpperCase()] || 'FX';
+      var typeB = PAIR_TYPES[String(b).toUpperCase()] || 'FX';
+      if (typeA === typeB) return 0;
+      if (typeA === 'GOLD') return -1;
+      if (typeB === 'GOLD') return 1;
+      return typeA.localeCompare(typeB);
+    });
+
+    sortedPairs.forEach(function(pair) {
+      var type = PAIR_TYPES[String(pair).toUpperCase()] || 'FX';
+      if (currentFilter !== 'ALL' && currentFilter !== type) return;
+      
+      var s = signalsData[pair];
+      if (!s) return;
+
+      if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile only scans 13:00–17:00 UTC. Switch to 15m Intraday outside this window.</div></section>'; return; }
+      if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
+      var isBuy = s.final.includes('BUY');
+      var isSell = s.final.includes('SELL');
+      var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
+      var pillCls = isBuy ? 'dg-pill--buy' : (isSell ? 'dg-pill--sell' : 'dg-pill--wait');
+      var pillText = isBuy ? 'BUY' : (isSell ? 'SELL' : 'WAIT');
+      var newsConfirmed = !!(latestNewsCandidate &&
+        String(s.pair).toUpperCase() === String(latestNewsCandidate.pair).toUpperCase() &&
+        ((isBuy && latestNewsCandidate.direction === 'BUY') || (isSell && latestNewsCandidate.direction === 'SELL')) &&
+        Date.now() < new Date(latestNewsCandidate.expiresAt).getTime());
+
+      // Visual Debug Box
+      var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
+        '<b>Six-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
+        'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
+        'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
+        '<br><b>Group score:</b> BUY '+s.buyScore+'/12 · SELL '+s.sellScore+'/12 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
+      
+      var quota = getDailyRiskQuota();
+      var quotaNotice = quota.exhausted ? '<div class="dg-pill dg-pill--sell" style="margin:0 0 9px;display:inline-flex">RISK QUOTA EXHAUSTED · SIGNAL ONLY</div>' : '';
+      var cardInner = '';
+      if (s.final === 'NO TRADE') {
+        cardInner = 
+          debugText +
+          '<div style="text-align:center;padding:16px 0">' +
+            '<div class="dg-signal__word ' + cls + '" style="font-size:28px">NO TRADE</div>' +
+            '<div class="dg-muted" style="font-size:13px;margin-top:4px">Market is quiet. Systems say WAIT.</div>' +
+          '</div>';
+      } else {
+        // Smart Decimal Logic: format each market with its appropriate price precision.
+        var dp = 2;
+        var pUpper = String(s.pair || '').toUpperCase();
+        if (pUpper.includes('JPY')) dp = 3;
+        else if (pUpper === 'XAUUSD' || pUpper === 'GOLD') dp = 2;
+        else if (pUpper.includes('BTC') || pUpper.includes('ETH')) dp = 1;
+        else if (pUpper.includes('US30') || pUpper.includes('US100') || pUpper.includes('NAS') || pUpper.includes('US500')) dp = 1;
+        else if (pUpper.includes('USD') || pUpper.includes('EUR') || pUpper.includes('GBP') || pUpper.includes('CHF') || pUpper.includes('CAD') || pUpper.includes('AUD') || pUpper.includes('NZD')) dp = 5;
+
+        var fEntry = Number(s.entry).toFixed(dp);
+        var fSl = Number(s.sl).toFixed(dp);
+        var fTp1 = Number(s.tp1).toFixed(dp);
+        var fTp2 = Number(s.tp2).toFixed(dp);
+
+        cardInner =
+          debugText + quotaNotice +
+          '<div class="dg-signal__word ' + cls + '" style="font-size:28px;text-align:left">' + s.final + '</div>' +
+          '<div class="dg-muted" style="font-size:13px;margin-bottom:5px">' + (currentSignalTF === '5' ? 'Scalping Setup' : 'Intraday Setup') + ' · '+(s.quality||'LOW')+' CONFIDENCE · '+Number(s.confidence||0)+'%</div>' +
+          '<div class="dg-muted" style="font-size:11px;margin-bottom:12px">Source: '+escapeNewsText(s.source||'Main confluence')+(s.momentumTrigger?' · '+escapeNewsText(s.momentumTrigger):'')+'</div>' +
+          '<div class="dg-grid-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + fEntry + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Stop Loss</span><strong style="font-size:15px" class="dg-neg">' + fSl + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + fTp1 + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + fTp2 + '</strong></div>' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Signal sources / evidence:</b><br>' + (s.evidence||[]).join('<br>') + '</div>' +
+          (newsConfirmed ? '<div style="font-size:12px;margin-top:8px;padding:9px;border-radius:9px;background:var(--dg-inset);color:var(--dg-text-2)"><b>News confirmation:</b> ' + escapeNewsText(latestNewsCandidate.event) + ' bias agrees with the technical scan. ' + escapeNewsText(latestNewsCandidate.evidence) + '</div>' : '');
+      }
+
+      listHtml += 
+        '<section class="dg-card" style="padding:16px;margin-bottom:12px">' +
+          '<div class="dg-card__head" style="margin-bottom:8px">' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
+              '<h2 class="dg-card__title" style="font-size:18px;margin:0">' + s.pair + '</h2>' +
+              '<span class="dg-pill ' + pillCls + '" style="min-height:22px;font-size:11px;padding:0 8px">' + pillText + '</span>' +
+              (newsConfirmed ? '<span class="dg-pill dg-pill--buy" style="min-height:22px;font-size:10px;padding:0 7px">NEWS CONFIRMED</span>' : '') +
+            '</div>' +
+            '<span style="font-size:11px;color:var(--dg-text-2)">' + currentSignalTF + 'm</span>' +
+          '</div>' +
+          cardInner +
+          '<div style="margin-top:12px;display:flex;gap:7px;align-items:center;">' +
+            (s.final === 'NO TRADE' ? '' :
+              '<button type="button" data-dagbo-action="journal" data-pair="' + encodeURIComponent(s.pair) + '" data-signal="' + encodeURIComponent(s.final) + '" data-entry="' + Number(s.entry) + '" data-sl="' + Number(s.sl) + '" data-tp="' + Number(s.tp1) + '" data-strategy="' + encodeURIComponent(s.strategy || '') + '" style="flex:1;min-width:0;padding:10px 5px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:none;font-size:12px;cursor:pointer;">Add to Journal</button>' +
+              '<button type="button" data-dagbo-action="copy" data-pair="' + encodeURIComponent(s.pair) + '" data-signal="' + encodeURIComponent(s.final) + '" data-entry="' + Number(s.entry) + '" data-sl="' + Number(s.sl) + '" data-tp="' + Number(s.tp1) + '" data-tp2="' + Number(s.tp2) + '" style="flex:1;min-width:0;padding:10px 5px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;border:1px solid var(--dg-line);font-size:12px;cursor:pointer;">Copy Trade</button>') +
+            '<a href="chart.html?pair=' + encodeURIComponent(s.pair) + '" style="flex:1;min-width:0;text-align:center;padding:10px 5px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:12px;">View Chart</a>' +
+          '</div>' +
+        '</section>';
+    });
+
+    if (listHtml === '') {
+      listHtml = '<div class="dg-card" style="text-align:center;padding:32px 16px"><p class="dg-muted">No signals available. Waiting for market data...</p></div>';
+    }
+    grid.innerHTML = listHtml;
+    updateScalpStats();
+    renderInsights();
+  }
+
+  window.copySignalTrade = async function(pair, signal, entry, sl, tp1, tp2) {
+    var direction = String(signal || '').includes('BUY') ? 'BUY' :
+      String(signal || '').includes('SELL') ? 'SELL' : 'WAIT';
+    if (direction === 'WAIT') {
+      alert('NO TRADE: there are no confirmed trade levels to copy.');
+      return;
+    }
+    var tradeText = [
+      'DAGBO SIGNAL',
+      'Pair: ' + pair,
+      'Signal: ' + signal,
+      'Timeframe: ' + currentSignalTF + 'm',
+      'Entry: ' + entry,
+      'Stop Loss: ' + sl,
+      'Take Profit 1: ' + tp1,
+      'Take Profit 2: ' + tp2
+    ].join('\n');
+
+    // Try the modern clipboard API first, then a mobile-friendly selection fallback.
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(tradeText);
+        alert('Trade details copied.');
+        return;
+      }
+    } catch (clipboardError) {
+      console.warn('Clipboard API unavailable; trying fallback.', clipboardError);
+    }
+
+    var field = document.createElement('textarea');
+    field.value = tradeText;
+    field.setAttribute('readonly', '');
+    field.setAttribute('aria-label', 'Trade details to copy');
+    field.style.position = 'fixed';
+    field.style.left = '0';
+    field.style.top = '0';
+    field.style.width = '2px';
+    field.style.height = '2px';
+    field.style.padding = '0';
+    field.style.opacity = '0.01';
+    document.body.appendChild(field);
+    field.focus();
+    field.select();
+    field.setSelectionRange(0, field.value.length);
+    var copied = false;
+    try { copied = document.execCommand('copy'); } catch (e) {}
+    field.remove();
+
+    if (copied) {
+      alert('Trade details copied.');
+    } else {
+      window.prompt('Copy your trade details:', tradeText);
+    }
+  };
+
+  window.executeTrade = function(pair, signal, entry, sl, tp, strategy) {
+    var dir = String(signal || '').includes('BUY') ? 'BUY' : String(signal || '').includes('SELL') ? 'SELL' : null;
+    if (!dir) { alert('This is not an executable BUY or SELL setup. Wait for confirmation.'); return; }
+    entry=Number(entry); sl=Number(sl); tp=Number(tp);
+    if (![entry,sl,tp].every(Number.isFinite) || entry<=0 || sl<=0 || tp<=0 ||
+        (dir==='BUY' && !(sl<entry && tp>entry)) ||
+        (dir==='SELL' && !(sl>entry && tp<entry))) {
+      alert('This signal has invalid Entry / Stop Loss / Take Profit levels. Refresh the signal before tracking it.');
+      return;
+    }
+
+    var journal=[];
+    try { journal=JSON.parse(localStorage.getItem('dagbo_journal'))||[]; } catch(e) { journal=[]; }
+    if (!Array.isArray(journal)) journal=[];
+    var duplicate=journal.find(function(t) {
+      return String(t.pair).toUpperCase()===String(pair).toUpperCase() && t.result==='OPEN';
+    });
+    if (duplicate) {
+      // Do not leave the button appearing dead: take the user to the existing open
+      // trade instead of silently blocking the Journal hand-off.
+      try { sessionStorage.setItem('dagbo_open_journal_trade', duplicate.id); }
+      catch (e) { alert('Could not open the existing Journal trade. Please check browser storage.'); return; }
+      window.location.href='journal.html';
+      return;
+    }
+
+    var trade={
+      id:String(Date.now())+'-'+Math.random().toString(36).slice(2,7),
+      pair:pair,
+      direction:dir,
+      entry:entry,
+      stopLoss:sl,
+      takeProfit:tp,
+      lotSize:Number(settings.lotSize)||0.01,
+      riskAmount:(Number(settings.accountSize)||100)*(Number(settings.risk)||1)/100,
+      strategy:strategy||'3-System Confluence',
+      timeframe:currentSignalTF+'m',
+      result:'OPEN',
+      status:'OPEN',
+      pnl:0,
+      rMultiple:0,
+      dateOpened:new Date().toISOString(),
+      dateClosed:null,
+      monitoringPending:true
+    };
+
+    // Save locally first so the button works even if push permission or cloud monitoring is unavailable.
+    try {
+      journal.push(trade);
+      localStorage.setItem('dagbo_journal',JSON.stringify(journal));
+      sessionStorage.setItem('dagbo_open_journal_trade',trade.id);
+    } catch(e) {
+      alert('Could not save this trade on your device. Check your phone storage and try again.');
+      return;
+    }
+
+    // Cloud monitoring is optional and must never block the local journal save or page navigation.
+    try {
+      if (window.DagboPWA && window.DagboPWA.getSubscription) {
+        window.DagboPWA.getSubscription().then(function(subscription) {
+          if (!subscription) return;
+          return fetch('/api/trades?action=open',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            keepalive:true,
+            body:JSON.stringify({
+              subscription:subscription,
+              pair:trade.pair,
+              direction:trade.direction,
+              entry:trade.entry,
+              stopLoss:trade.stopLoss,
+              takeProfit:trade.takeProfit,
+              lotSize:trade.lotSize,
+              journalTradeId:trade.id
+            })
+          });
+        }).catch(function(error){console.warn('Cloud trade monitoring unavailable; local journal entry was saved.',error);});
+      }
+    } catch(error) {
+      console.warn('Cloud trade monitoring unavailable; local journal entry was saved.',error);
+    }
+
+    window.location.href='journal.html';
+  };
+
+  document.getElementById('filterChips').addEventListener('click', function(e){
+    var btn = e.target.closest('.dg-chip');
+    if (!btn) return;
+    document.querySelectorAll('#filterChips .dg-chip').forEach(function(c){ c.classList.remove('is-active'); });
+    btn.classList.add('is-active');
+    currentFilter = btn.dataset.filter;
+    renderCards();
+  });
+
+  window.changeSignalTF = function(tf) {
+    currentSignalTF = tf;
+    loadAllSignals();
+  };
+
+  // --- INITIALIZE ---
+  async function loadAllSignals() {
+    var loading = document.getElementById('loadingText');
+    if (loading) loading.innerText = "Downloading live candles...";
+    
+    signalsData = {};
+    await loadNewsSignalContext();
+
+    for (let pair of enabledPairs) {
+      let data = await fetchPairData(pair, currentSignalTF);
+      if (data) signalsData[pair] = data;
+    }
+    
+    recordSignalSnapshot();
+    var now = new Date();
+    document.getElementById('lastUpdated').innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    renderCards();
+  }
+
+  loadAllSignals();
+
+  window.addEventListener('load', async function() {
+    try {
+      if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
+      var subscription = await window.DagboPWA.getSubscription();
+      if (!subscription) return;
+      await fetch('/api/trades?action=preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription: subscription, pairs: enabledPairs })
+      });
+    } catch(e) {
+      console.warn('Could not sync scanner market preferences:', e);
+    }
+  });
+
+})();
+</script>
+<script src="navigation.js" defer></script>
+</body>
+  </html>
++quota.remaining.toFixed(2);
+    var el=document.getElementById('scalpStatsText');
+    if(el)el.textContent="Today's 5m signals: "+count+" · Remaining daily loss allowance: "+money+" of $"+quota.limit.toFixed(2)+(quota.exhausted?" · RISK QUOTA EXHAUSTED — signals remain visible for review.":" · Journal records executed trades only.");
   }
 
   function recordSignalSnapshot() {
@@ -370,6 +783,7 @@
       var s = signalsData[pair];
       if (!s) return;
 
+      if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile only scans 13:00–17:00 UTC. Switch to 15m Intraday outside this window.</div></section>'; return; }
       if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
       var isBuy = s.final.includes('BUY');
       var isSell = s.final.includes('SELL');
@@ -386,8 +800,10 @@
         '<b>Six-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
         'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
         'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
-        '<br><b>Group score:</b> BUY '+s.buyScore+'/12 · SELL '+s.sellScore+'/12 (minimum 8 and 4 agreeing groups)</div>';
+        '<br><b>Group score:</b> BUY '+s.buyScore+'/12 · SELL '+s.sellScore+'/12 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
       
+      var quota = getDailyRiskQuota();
+      var quotaNotice = quota.exhausted ? '<div class="dg-pill dg-pill--sell" style="margin:0 0 9px;display:inline-flex">RISK QUOTA EXHAUSTED · SIGNAL ONLY</div>' : '';
       var cardInner = '';
       if (s.final === 'NO TRADE') {
         cardInner = 
@@ -412,9 +828,10 @@
         var fTp2 = Number(s.tp2).toFixed(dp);
 
         cardInner =
-          debugText +
+          debugText + quotaNotice +
           '<div class="dg-signal__word ' + cls + '" style="font-size:28px;text-align:left">' + s.final + '</div>' +
-          '<div class="dg-muted" style="font-size:13px;margin-bottom:12px">' + (currentSignalTF === '5' ? 'Scalping Setup' : 'Intraday Setup') + '</div>' +
+          '<div class="dg-muted" style="font-size:13px;margin-bottom:5px">' + (currentSignalTF === '5' ? 'Scalping Setup' : 'Intraday Setup') + ' · '+(s.quality||'LOW')+' CONFIDENCE · '+Number(s.confidence||0)+'%</div>' +
+          '<div class="dg-muted" style="font-size:11px;margin-bottom:12px">Source: '+escapeNewsText(s.source||'Main confluence')+(s.momentumTrigger?' · '+escapeNewsText(s.momentumTrigger):'')+'</div>' +
           '<div class="dg-grid-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + fEntry + '</strong></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Stop Loss</span><strong style="font-size:15px" class="dg-neg">' + fSl + '</strong></div>' +
@@ -449,6 +866,7 @@
       listHtml = '<div class="dg-card" style="text-align:center;padding:32px 16px"><p class="dg-muted">No signals available. Waiting for market data...</p></div>';
     }
     grid.innerHTML = listHtml;
+    updateScalpStats();
     renderInsights();
   }
 
