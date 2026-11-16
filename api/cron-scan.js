@@ -37,12 +37,13 @@ function isMarketOpen(pair, now = new Date()) {
   const day = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[v.weekday];
   const minute = Number(v.hour) * 60 + Number(v.minute);
 
-  // US cash-index session: 09:30–16:00 New York, Monday–Friday.
+  // US cash-index proxies (DJI / NDX / SPX) only publish executable candles
+  // during the underlying cash-index session: 09:30–16:00 New York weekdays.
   if (/^(US30|US100|NAS100|US500)$/.test(p)) {
     return day >= 1 && day <= 5 && minute >= 570 && minute < 960;
   }
 
-  // Spot gold and silver have a daily maintenance break, 17:00–18:00 ET.
+  // Spot gold and silver, including XAGUSD, have a daily maintenance break, 17:00–18:00 ET.
   // Weekly session: Sunday 18:00 through Friday 17:00 ET.
   if (/^(XAUUSD|GOLD|XAGUSD|SILVER)$/.test(p)) {
     if (day === 0) return minute >= 1080;
@@ -425,7 +426,12 @@ const HTF_FRAMES = [
 ];
 
 function pairDecimals(pair) {
-  return pair.includes("JPY") ? 3 : (pair === "XAUUSD" || pair === "GOLD" ? 2 : 5);
+  const p=String(pair||"").toUpperCase();
+  if(p.includes("JPY")) return 3;
+  if(p==="XAUUSD"||p==="GOLD") return 2;
+  if(p==="XAGUSD"||p==="SILVER") return 3;
+  if(p.includes("BTC")||p.includes("ETH")) return 1;
+  return 5;
 }
 function htfDirection(candles) {
   if (!Array.isArray(candles) || candles.length < 55) return "WAIT";
