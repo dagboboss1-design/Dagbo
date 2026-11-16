@@ -25,13 +25,38 @@ const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
 const MAX_PAIRS = 6;
 
 function isMarketOpen(pair, now = new Date()) {
-  const p=String(pair||'').toUpperCase();
-  if (p.includes('BTC') || p.includes('ETH')) return true;
-  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now);
-  const v=Object.fromEntries(parts.map(x=>[x.type,x.value]));
-  const day={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[v.weekday], minute=Number(v.hour)*60+Number(v.minute);
-  if (/^(US30|US100|NAS100|US500)$/.test(p)) return day>=1&&day<=5&&minute>=570&&minute<960;
-  return (day===0&&minute>=1020)||(day>=1&&day<=4)||(day===5&&minute<1020);
+  const p = String(pair || "").toUpperCase();
+  // Crypto trades continuously, including weekends.
+  if (p.includes("BTC") || p.includes("ETH")) return true;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", weekday: "short", hour: "2-digit",
+    minute: "2-digit", hourCycle: "h23"
+  }).formatToParts(now);
+  const v = Object.fromEntries(parts.map(x => [x.type, x.value]));
+  const day = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[v.weekday];
+  const minute = Number(v.hour) * 60 + Number(v.minute);
+
+  // US cash-index session: 09:30–16:00 New York, Monday–Friday.
+  if (/^(US30|US100|NAS100|US500)$/.test(p)) {
+    return day >= 1 && day <= 5 && minute >= 570 && minute < 960;
+  }
+
+  // Spot gold and silver have a daily maintenance break, 17:00–18:00 ET.
+  // Weekly session: Sunday 18:00 through Friday 17:00 ET.
+  if (/^(XAUUSD|GOLD|XAGUSD|SILVER)$/.test(p)) {
+    if (day === 0) return minute >= 1080;
+    if (day >= 1 && day <= 4) return minute >= 1080 || minute < 1020;
+    if (day === 5) return minute < 1020;
+    return false;
+  }
+
+  // FX weekly session: Sunday 17:00 through Friday 17:00 ET.
+  // Skip the short 17:00–17:05 ET daily rollover window.
+  if (day === 0) return minute >= 1025;
+  if (day >= 1 && day <= 4) return minute < 1020 || minute >= 1025;
+  if (day === 5) return minute < 1020;
+  return false;
 }
 
 async function getConfiguredPairs() {
@@ -642,6 +667,12 @@ module.exports = async function handler(req, res) {
           return Number.isFinite(stamp) && stamp + 15 * 60 * 1000 <= Date.now();
         }).slice(0, 60).reverse();
         if (closedCandles.length < 60) throw new Error("Waiting for 60 fully closed candles");
+        const newestClosed = closedCandles[closedCandles.length - 1];
+        const newestRaw = String(newestClosed.datetime || "");
+        const newestStamp = Date.parse(newestRaw.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(newestRaw) ? "" : "Z"));
+        if (!Number.isFinite(newestStamp) || Date.now() - (newestStamp + 15 * 60 * 1000) > 35 * 60 * 1000) {
+          throw new Error("Market candles are stale; suppressing signal until fresh data arrives");
+        }
         const analysis = analyze(closedCandles, pair);
         if (!analysis) throw new Error("Could not calculate indicators");
         return { pair, analysis };
