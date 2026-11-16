@@ -192,11 +192,12 @@
       }
 
       let candles = data.values;
-      if (!candles || candles.length < 20) return null;
+      if (!candles || candles.length < 60) return null;
 
       candles = candles.reverse(); 
 
       var analysis=analyseAllMethods(candles);
+      if (!analysis) return null;
       var final=analysis.final;
       var entry=parseFloat(candles[candles.length-1].close);
       var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
@@ -216,7 +217,7 @@
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
         lastCandleOpen:Number(lastC.open).toFixed(2),lastCandleClose:Number(lastC.close).toFixed(2),
         rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
-        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName
+        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed
       };
     } catch(e) {
       console.error(e);
@@ -382,9 +383,10 @@
 
       // Visual Debug Box
       var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
-        '<b>Automatic evidence scan</b><br>RSI: '+Number(s.rsiValue).toFixed(1)+' · EMA: '+s.emaTrend+' · MACD: '+Number(s.macdValue).toPrecision(4)+'<br>' +
-        'Structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+'<br>Bollinger: '+s.bb+' · Volume: '+s.volume+'<br>Candle: '+s.candlePattern+
-        '<br><b>Votes:</b> BUY '+s.buyScore+'/'+s.totalMethods+' · SELL '+s.sellScore+'/'+s.totalMethods+'</div>';
+        '<b>Six-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
+        'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
+        'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
+        '<br><b>Group score:</b> BUY '+s.buyScore+'/12 · SELL '+s.sellScore+'/12 (minimum 8 and 4 agreeing groups)</div>';
       
       var cardInner = '';
       if (s.final === 'NO TRADE') {
