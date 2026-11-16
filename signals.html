@@ -62,7 +62,7 @@
     <div style="font-weight:800;font-size:14px">5m SCALP PROFILE · LOWER THRESHOLD</div>
     <div id="scalpStatsText" class="dg-muted" style="font-size:12px;line-height:1.6;margin-top:6px">Loading today's signal and risk figures…</div>
     <div class="dg-help" style="margin-top:6px">Scalping uses RSI(7), Stochastic(5,3,3), EMA20/50 and an ATR activity filter. Thresholds: Scalp 65 · Intraday 70 · Swing 75 (reserved profile). Low/Medium/High are confluence-quality tiers, not win probabilities. Signals are for reference; only journal trades you actually execute. Lower threshold means more signals, not higher accuracy.</div>
-    <div class="dg-help" style="margin-top:5px">Scalp session: 13:00–17:00 UTC. No new 5m signals outside this window.</div>
+    <div class="dg-help" style="margin-top:5px">Scalp session: 9:00 AM–6:00 PM Nigeria time (WAT). No new 5m signals outside this window.</div>
   </section>
 
   <div class="dg-chips" id="filterChips">
@@ -126,8 +126,8 @@
   var currentSignalTF = '15';
   var latestNewsCandidate = null;
 
-  // Use New York market-session time so daylight-saving changes are handled.
-  function isScalpSessionNow() { var d=new Date(),m=d.getUTCHours()*60+d.getUTCMinutes(); return m>=780&&m<1020; }
+  // Nigeria scalping window: 09:00–18:00 Africa/Lagos local time.
+  function isScalpSessionNow() { var parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Lagos",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()); var v={}; parts.forEach(function(x){v[x.type]=x.value;}); var m=Number(v.hour)*60+Number(v.minute); return m>=540&&m<1080; }
 
   function marketSessionOpen(pair) {
     var p=String(pair||'').toUpperCase();
@@ -189,7 +189,7 @@
 
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
-    if (tf === '5' && !isScalpSessionNow()) return {pair:pair,final:'SESSION FILTER',sessionFiltered:true,buyScore:0,sellScore:0,strategy:'Scalping is restricted to the 13:00–17:00 UTC high-liquidity window.'};
+    if (tf === '5' && !isScalpSessionNow()) return {pair:pair,final:'SESSION FILTER',sessionFiltered:true,buyScore:0,sellScore:0,strategy:'Scalping is restricted to 9:00 AM–6:00 PM Nigeria time (WAT).'};
     if (!marketSessionOpen(pair)) return {pair:pair,final:'MARKET CLOSED',marketClosed:true,buyScore:0,sellScore:0,strategy:'Market session is closed. Historical candles are not an executable signal.'};
     let url = `/api/market-data?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}`;
     
@@ -415,7 +415,7 @@
       var s = signalsData[pair];
       if (!s) return;
 
-      if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile only scans 13:00–17:00 UTC. Switch to 15m Intraday outside this window.</div></section>'; return; }
+      if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
       if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
       var isBuy = s.final.includes('BUY');
       var isSell = s.final.includes('SELL');
