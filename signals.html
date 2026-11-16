@@ -208,7 +208,7 @@
       var barMs = Number(tf) * 60 * 1000;
       candles = candles.filter(function(c) {
         var raw = String(c.datetime || '');
-        var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? '' : 'Z'));
+        var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? '' : 'Z'));
         return Number.isFinite(stamp) && stamp + barMs <= Date.now();
       }).reverse();
       if (candles.length < 60) return null; 
