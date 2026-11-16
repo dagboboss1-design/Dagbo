@@ -629,14 +629,20 @@ module.exports = async function handler(req, res) {
       if (!isMarketOpen(pair)) return { pair, closed: true };
       const symbol = SYMBOLS[pair];
       const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
-        "&interval=15min&outputsize=60&apikey=" + encodeURIComponent(apiKey);
+        "&interval=15min&outputsize=61&apikey=" + encodeURIComponent(apiKey);
       try {
         const response = await fetch(url);
         const data = await response.json();
-        if (!response.ok || data.status === "error" || !Array.isArray(data.values) || data.values.length < 60) {
+        if (!response.ok || data.status === "error" || !Array.isArray(data.values) || data.values.length < 61) {
           throw new Error(data.message || "Insufficient candle data");
         }
-        const analysis = analyze(data.values.slice().reverse(), pair);
+        const closedCandles = data.values.filter(c => {
+          const raw = String(c.datetime || "");
+          const stamp = Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? "" : "Z"));
+          return Number.isFinite(stamp) && stamp + 15 * 60 * 1000 <= Date.now();
+        }).slice(0, 60).reverse();
+        if (closedCandles.length < 60) throw new Error("Waiting for 60 fully closed candles");
+        const analysis = analyze(closedCandles, pair);
         if (!analysis) throw new Error("Could not calculate indicators");
         return { pair, analysis };
       } catch (err) {
