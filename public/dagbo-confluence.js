@@ -18,9 +18,10 @@ if(out.direction==="WAIT"&&hs.length>=3&&ls.length>=3){var ah=hs.slice(-3),al=ls
 if(out.direction==="WAIT"&&hs.length>=3&&ls.length>=3){var wh=hs.slice(-3),wl=ls.slice(-3),hslope=wh[2].price-wh[0].price,lslope=wl[2].price-wl[0].price;if(hslope>0&&lslope>hslope*1.15&&last<wl[2].price&&prior>=wl[2].price)out={direction:"SELL",name:"Rising Wedge downside breakdown",confirmed:true};else if(lslope<0&&hslope<lslope*1.15&&last>wh[2].price&&prior<=wh[2].price)out={direction:"BUY",name:"Falling Wedge upside breakout",confirmed:true};}
 if(out.direction==="WAIT"&&hs.length>=3&&ls.length>=3){var hh=hs.slice(-3),ll=ls.slice(-3);if(hh[2].price<hh[1].price&&hh[1].price<hh[0].price&&ll[2].price<ll[1].price&&ll[1].price<ll[0].price&&last>hh[2].price&&prior<=hh[2].price)out={direction:"BUY",name:"Bull Flag / channel breakout",confirmed:true};else if(hh[2].price>hh[1].price&&hh[1].price>hh[0].price&&ll[2].price>ll[1].price&&ll[1].price>ll[0].price&&last<ll[2].price&&prior>=ll[2].price)out={direction:"SELL",name:"Bear Flag / channel breakdown",confirmed:true};}
 return out;}
-function stochastic(candles,period,smooth){
-var raw=[];for(var i=candles.length-period;i<candles.length;i++){var win=candles.slice(i-period+1,i+1),hi=Math.max.apply(null,win.map(function(x){return n(x.high)})),lo=Math.min.apply(null,win.map(function(x){return n(x.low)})),cl=n(candles[i].close);raw.push(hi===lo?50:(cl-lo)/(hi-lo)*100);}
-var k=raw.slice(-smooth).reduce(function(a,b){return a+b},0)/Math.min(smooth,raw.length);return {k:k,d:k};
+function stochastic(candles,period,kSmooth){
+var raw=[];for(var i=Math.max(period-1,candles.length-5);i<candles.length;i++){var win=candles.slice(i-period+1,i+1),hi=Math.max.apply(null,win.map(function(x){return n(x.high)})),lo=Math.min.apply(null,win.map(function(x){return n(x.low)})),cl=n(candles[i].close);raw.push(hi===lo?50:(cl-lo)/(hi-lo)*100);}
+var slowKs=[];for(var j=0;j<raw.length;j++){var part=raw.slice(Math.max(0,j-kSmooth+1),j+1);slowKs.push(part.reduce(function(a,b){return a+b},0)/part.length);}
+var k=slowKs[slowKs.length-1],tail=slowKs.slice(-3),d=tail.reduce(function(a,b){return a+b},0)/tail.length;return {k:k,d:d};
 }
 function analyze(candles,pair,profile){
 profile=profile==="scalp"?"scalp":profile==="swing"?"swing":"intraday";
