@@ -18,15 +18,15 @@ if(out.direction==="WAIT"&&hs.length>=3&&ls.length>=3){var hh=hs.slice(-3),ll=ls
 return out;}
 function analyze(candles,pair){if(!Array.isArray(candles)||candles.length<60)return null;var cs=candles.map(function(x){return n(x.close)}),hs=candles.map(function(x){return n(x.high)}),ls=candles.map(function(x){return n(x.low)});if(cs.some(function(x){return x===null})||hs.some(function(x){return x===null})||ls.some(function(x){return x===null}))return null;
 var last=candles[candles.length-1],prev=candles[candles.length-2],close=cs[cs.length-1],open=n(last.open),high=hs[hs.length-1],low=ls[ls.length-1];if(open===null)return null;
-var e20=ema(cs,20),e50=ema(cs,50),e200=ema(cs,Math.min(200,cs.length)),e12=ema(cs,12),e26=ema(cs,26),macd=e12-e26,macdPrev=ema(cs.slice(0,-1),12)-ema(cs.slice(0,-1),26),rv=rsi(cs,14);
-var trendDir=e20>e50&&close>e20&&close>e200&&macd>macdPrev?"BUY":e20<e50&&close<e20&&close<e200&&macd<macdPrev?"SELL":"WAIT";
+var e20=ema(cs,20),e50=ema(cs,50),e12=ema(cs,12),e26=ema(cs,26),macd=e12-e26,macdPrev=ema(cs.slice(0,-1),12)-ema(cs.slice(0,-1),26),rv=rsi(cs,14);
+var trendDir=e20>e50&&close>e20&&macd>macdPrev?"BUY":e20<e50&&close<e20&&macd<macdPrev?"SELL":"WAIT";
 var momentumDir=rv>=55?"BUY":rv<=45?"SELL":"WAIT";
 var recent=cs.slice(-20),mean=recent.reduce(function(s,x){return s+x},0)/recent.length,sd=Math.sqrt(recent.reduce(function(s,x){return s+(x-mean)*(x-mean)},0)/recent.length),bbDir=close<mean-2*sd&&close>open?"BUY":close>mean+2*sd&&close<open?"SELL":"WAIT";
 var tr=0;for(var i=cs.length-14;i<cs.length;i++)tr+=Math.max(hs[i]-ls[i],Math.abs(hs[i]-cs[i-1]),Math.abs(ls[i]-cs[i-1]));var atr=tr/14;
 var vols=candles.slice(-21,-1).map(function(x){return n(x.volume)}).filter(function(x){return x!==null&&x>0}),v=n(last.volume),avg=vols.length?vols.reduce(function(s,x){return s+x},0)/vols.length:0,volumeDir=avg>0&&v!==null&&v>=avg*1.25?(close>open?"BUY":close<open?"SELL":"WAIT"):"WAIT";
 var prior=candles.slice(-21,-1),sHigh=Math.max.apply(null,prior.map(function(x){return n(x.high)})),sLow=Math.min.apply(null,prior.map(function(x){return n(x.low)})),structureDir=close>sHigh?"BUY":close<sLow?"SELL":"WAIT";
 var sweepDir=high>sHigh&&close<sHigh?"SELL":low<sLow&&close>sLow?"BUY":"WAIT",twoBack=candles[candles.length-3],fvgDir=low>n(twoBack.high)?"BUY":high<n(twoBack.low)?"SELL":"WAIT";
-var structureVotes=[structureDir,sweepDir,fvgDir].filter(function(x){return x!=="WAIT"}),structureDirFinal=structureVotes.filter(function(x){return x==="BUY"}).length>structureVotes.filter(function(x){return x==="SELL"}).length?"BUY":structureVotes.filter(function(x){return x==="SELL"}).length>structureVotes.filter(function(x){return x==="BUY"}).length?"SELL":"WAIT";
+var structureVotes=[structureDir,sweepDir,fvgDir],structureBuys=structureVotes.filter(function(x){return x==="BUY"}).length,structureSells=structureVotes.filter(function(x){return x==="SELL"}).length,structureDirFinal=structureBuys>=2?"BUY":structureSells>=2?"SELL":"WAIT";
 var pattern=patternScan(candles,cs);
 var groups=[{name:"Trend",dir:trendDir,detail:"EMA20/50/200 + MACD"},{name:"Momentum",dir:momentumDir,detail:"RSI(14) "+rv.toFixed(1)},{name:"Volatility",dir:bbDir,detail:"Bollinger Bands(20,2)"},{name:"Volume",dir:volumeDir,detail:avg>0&&v!==null?(v/avg).toFixed(2)+"x average volume":"volume unavailable"},{name:"Chart pattern",dir:pattern.direction,detail:pattern.name},{name:"Market structure",dir:structureDirFinal,detail:"BOS "+structureDir+" · sweep "+sweepDir+" · FVG "+fvgDir}];
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
