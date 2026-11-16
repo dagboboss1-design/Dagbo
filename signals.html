@@ -304,7 +304,12 @@
     if(currentSignalTF!=='5')return;
     var stored={};try{stored=JSON.parse(localStorage.getItem('dagbo_scalp_signal_count'))||{};}catch(e){}
     var count=stored.date===localDateKey()&&Array.isArray(stored.items)?stored.items.length:0;
-    var quota=getDailyRiskQuota(),money='
+    var quota=getDailyRiskQuota(),money='$'+quota.remaining.toFixed(2);
+    var el=document.getElementById('scalpStatsText');
+    if(el)el.textContent="Today's 5m signals: "+count+" · Remaining daily loss allowance: "+money+" of $"+quota.limit.toFixed(2)+(quota.exhausted?" · RISK QUOTA EXHAUSTED — signals remain visible for review.":" · Journal records executed trades only.");
+  }
+
+  function recordSignalSnapshot() {
     var snapshots = {}, history = [];
     try { snapshots = JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots')) || {}; } catch(e) {}
     try { history = JSON.parse(localStorage.getItem('dagbo_alert_history')) || []; } catch(e) {}
