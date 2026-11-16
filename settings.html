@@ -201,7 +201,7 @@
 
   const KEY = 'dagbo_settings';
   const KEY_SAVED = 'dagbo_settings_saved';
-  const ALL_PAIRS = ['XAUUSD','EURUSD','GBPUSD','USDJPY','GBPJPY','US30','US100','NAS100','US500','BTCUSD','ETHUSD','AUDUSD','USDCHF'];
+  const ALL_PAIRS = ['XAUUSD','XAGUSD','EURUSD','GBPUSD','USDJPY','GBPJPY','US30','US100','NAS100','US500','BTCUSD','ETHUSD','AUDUSD','USDCHF'];
 
   var state = {};
   var usdNgnRate = null, usdNgnUpdated = null;
@@ -256,7 +256,7 @@
     ALL_PAIRS.forEach(function(p) {
       if (state.pairs.indexOf(p) > -1) {
         var opt = document.createElement('option');
-        opt.value = p; opt.textContent = p === 'XAUUSD' ? 'GOLD (XAUUSD)' : p;
+        opt.value = p; opt.textContent = p === 'XAUUSD' ? 'GOLD (XAUUSD)' : (p === 'XAGUSD' ? 'SILVER (XAGUSD)' : p);
         selPair.appendChild(opt);
       }
     });
