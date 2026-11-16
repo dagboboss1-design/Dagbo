@@ -208,7 +208,7 @@ module.exports = async function handler(req, res) {
       // Fetch a real Twelve Data quote for explicit pair questions or the pair
       // selected in the user's saved chart snapshots. Never ask the model to guess.
       const pairSymbols = {
-        XAUUSD:"XAU/USD", GOLD:"XAU/USD", EURUSD:"EUR/USD", GBPUSD:"GBP/USD",
+        XAUUSD:"XAU/USD", GOLD:"XAU/USD", XAGUSD:"XAG/USD", SILVER:"XAG/USD", EURUSD:"EUR/USD", GBPUSD:"GBP/USD",
         USDJPY:"USD/JPY", GBPJPY:"GBP/JPY", AUDUSD:"AUD/USD", USDCHF:"USD/CHF",
         USDCAD:"USD/CAD", NZDUSD:"NZD/USD", EURJPY:"EUR/JPY", EURGBP:"EUR/GBP",
         BTCUSD:"BTC/USD", ETHUSD:"ETH/USD", US30:"DJI", US100:"NDX", NAS100:"NDX", US500:"SPX"
@@ -233,26 +233,6 @@ module.exports = async function handler(req, res) {
       }
       let fundamentalContext = "";
       const asksFundamentals = /\b(fundamental|macro|economic|inflation|cpi|pce|gdp|unemployment|interest rate|treasury|yield|central bank|fed|fomc|rate decision|economic calendar)\b/i.test(question);
-      const fmpKey = process.env.FMP_API_KEY;
-      if (asksFundamentals && fmpKey) {
-        try {
-          const from = new Date().toISOString().slice(0, 10);
-          const to = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-          const calendarUrl = "https://financialmodelingprep.com/stable/economic-calendar?from=" + from + "&to=" + to + "&apikey=" + encodeURIComponent(fmpKey);
-          const macroUrl = "https://financialmodelingprep.com/stable/treasury-rates?apikey=" + encodeURIComponent(fmpKey);
-          const results = await Promise.all([fetch(calendarUrl), fetch(macroUrl)]);
-          const payloads = await Promise.all(results.map(r => r.ok ? r.json() : Promise.resolve(null)));
-          const events = Array.isArray(payloads[0]) ? payloads[0].slice(0, 12).map(e => ({
-            date: e.date, country: e.country, currency: e.currency, event: e.event,
-            impact: e.impact, estimate: e.estimate, previous: e.previous, actual: e.actual
-          })) : [];
-          const rates = Array.isArray(payloads[1]) && payloads[1].length ? payloads[1][0] : null;
-          fundamentalContext = "FMP FUNDAMENTAL DATA (may be plan-limited; missing fields are unknown): " +
-            JSON.stringify({ upcomingEconomicEvents: events, latestTreasuryRates: rates });
-        } catch (error) {
-          console.error("DAGBO FMP fundamentals context unavailable:", error.message);
-        }
-      }
       let liveQuoteContext = "";
       if (asksPrice) {
         const quoteKey = process.env.TWELVE_DATA_API_KEY;
@@ -288,6 +268,28 @@ module.exports = async function handler(req, res) {
       if (!rate.allowed) {
         res.setHeader("Retry-After", String(AI_RATE_WINDOW_SECONDS));
         return res.status(429).json({ error: "Dagbo AI is receiving too many requests. Please wait a few minutes and try again." });
+      }
+
+      const asksFundamentals = /\b(fundamental|macro|economic|inflation|cpi|pce|gdp|unemployment|interest rate|treasury|yield|central bank|fed|fomc|rate decision|economic calendar)\b/i.test(question);
+      const fmpKey = process.env.FMP_API_KEY;
+      if (asksFundamentals && fmpKey) {
+        try {
+          const from = new Date().toISOString().slice(0, 10);
+          const to = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+          const calendarUrl = "https://financialmodelingprep.com/stable/economic-calendar?from=" + from + "&to=" + to + "&apikey=" + encodeURIComponent(fmpKey);
+          const macroUrl = "https://financialmodelingprep.com/stable/treasury-rates?apikey=" + encodeURIComponent(fmpKey);
+          const results = await Promise.all([fetch(calendarUrl), fetch(macroUrl)]);
+          const payloads = await Promise.all(results.map(r => r.ok ? r.json() : Promise.resolve(null)));
+          const events = Array.isArray(payloads[0]) ? payloads[0].slice(0, 12).map(e => ({
+            date: e.date, country: e.country, currency: e.currency, event: e.event,
+            impact: e.impact, estimate: e.estimate, previous: e.previous, actual: e.actual
+          })) : [];
+          const rates = Array.isArray(payloads[1]) && payloads[1].length ? payloads[1][0] : null;
+          fundamentalContext = "FMP FUNDAMENTAL DATA (may be plan-limited; missing fields are unknown): " +
+            JSON.stringify({ upcomingEconomicEvents: events, latestTreasuryRates: rates });
+        } catch (error) {
+          console.error("DAGBO FMP fundamentals context unavailable:", error.message);
+        }
       }
 
       // Keep the Groq API key on the server; never accept it from the browser.
