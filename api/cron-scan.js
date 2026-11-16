@@ -633,7 +633,7 @@ module.exports = async function handler(req, res) {
       try {
         const response = await fetch(url);
         const data = await response.json();
-        if (!response.ok || data.status === "error" || !Array.isArray(data.values) || data.values.length < 50) {
+        if (!response.ok || data.status === "error" || !Array.isArray(data.values) || data.values.length < 60) {
           throw new Error(data.message || "Insufficient candle data");
         }
         const analysis = analyze(data.values.slice().reverse(), pair);
