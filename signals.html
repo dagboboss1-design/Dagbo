@@ -387,8 +387,12 @@
     var grid=document.getElementById('trendSignalsGrid'),updated=document.getElementById('trendSignalsUpdated');
     if(!grid||!updated)return;
     grid.innerHTML='';
-    var selected=enabledPairs.map(function(p){return String(p).toUpperCase();});
-    var rows=(snapshot&&Array.isArray(snapshot.htfSignals)?snapshot.htfSignals:[]).filter(function(x){return selected.includes(String(x.pair).toUpperCase());});
+    function canonicalPair(value){
+      var p=String(value||'').toUpperCase();
+      return p==='GOLD'?'XAUUSD':p==='SILVER'?'XAGUSD':p==='NAS100'?'US100':p;
+    }
+    var selected=enabledPairs.map(canonicalPair);
+    var rows=(snapshot&&Array.isArray(snapshot.htfSignals)?snapshot.htfSignals:[]).filter(function(x){return selected.includes(canonicalPair(x.pair));});
     if(!rows.length){
       var empty=document.createElement('div');empty.className='dg-muted';empty.style.cssText='padding:16px 8px;text-align:center';
       empty.textContent='No selected pair currently meets the Trend confirmation rules. The scanner will wait instead of forcing a trade.';grid.appendChild(empty);
