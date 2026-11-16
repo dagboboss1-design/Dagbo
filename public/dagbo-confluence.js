@@ -33,7 +33,7 @@ var last=candles[candles.length-1],prev=candles[candles.length-2],close=cs[cs.le
 var e20=ema(cs,emaFast),e50=ema(cs,emaSlow),e12=ema(cs,isScalp?6:12),e26=ema(cs,isScalp?13:26),macd=e12-e26,macdPrev=ema(cs.slice(0,-1),isScalp?6:12)-ema(cs.slice(0,-1),isScalp?13:26),rv=rsi(cs,rsiPeriod);
 var trendDir=e20>e50&&close>e20&&macd>macdPrev?"BUY":e20<e50&&close<e20&&macd<macdPrev?"SELL":"WAIT";
 var stoch=stochastic(candles,isScalp?5:14,3),prevStoch=stochastic(candles.slice(0,-1),isScalp?5:14,3);
-var momentumDir=isScalp?((rv>50&&stoch.k>stoch.d&&stoch.k>50)?"BUY":(rv<50&&stoch.k<stoch.d&&stoch.k<50)?"SELL":"WAIT"):(rv>=55?"BUY":rv<=45?"SELL":"WAIT");
+var momentumDir=isScalp?((rv>50&&stoch.k>=stoch.d&&stoch.k>50)?"BUY":(rv<50&&stoch.k<=stoch.d&&stoch.k<50)?"SELL":"WAIT"):(rv>=55?"BUY":rv<=45?"SELL":"WAIT");
 var bbPeriod=isScalp?12:20,recent=cs.slice(-bbPeriod),mean=recent.reduce(function(s,x){return s+x},0)/recent.length,sd=Math.sqrt(recent.reduce(function(s,x){return s+(x-mean)*(x-mean)},0)/recent.length),bbDir=close<mean-2*sd&&close>open?"BUY":close>mean+2*sd&&close<open?"SELL":"WAIT";
 var atrPeriod=14,tr=0;for(var i=cs.length-atrPeriod;i<cs.length;i++)tr+=Math.max(hs[i]-ls[i],Math.abs(hs[i]-cs[i-1]),Math.abs(ls[i]-cs[i-1]));var atr=tr/atrPeriod,atrPct=atr/Math.max(Math.abs(close),1e-9)*100,atrOk=atrPct>=(isScalp?0.008:0.004);
 var vols=candles.slice(-21,-1).map(function(x){return n(x.volume)}).filter(function(x){return x!==null&&x>0}),v=n(last.volume),avg=vols.length?vols.reduce(function(s,x){return s+x},0)/vols.length:0,volumeDir=avg>0&&v!==null&&v>=avg*1.2?(close>open?"BUY":close<open?"SELL":"WAIT"):"WAIT";
