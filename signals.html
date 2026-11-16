@@ -30,7 +30,7 @@
   </div>
   
   <h1 class="dg-title">Signal Board</h1>
-  <p class="dg-subtitle">3 Systems. Confluence Engine.</p>
+  <p class="dg-subtitle">Intraday · Scalping · Higher-Timeframe Trend</p>
 
   <a class="dg-row dg-row--link dg-card" href="alerts.html" style="margin-bottom:18px;border-radius:16px">
     <span class="dg-row__icon dg-row__icon--amber">🔔</span>
@@ -47,12 +47,19 @@
   <!-- TIMEFRAME TOGGLE -->
   <div class="dg-seg" role="radiogroup" style="margin-bottom:16px">
     <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_15" value="15" checked onchange="changeSignalTF('15')">
-    <label class="dg-seg__lb" for="tf_15">15m (Intraday)</label>
-    
+    <label class="dg-seg__lb" for="tf_15">15m Intraday</label>
     <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_5" value="5" onchange="changeSignalTF('5')">
-    <label class="dg-seg__lb" for="tf_5">5m (Scalping)</label>
-    <a class="dg-seg__lb" href="signal-insights.html" style="font-size:12px;text-decoration:none;text-align:center">Trend</a>
+    <label class="dg-seg__lb" for="tf_5">5m Scalping</label>
+    <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_trend" value="trend" onchange="changeSignalTF('trend')">
+    <label class="dg-seg__lb" for="tf_trend">Trend</label>
   </div>
+  <section class="dg-card" id="trendSignalsPanel" style="display:none;margin:-4px 0 16px">
+    <div class="dg-card__head"><h2 class="dg-card__title">Higher-Timeframe Trend Signals</h2><span class="dg-pill dg-pill--open">MONTHLY → 4H</span></div>
+    <p class="dg-muted" style="font-size:12px;line-height:1.55;margin:6px 0 10px">A setup needs at least 3 of 4 timeframe directions (Monthly, Weekly, Daily, 4H), including 4H, plus matching 4H multi-method confirmation. Entry and targets use 4H ATR. No confirmed setup means WAIT.</p>
+    <div id="trendSignalsUpdated" class="dg-muted" style="font-size:11px;margin-bottom:8px">Loading latest scheduled Trend scan…</div>
+    <div id="trendSignalsGrid" class="dg-stack"></div>
+    <button type="button" class="dg-btn" onclick="loadTrendSignals()" style="width:100%;margin-top:10px">↻ Refresh Trend</button>
+  </section>
   <section class="dg-card" id="scalpStats" style="margin:-4px 0 16px;padding:13px;display:none">
     <div style="font-weight:800;font-size:14px">5m SCALP PROFILE · LOWER THRESHOLD</div>
     <div id="scalpStatsText" class="dg-muted" style="font-size:12px;line-height:1.6;margin-top:6px">Loading today's signal and risk figures…</div>
@@ -376,8 +383,76 @@
   }
 
   // --- RENDER UI ---
+  function renderTrendCards(snapshot) {
+    var grid=document.getElementById('trendSignalsGrid'),updated=document.getElementById('trendSignalsUpdated');
+    if(!grid||!updated)return;
+    grid.innerHTML='';
+    var selected=enabledPairs.map(function(p){return String(p).toUpperCase();});
+    var rows=(snapshot&&Array.isArray(snapshot.htfSignals)?snapshot.htfSignals:[]).filter(function(x){return selected.includes(String(x.pair).toUpperCase());});
+    if(!rows.length){
+      var empty=document.createElement('div');empty.className='dg-muted';empty.style.cssText='padding:16px 8px;text-align:center';
+      empty.textContent='No selected pair currently meets the Trend confirmation rules. The scanner will wait instead of forcing a trade.';grid.appendChild(empty);
+    }
+    rows.forEach(function(signal){
+      var isBuy=signal.direction==='BUY',direction=isBuy?'BUY':'SELL';
+      var card=document.createElement('section');card.className='dg-card';card.style.cssText='padding:14px;margin-bottom:10px';
+      var title=document.createElement('div');title.className='dg-card__head';
+      var name=document.createElement('strong');name.style.fontSize='17px';name.textContent=signal.pair;
+      var pill=document.createElement('span');pill.className='dg-pill '+(isBuy?'dg-pill--buy':'dg-pill--sell');pill.textContent=direction;
+      title.appendChild(name);title.appendChild(pill);card.appendChild(title);
+      var sub=document.createElement('div');sub.className='dg-muted';sub.style.cssText='font-size:11px;margin:4px 0 10px';
+      sub.textContent='4H Trend · '+(signal.quality||'CONFIRMED')+' · '+(signal.confidence||0)+'% confluence · '+signal.agreement+' timeframe agreement';card.appendChild(sub);
+      var dp=String(signal.pair).includes('JPY')?3:(/XAU|GOLD/.test(signal.pair)?2:(/BTC|ETH/.test(signal.pair)?1:5));
+      var levels=[['Entry',signal.entry,''],['Stop Loss',signal.stopLoss,'dg-neg'],['TP 1',signal.takeProfit,'dg-pos'],['TP 2',signal.takeProfit2,'dg-pos']];
+      var box=document.createElement('div');box.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px';
+      levels.forEach(function(item){var cell=document.createElement('div');cell.className='dg-level';cell.style.padding='8px 10px';var label=document.createElement('span');label.style.fontSize='11px';label.textContent=item[0];var value=document.createElement('strong');value.style.fontSize='14px';if(item[2])value.className=item[2];value.textContent=Number(item[1]).toFixed(dp);cell.appendChild(label);cell.appendChild(value);box.appendChild(cell);});
+      card.appendChild(box);
+      var detail=document.createElement('div');detail.className='dg-muted';detail.style.cssText='font-size:11px;line-height:1.5;margin-top:9px';
+      detail.textContent='Monthly '+signal.timeframes.Monthly+' · Weekly '+signal.timeframes.Weekly+' · Daily '+signal.timeframes.Daily+' · 4H '+signal.timeframes['4H']+' · 4H methods '+signal.methodAgreement+'/12';
+      card.appendChild(detail);
+      var evidence=document.createElement('div');evidence.className='dg-muted';evidence.style.cssText='font-size:11px;line-height:1.5;margin-top:6px';
+      evidence.textContent='Evidence: '+(Array.isArray(signal.methodEvidence)?signal.methodEvidence.join(' · '):'4H multi-method confirmation');card.appendChild(evidence);
+      var actions=document.createElement('div');actions.style.cssText='display:flex;gap:7px;margin-top:12px';
+      var journal=document.createElement('button');journal.type='button';journal.textContent='Add to Journal';journal.style.cssText='flex:1;padding:10px 5px;border-radius:10px;background:var(--dg-green);color:#fff;font-weight:bold;border:0;font-size:12px';
+      journal.addEventListener('click',function(){window.executeTrade(signal.pair,direction,signal.entry,signal.stopLoss,signal.takeProfit,'Higher-Timeframe Trend · '+signal.agreement+' agreement',signal.takeProfit2);});
+      var copy=document.createElement('button');copy.type='button';copy.textContent='Copy Trade';copy.style.cssText='flex:1;padding:10px 5px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;border:1px solid var(--dg-line);font-size:12px';
+      copy.addEventListener('click',function(){window.copySignalTrade(signal.pair,direction,signal.entry,signal.stopLoss,signal.takeProfit,signal.takeProfit2);});
+      var chart=document.createElement('a');chart.href='chart.html?pair='+encodeURIComponent(signal.pair);chart.textContent='View Chart';chart.style.cssText='flex:1;text-align:center;padding:10px 5px;border-radius:10px;background:var(--dg-fill);color:var(--dg-text);font-weight:bold;text-decoration:none;font-size:12px';
+      actions.appendChild(journal);actions.appendChild(copy);actions.appendChild(chart);card.appendChild(actions);grid.appendChild(card);
+    });
+    updated.textContent=snapshot?'Updated '+new Date(snapshot.updatedAt).toLocaleString()+' · Source: '+(snapshot.source||'Twelve Data'):'No scheduled Trend scan has completed yet.';
+  }
+
+  async function loadTrendSignals(){
+    var grid=document.getElementById('trendSignalsGrid'),updated=document.getElementById('trendSignalsUpdated');
+    if(grid)grid.textContent='Loading latest Monthly / Weekly / Daily / 4H scan…';
+    if(updated)updated.textContent='Checking the latest scheduled scan…';
+    try{
+      var response=await fetch('/api/cron-scan?view=pair-intelligence',{cache:'no-store'});
+      var data=await response.json();
+      if(!response.ok||!data||!data.snapshot)throw new Error(data&&data.message||'The scheduled Trend scan has not completed yet.');
+      renderTrendCards(data.snapshot);
+    }catch(error){
+      if(grid)grid.textContent=error.message||'Trend data is temporarily unavailable.';
+      if(updated)updated.textContent='Try again after the scheduled scanner has run.';
+    }
+  }
+
   function renderCards() {
     var grid = document.getElementById('signals-grid');
+    var trendPanel=document.getElementById('trendSignalsPanel');
+    if(trendPanel)trendPanel.style.display=currentSignalTF==='trend'?'block':'none';
+    if(currentSignalTF==='trend'){
+      if(grid)grid.style.display='none';
+      var chips=document.getElementById('filterChips');if(chips)chips.style.display='none';
+      var refresh=document.getElementById('lastUpdated');if(refresh&&refresh.parentElement)refresh.parentElement.style.display='none';
+      loadTrendSignals();
+      return;
+    }
+    if(grid)grid.style.display='';
+    var chips=document.getElementById('filterChips');if(chips)chips.style.display='';
+    var refresh=document.getElementById('lastUpdated');if(refresh&&refresh.parentElement)refresh.parentElement.style.display='';
+
     if (grid && !grid.dataset.dagboTradeActionsBound) {
       grid.dataset.dagboTradeActionsBound = '1';
       grid.addEventListener('click', function(event) {
@@ -563,7 +638,7 @@
     }
   };
 
-  window.executeTrade = function(pair, signal, entry, sl, tp, strategy) {
+  window.executeTrade = function(pair, signal, entry, sl, tp, strategy, tp2) {
     var dir = String(signal || '').includes('BUY') ? 'BUY' : String(signal || '').includes('SELL') ? 'SELL' : null;
     if (!dir) { alert('This is not an executable BUY or SELL setup. Wait for confirmation.'); return; }
     entry=Number(entry); sl=Number(sl); tp=Number(tp);
@@ -596,10 +671,11 @@
       entry:entry,
       stopLoss:sl,
       takeProfit:tp,
+      takeProfit2:Number.isFinite(Number(tp2))&&Number(tp2)>0?Number(tp2):null,
       lotSize:Number(settings.lotSize)||0.01,
       riskAmount:(Number(settings.accountSize)||100)*(Number(settings.risk)||1)/100,
       strategy:strategy||'3-System Confluence',
-      timeframe:currentSignalTF+'m',
+      timeframe:currentSignalTF==='trend'?'4H Trend':currentSignalTF+'m',
       result:'OPEN',
       status:'OPEN',
       pnl:0,
@@ -659,8 +735,21 @@
 
   window.changeSignalTF = function(tf) {
     currentSignalTF = tf;
+    document.getElementById('scalpStats').style.display=tf==='5'?'block':'none';
+    if(tf==='trend'){
+      var grid=document.getElementById('signals-grid');if(grid)grid.style.display='none';
+      var chips=document.getElementById('filterChips');if(chips)chips.style.display='none';
+      var refresh=document.getElementById('lastUpdated');if(refresh&&refresh.parentElement)refresh.parentElement.style.display='none';
+      var panel=document.getElementById('trendSignalsPanel');if(panel)panel.style.display='block';
+      loadTrendSignals();return;
+    }
+    var panel=document.getElementById('trendSignalsPanel');if(panel)panel.style.display='none';
+    var grid=document.getElementById('signals-grid');if(grid)grid.style.display='';
+    var chips=document.getElementById('filterChips');if(chips)chips.style.display='';
+    var refresh=document.getElementById('lastUpdated');if(refresh&&refresh.parentElement)refresh.parentElement.style.display='';
     loadAllSignals();
   };
+  window.loadTrendSignals=loadTrendSignals;
 
   // --- INITIALIZE ---
   async function loadAllSignals() {
