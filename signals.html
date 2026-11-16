@@ -203,9 +203,15 @@
       }
 
       let candles = data.values;
-      if (!candles || candles.length < 60) return null;
-
-      candles = candles.reverse(); 
+      if (!candles || candles.length < 61) return null;
+      // Ignore the still-forming candle: pattern and indicator confirmation must use closed bars only.
+      var barMs = Number(tf) * 60 * 1000;
+      candles = candles.filter(function(c) {
+        var raw = String(c.datetime || '');
+        var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? '' : 'Z'));
+        return Number.isFinite(stamp) && stamp + barMs <= Date.now();
+      }).reverse();
+      if (candles.length < 60) return null; 
 
       var analysis=analyseAllMethods(candles, tf === '5' ? 'scalp' : 'intraday');
       if (!analysis) return null;
@@ -306,7 +312,7 @@
     var count=stored.date===localDateKey()&&Array.isArray(stored.items)?stored.items.length:0;
     var quota=getDailyRiskQuota(),money='$'+quota.remaining.toFixed(2);
     var el=document.getElementById('scalpStatsText');
-    if(el)el.textContent="Today's 5m signals: "+count+" · Remaining daily loss allowance: "+money+" of $"+quota.limit.toFixed(2)+(quota.exhausted?" · RISK QUOTA EXHAUSTED — signals remain visible for review.":" · Journal records executed trades only.");
+    if(el)el.textContent="Today's 5m signals on this device: "+count+" · Remaining Journal-based loss allowance: "+money+" of $"+quota.limit.toFixed(2)+(quota.exhausted?" · RISK QUOTA EXHAUSTED — signals remain visible for review.":" · Journal records executed trades only.");
   }
 
   function recordSignalSnapshot() {
