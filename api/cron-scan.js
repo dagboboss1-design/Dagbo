@@ -536,7 +536,7 @@ async function runPairIntelligence(pairs, apiKey) {
     if(direction!=="WAIT"&&methodDirection===direction){
       const plan=tradePlan(pair,direction,data[pair]["4h"]);
       if(plan) htfSignals.push({...plan,timeframes:directions,agreement:Math.max(buys,sells)+"/4",
-        methodAgreement:(direction==="BUY"?fourHourMethods.buyScore:fourHourMethods.sellScore)+"/9",
+        methodAgreement:(direction==="BUY"?fourHourMethods.buyScore:fourHourMethods.sellScore)+"/12",
         methodEvidence:fourHourMethods.evidence.slice(0,5)});
     }
   }
@@ -658,7 +658,7 @@ module.exports = async function handler(req, res) {
             (previous.signal.includes("BUY") !== analysis.signal.includes("BUY") ? "🔄 SIGNAL DIRECTION CHANGED" : "📈 SIGNAL STRENGTH CHANGED");
           const body = pair + " · " + analysis.signal + " · Entry " + analysis.entry.toFixed(5) +
             " · SL " + analysis.stopLoss.toFixed(5) + " · TP " + analysis.takeProfit.toFixed(5) +
-            " · " + analysis.buyScore + " BUY / " + analysis.sellScore + " SELL votes. Sources: " +
+            " · " + analysis.confidence + "% " + analysis.quality + " confluence quality (threshold " + analysis.threshold + "). Group score: " + analysis.buyScore + " BUY / " + analysis.sellScore + " SELL. Sources: " +
             analysis.evidence.slice(0, 3).join("; ") + ". Confirm on chart.";
           await broadcast(title, body, "signal-" + pair);
         }
