@@ -47,7 +47,7 @@ var maxScore=12,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(
 var threshold=profile==="scalp"?65:profile==="swing"?75:70,minGroups=isScalp?3:4;
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
-var dir=atrOk&&lead!=="WAIT"&&leadConfidence>=threshold&&leadGroups>=minGroups?"";
+var dir=atrOk&&lead!=="WAIT"&&leadConfidence>=threshold&&leadGroups>=minGroups?lead:"WAIT";
 var source="MAIN CONFLUENCE",momentumTrigger=null,wrNow=null,wrPrev=null;
 if(!dir&&isScalp&&atrOk){
 function williams(idx){var w=candles.slice(idx-13,idx+1),hh=Math.max.apply(null,w.map(function(x){return n(x.high)})),ll=Math.min.apply(null,w.map(function(x){return n(x.low)}));return hh===ll?-50:(hh-n(w[w.length-1].close))/(hh-ll)*-100;}
