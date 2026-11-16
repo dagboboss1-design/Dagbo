@@ -198,12 +198,15 @@
       let data = await res.json();
       
       if (!res.ok || data.error || data.status === 'error') {
-        console.error("Market data API Error:", data.error || data.message || res.statusText);
-        return null;
+        var apiError = data.error || data.message || res.statusText || ('HTTP ' + res.status);
+        console.error("Market data API Error:", apiError);
+        return { pair: pair, error: String(apiError), errorStage: 'provider' };
       }
 
       let candles = data.values;
-      if (!candles || candles.length < 61) return null;
+      if (!Array.isArray(candles) || candles.length < 30) {
+        return { pair: pair, error: 'Provider returned ' + (Array.isArray(candles) ? candles.length : 0) + ' candles; at least 30 are required.', errorStage: 'candles' };
+      }
       // Ignore the still-forming candle: pattern and indicator confirmation must use closed bars only.
       var barMs = Number(tf) * 60 * 1000;
       candles = candles.filter(function(c) {
@@ -211,10 +214,12 @@
         var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? '' : 'Z'));
         return Number.isFinite(stamp) && stamp + barMs <= Date.now();
       }).reverse();
-      if (candles.length < 60) return null; 
+      if (candles.length < 30) {
+        return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain after UTC time filtering.', errorStage: 'closed-candles' };
+      }
 
       var analysis=analyseAllMethods(candles, tf === '5' ? 'scalp' : 'intraday');
-      if (!analysis) return null;
+      if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
       var final=analysis.final;
       var entry=parseFloat(candles[candles.length-1].close);
       var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
@@ -238,7 +243,7 @@
       };
     } catch(e) {
       console.error(e);
-      return null;
+      return { pair: pair, error: String(e && e.message || e), errorStage: 'exception' };
     }
   }
 
@@ -414,6 +419,10 @@
       
       var s = signalsData[pair];
       if (!s) return;
+      if (s.error) {
+        listHtml += '<section class="dg-card" style="border:1px solid #b7791f"><strong>' + escapeNewsText(s.pair) + ' · DATA ERROR</strong><div class="dg-muted" style="margin-top:6px">' + escapeNewsText(s.error) + '</div></section>';
+        return;
+      }
 
       if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
       if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
