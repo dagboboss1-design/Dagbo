@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#F5F5F7"><title>Trading Profiles · DAGBO SIGNAL</title><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="dagbo.css"><script>(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();</script>
+<style>
+.sp-tabs{display:flex;gap:8px;overflow:auto;padding:2px 0 12px;scrollbar-width:none}.sp-tab{flex:none;border:1px solid var(--dg-line);background:var(--dg-card);color:var(--dg-text);border-radius:999px;padding:9px 13px;font:600 12px inherit}.sp-tab[aria-selected=true]{background:var(--dg-text);color:var(--dg-bg);border-color:var(--dg-text)}
+.sp-meta{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}.sp-chip{border:1px solid var(--dg-line);border-radius:999px;padding:6px 9px;font-size:11px;color:var(--dg-text-2)}
+.sp-group{margin-top:16px}.sp-group h3{font-size:13px;margin:0 0 9px}.sp-method{padding:12px 0;border-top:1px solid var(--dg-line);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.sp-method strong{font-size:13px;display:block}.sp-method small{display:block;color:var(--dg-text-2);font-size:11px;line-height:1.45;margin-top:4px}.sp-method button{flex:none;border:1px solid var(--dg-line);border-radius:999px;padding:6px 9px;background:transparent;color:var(--dg-text);font-size:11px}.sp-method button[aria-pressed=true]{background:var(--dg-fill);font-weight:700}.sp-note{font-size:12px;line-height:1.55;color:var(--dg-text-2)}
+</style></head><body><main class="dg-page">
+<div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">EDGE ENGINE</div></div>
+<h1 class="dg-title">Trading Profiles</h1><p class="dg-subtitle">Separate strategy playbooks for each trading style, timeframe and market session.</p>
+<div class="sp-tabs" id="profileTabs" role="tablist" aria-label="Trading profiles"></div>
+<section class="dg-card" id="profileSummary" aria-live="polite"></section>
+<section class="dg-card" style="margin-top:14px"><div class="dg-card__head"><h2 class="dg-card__title">Profile indicators</h2><span class="dg-pill dg-pill--open">PLAYBOOK</span></div><div id="indicators"></div></section>
+<section class="dg-card" style="margin-top:14px"><div class="dg-card__head"><h2 class="dg-card__title">Priority strategy library</h2><span class="dg-muted" id="enabledCount" style="font-size:11px"></span></div><p class="sp-note">These are the methods prioritized for this trading style. You can switch methods on or off in this profile. Preferences are saved on this device.</p><div id="methods"></div></section>
+<section class="dg-card" style="margin-top:14px"><h2 class="dg-card__title">Execution rules</h2><ul id="filters" class="sp-note" style="padding-left:18px;line-height:1.8"></ul></section>
+<section class="dg-card" style="margin-top:14px"><h2 class="dg-card__title">All trading styles</h2><div id="allStyles" class="sp-meta"></div><p class="sp-note">Trading style is the top-level profile. Indicator combinations, candlestick patterns, chart patterns, price action, SMC/ICT, news, sentiment, macro and risk methods are assigned according to their suitability—not all are forced into every scan.</p></section>
+<p class="dg-note">Profile selection and enabled-method preferences are saved locally. This page organizes the strategy playbooks; it does not claim that every listed detector is already connected to live signal generation. A live signal must only cite methods actually evaluated from available market data.</p>
+<a class="dg-btn dg-btn--primary dg-btn--block" href="signals.html">Open Signal Board</a>
+</main><script src="strategy-profiles.js"></script><script>
+(function(){
+ var api=window.DagboStrategyProfiles,profiles=api.getProfiles(),active='scalping',store={};
+ try{store=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}}catch(e){}
+ if(store.active&&profiles.some(function(p){return p.id===store.active}))active=store.active;
+ function save(){store.active=active;localStorage.setItem('dagbo_strategy_profile_settings',JSON.stringify(store))}
+ function enabled(p,item){var key=p.id+'::'+item[1];return !store.disabled||!store.disabled[key]}
+ function render(){
+  var p=api.getProfile(active),tabs=document.getElementById('profileTabs');tabs.textContent='';
+  profiles.forEach(function(x){var b=document.createElement('button');b.className='sp-tab';b.type='button';b.textContent=x.name;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(x.id===active));b.addEventListener('click',function(){active=x.id;save();render()});tabs.appendChild(b)});
+  var summary=document.getElementById('profileSummary');summary.textContent='';
+  var h=document.createElement('h2');h.className='dg-card__title';h.textContent=p.name+' profile';summary.appendChild(h);
+  var desc=document.createElement('p');desc.className='sp-note';desc.textContent=p.objective;summary.appendChild(desc);
+  var meta=document.createElement('div');meta.className='sp-meta';
+  [p.tag,'Primary: '+p.primary,'Sessions: '+p.sessions.join(', '),'WAT: '+p.nigeriaWindow].forEach(function(v){var s=document.createElement('span');s.className='sp-chip';s.textContent=v;meta.appendChild(s)});summary.appendChild(meta);
+  var ind=document.getElementById('indicators');ind.textContent='';p.indicators.forEach(function(v){var s=document.createElement('span');s.className='sp-chip';s.style.display='inline-block';s.style.margin='3px';s.textContent=v;ind.appendChild(s)});
+  var methods=document.getElementById('methods');methods.textContent='';var count=0;
+  p.priority.forEach(function(item){var row=document.createElement('div');row.className='sp-method';var left=document.createElement('div'),title=document.createElement('strong'),desc2=document.createElement('small');title.textContent=item[1];desc2.textContent=item[0]+' · '+item[2];left.appendChild(title);left.appendChild(desc2);var b=document.createElement('button');b.type='button';var on=enabled(p,item);if(on)count++;b.textContent=on?'Enabled':'Disabled';b.setAttribute('aria-pressed',String(on));b.addEventListener('click',function(){store.disabled=store.disabled||{};var key=p.id+'::'+item[1];if(enabled(p,item))store.disabled[key]=true;else delete store.disabled[key];save();render()});row.appendChild(left);row.appendChild(b);methods.appendChild(row)});
+  document.getElementById('enabledCount').textContent=count+'/'+p.priority.length+' enabled';
+  var filters=document.getElementById('filters');filters.textContent='';p.filters.forEach(function(v){var li=document.createElement('li');li.textContent=v;filters.appendChild(li)});
+  var styles=document.getElementById('allStyles');styles.textContent='';api.allStyles.forEach(function(x){var s=document.createElement('span');s.className='sp-chip';s.textContent=x[0]+' → '+x[1].split(' ').map(function(id){var q=api.getProfile(id);return q.name}).join(' / ');styles.appendChild(s)});
+ }
+ render();
+})();
+</script><script src="navigation.js" defer></script></body></html>
