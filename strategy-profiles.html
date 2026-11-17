@@ -19,8 +19,9 @@
 (function(){
  var api=window.DagboStrategyProfiles,profiles=api.getProfiles(),active='scalping',store={};
  try{store=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}}catch(e){}
- if(store.active&&profiles.some(function(p){return p.id===store.active}))active=store.active;
- function save(){store.active=active;localStorage.setItem('dagbo_strategy_profile_settings',JSON.stringify(store))}
+ try{var shared=localStorage.getItem('dagbo_active_trading_profile');if(shared&&profiles.some(function(p){return p.id===shared}))active=shared;}catch(e){}
+ if(store.active&&profiles.some(function(p){return p.id===store.active})&&!localStorage.getItem('dagbo_active_trading_profile'))active=store.active;
+ function save(){store.active=active;localStorage.setItem('dagbo_strategy_profile_settings',JSON.stringify(store));localStorage.setItem('dagbo_active_trading_profile',active);}
  function enabled(p,item){var key=p.id+'::'+item[1];return !store.disabled||!store.disabled[key]}
  function render(){
   var p=api.getProfile(active),tabs=document.getElementById('profileTabs');tabs.textContent='';
