@@ -6,7 +6,7 @@
   'use strict';
   var profiles = [
     {
-      id:'scalping', name:'Scalping', tag:'5m · seconds to minutes', timeframes:['1m','5m'], primary:'5m',
+      id:'scalping', name:'Scalping', tag:'5m · seconds to minutes', timeframes:['5'], primary:'5m', primaryTf:'5',
       sessions:['London open','New York open'], nigeriaWindow:'09:00–18:00 WAT',
       objective:'Capture short intraday moves with tight invalidation and strict spread/liquidity filters.',
       filters:['Closed-candle confirmation','Spread and volatility check','No trade outside configured session','Avoid high-impact news unless Event mode is enabled'],
@@ -27,7 +27,7 @@
       ]
     },
     {
-      id:'day', name:'Day Trading', tag:'15m–1h · same-day trades', timeframes:['15m','30m','1h'], primary:'15m',
+      id:'day', name:'Day Trading', tag:'15m–1h · same-day trades', timeframes:['15m','30m','1h'], primary:'15m', primaryTf:'15',
       sessions:['London session','New York session','London–New York overlap'], nigeriaWindow:'Session-aware · WAT display',
       objective:'Trade the session trend, opening ranges, intraday levels and confirmed breakouts. Close or manage before the relevant market close.',
       filters:['Use 15m setup with 1h context','Respect instrument trading hours','Check economic calendar before entry','No overnight carry by default'],
@@ -47,7 +47,7 @@
       ]
     },
     {
-      id:'swing', name:'Swing Trading', tag:'4h–1d · days to weeks', timeframes:['4h','1d'], primary:'4h',
+      id:'swing', name:'Swing Trading', tag:'4h–1d · days to weeks', timeframes:['4h','1d'], primary:'4h', primaryTf:'240',
       sessions:['Multi-session'], nigeriaWindow:'No intraday session gate',
       objective:'Capture multi-day directional legs and pullbacks while accounting for overnight and weekend gaps.',
       filters:['4h setup with daily trend context','Use wider structure-based invalidation','Check scheduled macro events and weekend gap exposure','Do not apply scalping time windows'],
@@ -66,7 +66,7 @@
       ]
     },
     {
-      id:'position', name:'Position Trading', tag:'1d–1w · weeks to months', timeframes:['1d','1w','1M'], primary:'1d',
+      id:'position', name:'Position Trading', tag:'1d–1w · weeks to months', timeframes:['1d','1w'], primary:'1d', primaryTf:'1day',
       sessions:['Macro cycle'], nigeriaWindow:'No intraday session gate',
       objective:'Follow major macro and structural trends. Prioritize fundamental regime, broad levels and portfolio risk over frequent entries.',
       filters:['Daily setup with weekly/monthly context','Macro calendar and central-bank regime check','Carry, swap and funding costs matter','Lower turnover; no scalping triggers'],
@@ -83,7 +83,7 @@
       ]
     },
     {
-      id:'event', name:'News & Event', tag:'Event window · release-driven', timeframes:['5m','15m','1h'], primary:'15m',
+      id:'event', name:'News & Event', tag:'Event window · release-driven', timeframes:['5m','15m','1h'], primary:'15m', primaryTf:'15',
       sessions:['Scheduled release window','Central-bank events'], nigeriaWindow:'Event time shown in WAT',
       objective:'Prepare for scheduled economic releases and measure post-release reaction. Direction and volatility likelihood remain separate assessments.',
       filters:['Require a verified event, timestamp and affected currencies','Check actual vs forecast vs previous when available','No directional call from headline sentiment alone','Wait for post-release price confirmation','If event data is missing, show unavailable—not a guessed bias'],
