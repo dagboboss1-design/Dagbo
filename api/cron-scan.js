@@ -9,7 +9,7 @@ const redis = new Redis({
 });
 
 const SYMBOLS = {
-  XAUUSD: "XAU/USD", GOLD: "XAU/USD", DXY: "DXY",
+  XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD", DXY: "DXY",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY",
   GBPJPY: "GBP/JPY", AUDUSD: "AUD/USD", USDCHF: "USD/CHF",
   USDCAD: "USD/CAD", NZDUSD: "NZD/USD", EURJPY: "EUR/JPY", EURGBP: "EUR/GBP",
@@ -400,7 +400,7 @@ const HTF_FRAMES = [
 ];
 
 function pairDecimals(pair) {
-  return pair.includes("JPY") ? 3 : (pair === "XAUUSD" || pair === "GOLD" ? 2 : 5);
+  return pair.includes("JPY") || pair === "XAGUSD" || pair === "SILVER" ? 3 : (pair === "XAUUSD" || pair === "GOLD" ? 2 : 5);
 }
 function htfDirection(candles) {
   if (!Array.isArray(candles) || candles.length < 55) return "WAIT";
