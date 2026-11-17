@@ -18,6 +18,17 @@ if(out.direction==="WAIT"&&hs.length>=3&&ls.length>=3){var ah=hs.slice(-3),al=ls
 if(out.direction==="WAIT"&&hs.length>=3&&ls.length>=3){var wh=hs.slice(-3),wl=ls.slice(-3),hslope=wh[2].price-wh[0].price,lslope=wl[2].price-wl[0].price;if(hslope>0&&lslope>hslope*1.15&&last<wl[2].price&&prior>=wl[2].price)out={direction:"SELL",name:"Rising Wedge downside breakdown",confirmed:true};else if(lslope<0&&hslope<lslope*1.15&&last>wh[2].price&&prior<=wh[2].price)out={direction:"BUY",name:"Falling Wedge upside breakout",confirmed:true};}
 if(out.direction==="WAIT"&&hs.length>=3&&ls.length>=3){var hh=hs.slice(-3),ll=ls.slice(-3);if(hh[2].price<hh[1].price&&hh[1].price<hh[0].price&&ll[2].price<ll[1].price&&ll[1].price<ll[0].price&&last>hh[2].price&&prior<=hh[2].price)out={direction:"BUY",name:"Bull Flag / channel breakout",confirmed:true};else if(hh[2].price>hh[1].price&&hh[1].price>hh[0].price&&ll[2].price>ll[1].price&&ll[1].price>ll[0].price&&last<ll[2].price&&prior>=ll[2].price)out={direction:"SELL",name:"Bear Flag / channel breakdown",confirmed:true};}
 return out;}
+function candleScan(candles){
+var last=candles[candles.length-1],prev=candles[candles.length-2];
+var o=n(last.open),h=n(last.high),l=n(last.low),cl=n(last.close),po=n(prev.open),pc=n(prev.close);
+if([o,h,l,cl,po,pc].some(function(v){return v===null;}))return {direction:"WAIT",name:"Candlestick data unavailable"};
+var body=Math.abs(cl-o),prevBody=Math.abs(pc-po),upper=h-Math.max(o,cl),lower=Math.min(o,cl)-l;
+if(cl>o&&pc<po&&o<=pc&&cl>=po&&body>=Math.max(prevBody*.9,1e-12))return {direction:"BUY",name:"Bullish Engulfing"};
+if(cl<o&&pc>po&&o>=pc&&cl<=po&&body>=Math.max(prevBody*.9,1e-12))return {direction:"SELL",name:"Bearish Engulfing"};
+if(body>0&&lower>=body*2&&upper<=body*.8&&cl>o)return {direction:"BUY",name:"Bullish Pin Bar / Hammer"};
+if(body>0&&upper>=body*2&&lower<=body*.8&&cl<o)return {direction:"SELL",name:"Bearish Pin Bar / Shooting Star"};
+return {direction:"WAIT",name:"No confirmed engulfing or pin-bar pattern"};
+}
 function stochastic(candles,period,kSmooth){
 var raw=[];for(var i=Math.max(period-1,candles.length-5);i<candles.length;i++){var win=candles.slice(i-period+1,i+1),hi=Math.max.apply(null,win.map(function(x){return n(x.high)})),lo=Math.min.apply(null,win.map(function(x){return n(x.low)})),cl=n(candles[i].close);raw.push(hi===lo?50:(cl-lo)/(hi-lo)*100);}
 var slowKs=[];for(var j=0;j<raw.length;j++){var part=raw.slice(Math.max(0,j-kSmooth+1),j+1);slowKs.push(part.reduce(function(a,b){return a+b},0)/part.length);}
@@ -40,10 +51,10 @@ var vols=candles.slice(-21,-1).map(function(x){return n(x.volume)}).filter(funct
 var prior=candles.slice(-(isScalp?7:21),-1),sHigh=Math.max.apply(null,prior.map(function(x){return n(x.high)})),sLow=Math.min.apply(null,prior.map(function(x){return n(x.low)})),structureDir=close>sHigh?"BUY":close<sLow?"SELL":"WAIT";
 var sweepDir=high>sHigh&&close<sHigh?"SELL":low<sLow&&close>sLow?"BUY":"WAIT",twoBack=candles[candles.length-3],fvgDir=low>n(twoBack.high)?"BUY":high<n(twoBack.low)?"SELL":"WAIT";
 var structureVotes=[structureDir,sweepDir,fvgDir],structureBuys=structureVotes.filter(function(x){return x==="BUY"}).length,structureSells=structureVotes.filter(function(x){return x==="SELL"}).length,structureDirFinal=structureBuys>=2?"BUY":structureSells>=2?"SELL":"WAIT";
-var pattern=patternScan(candles,cs);
-var groups=[{name:"Trend",dir:trendDir,detail:"EMA20/50 + "+(isScalp?"MACD(6,13)":"MACD(12,26)")},{name:"Momentum",dir:momentumDir,detail:"RSI("+rsiPeriod+")"+(isScalp?" + Stochastic(5,3,3)":"")},{name:"Volatility",dir:bbDir,detail:"Bollinger Bands("+bbPeriod+",2) · ATR "+(atrOk?"active":"too quiet")},{name:"Volume",dir:volumeDir,detail:avg>0&&v!==null?(v/avg).toFixed(2)+"x average volume":"volume unavailable"},{name:"Chart pattern",dir:pattern.direction,detail:pattern.name},{name:"Market structure",dir:structureDirFinal,detail:"BOS "+structureDir+" · sweep "+sweepDir+" · FVG "+fvgDir}];
+var pattern=patternScan(candles,cs),candle=candleScan(candles);
+var groups=[{name:"Trend",dir:trendDir,detail:"EMA20 "+e20.toFixed(5)+" / EMA50 "+e50.toFixed(5)+" · MACD "+macd.toFixed(5)+" · "+trendDir},{name:"Momentum",dir:momentumDir,detail:"RSI("+rsiPeriod+") "+rv.toFixed(1)+(isScalp?" · Stochastic K "+stoch.k.toFixed(1)+" / D "+stoch.d.toFixed(1):"")},{name:"Volatility",dir:bbDir,detail:"Bollinger Bands("+bbPeriod+",2) · ATR "+atr.toFixed(5)+" ("+(atrOk?"active":"too quiet")+")"},{name:"Volume",dir:volumeDir,detail:avg>0&&v!==null?(v/avg).toFixed(2)+"x average volume":"volume unavailable"},{name:"Chart pattern",dir:pattern.direction,detail:pattern.name},{name:"Candlestick",dir:candle.direction,detail:candle.name},{name:"Market structure",dir:structureDirFinal,detail:"BOS "+structureDir+" · sweep "+sweepDir+" · FVG "+fvgDir}];
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
-var maxScore=12,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
+var maxScore=14,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
 var threshold=profile==="scalp"?65:profile==="swing"?75:70,minGroups=isScalp?3:4;
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
@@ -61,7 +72,7 @@ var signal=dir==="WAIT"?"NO TRADE":(leadConfidence>=85&&source==="MAIN CONFLUENC
 var confidenceValue=source==="FAST MOMENTUM CHANNEL"?65:leadConfidence;
 var quality=confidenceValue>=85?"HIGH":confidenceValue>=70?"MEDIUM":"LOW";
 var buy=dir==="BUY";
-return {pair:pair,profile:profile,signal:signal,direction:dir,source:source,confidence:confidenceValue,quality:quality,threshold:threshold,entry:close,stopLoss:buy?close-atr*1.5:close+atr*1.5,takeProfit:buy?close+atr*2:close-atr*2,tp2:buy?close+atr*3.5:close-atr*3.5,atr:atr,atrPct:atrPct,atrOk:atrOk,rsi:Number(rv.toFixed(1)),stochasticK:Number(stoch.k.toFixed(1)),williamsR:wrNow===null?null:Number(wrNow.toFixed(1)),momentumTrigger:momentumTrigger,evidence:evidence,buyScore:score.BUY,sellScore:score.SELL,totalMethods:12,groups:groups,pattern:pattern.name,patternDirection:pattern.direction,patternConfirmed:pattern.confirmed,structure:structureDir,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,candleHigh:high,candleLow:low,candleTime:last.datetime||null,macd:macd,emaTrend:trendDir};}
+return {pair:pair,profile:profile,signal:signal,direction:dir,source:source,confidence:confidenceValue,quality:quality,threshold:threshold,entry:close,stopLoss:buy?close-atr*1.5:close+atr*1.5,takeProfit:buy?close+atr*2:close-atr*2,tp2:buy?close+atr*3.5:close-atr*3.5,atr:atr,atrPct:atrPct,atrOk:atrOk,rsi:Number(rv.toFixed(1)),stochasticK:Number(stoch.k.toFixed(1)),williamsR:wrNow===null?null:Number(wrNow.toFixed(1)),momentumTrigger:momentumTrigger,evidence:evidence,buyScore:score.BUY,sellScore:score.SELL,totalMethods:14,groups:groups,pattern:pattern.name,candlePattern:candle.name,candleDirection:candle.direction,emaFastValue:e20,emaSlowValue:e50,patternDirection:pattern.direction,patternConfirmed:pattern.confirmed,structure:structureDir,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,candleHigh:high,candleLow:low,candleTime:last.datetime||null,macd:macd,emaTrend:trendDir};}
 
 return {analyze:analyze,patternScan:patternScan};
 });
