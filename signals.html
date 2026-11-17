@@ -225,7 +225,8 @@
   }
   function candleNumber(c, key){return Number(c[key]);}
   function analyseAllMethods(candles, profile) {
-    var result = window.DagboConfluence.analyze(candles, '', profile, {enabledGroups:groupsForActiveProfile()});
+    var engineProfile = profile === 'scalping' ? 'scalp' : profile;
+    var result = window.DagboConfluence.analyze(candles, '', engineProfile, {enabledGroups:groupsForActiveProfile()});
     if (!result) return null;
     return {
       final: result.signal,
