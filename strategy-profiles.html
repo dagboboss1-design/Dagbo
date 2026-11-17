@@ -38,6 +38,7 @@
   var filters=document.getElementById('filters');filters.textContent='';p.filters.forEach(function(v){var li=document.createElement('li');li.textContent=v;filters.appendChild(li)});
   var styles=document.getElementById('allStyles');styles.textContent='';api.allStyles.forEach(function(x){var s=document.createElement('span');s.className='sp-chip';s.textContent=x[0]+' → '+x[1].split(' ').map(function(id){var q=api.getProfile(id);return q.name}).join(' / ');styles.appendChild(s)});
  }
+ try{localStorage.setItem('dagbo_active_trading_profile',active);}catch(e){}
  render();
 })();
 </script><script src="navigation.js" defer></script></body></html>
