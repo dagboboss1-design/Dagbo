@@ -194,13 +194,13 @@
       direction: result.signal.indexOf('BUY') >= 0 ? 'BUY' : result.signal.indexOf('SELL') >= 0 ? 'SELL' : 'WAIT',
       buyScore: result.buyScore, sellScore: result.sellScore, totalMethods: result.totalMethods,
       evidence: result.evidence, rsi: result.rsi, emaTrend: result.emaTrend, macd: result.macd,
-      candleName: 'Candlestick confirmation is secondary to grouped confluence',
+      candleName: result.candlePattern || 'No confirmed candlestick pattern',
       structure: result.structure, structureName: result.structure, sweep: result.sweep, fvg: result.fvg,
       bb: result.bb, volume: result.volume, pattern: result.pattern,
       patternDirection: result.patternDirection, patternConfirmed: result.patternConfirmed,
       confidence: result.confidence, quality: result.quality, source: result.source, threshold: result.threshold,
       momentumTrigger: result.momentumTrigger, atrOk: result.atrOk, candleTime: result.candleTime,
-      groups: result.groups
+      groups: result.groups, candlePattern: result.candlePattern, candleDirection: result.candleDirection, emaFastValue: result.emaFastValue, emaSlowValue: result.emaSlowValue
     };
   }
 
@@ -256,7 +256,7 @@
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
         lastCandleOpen:Number(lastC.open).toFixed(2),lastCandleClose:Number(lastC.close).toFixed(2),
         rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
-        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed,confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,momentumTrigger:analysis.momentumTrigger,atrOk:analysis.atrOk,candleTime:analysis.candleTime
+        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName,candleDirection:analysis.candleDirection,emaFastValue:analysis.emaFastValue,emaSlowValue:analysis.emaSlowValue,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed,confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,momentumTrigger:analysis.momentumTrigger,atrOk:analysis.atrOk,candleTime:analysis.candleTime
       };
     } catch(e) {
       console.error(e);
@@ -576,7 +576,7 @@
 
       // Visual Debug Box
       var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
-        '<b>Six-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
+        '<b>Seven-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
         'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
         'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
         '<br><b>Group score:</b> BUY '+s.buyScore+'/12 · SELL '+s.sellScore+'/12 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
