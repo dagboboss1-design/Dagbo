@@ -142,12 +142,12 @@
   function scannerProfileName(){return activeProfileConfig?activeProfileConfig.name:'Day Trading';}
   function groupsForActiveProfile(){
     var categoryMap={
-      'Trend':['Trend','Indicator setup'],'Trend following':['Trend','Indicator setup'],'Trend strength':['Trend','Indicator setup'],'Macro trend':['Trend','Indicator setup'],'Intermarket':['Trend','Indicator setup'],
-      'Momentum':['Momentum','Indicator setup'],'Trend pullback':['Trend','Momentum','Indicator setup'],'Intraday value':['Momentum','Volatility','Volume','Indicator setup'],'Value':['Momentum','Volatility','Indicator setup'],
-      'Retracement':['Trend','Momentum','Key levels'],'Trend flip':['Trend','Momentum','Key levels'],'Relative strength':['Trend','Momentum','Indicator setup'],'Carry':['Trend','Indicator setup'],
-      'Breakout':['Market structure','Volatility','Key levels'],'Session range':['Market structure','Key levels'],'Key levels':['Market structure','Key levels'],'Structure':['Market structure','Key levels'],
-      'Liquidity':['Market structure'],'SMC':['Market structure'],'Session':['Market structure','Key levels'],'Levels':['Market structure','Key levels'],
-      'Pattern':['Chart pattern','Candlestick'],'Candlestick':['Candlestick'],'Reversal':['Chart pattern','Candlestick','Market structure'],
+      'Trend':['Trend'],'Trend following':['Trend'],'Trend strength':['Trend'],'Macro trend':['Trend'],'Intermarket':['Trend'],
+      'Momentum':['Momentum'],'Trend pullback':['Trend','Momentum'],'Intraday value':['Momentum','Volatility','Volume'],'Value':['Momentum','Volatility'],
+      'Retracement':['Trend','Momentum','Market structure'],'Trend flip':['Trend','Momentum','Market structure'],'Relative strength':['Trend','Momentum'],'Carry':['Trend'],
+      'Breakout':['Market structure','Volatility'],'Session range':['Market structure'],'Key levels':['Market structure'],'Structure':['Market structure'],
+      'Liquidity':['Market structure'],'SMC':['Market structure'],'Session':['Market structure'],'Levels':['Market structure'],
+      'Pattern':['Chart pattern'],'Candlestick':['Chart pattern'],'Reversal':['Chart pattern','Market structure'],
       'Volatility':['Volatility'],'Price action':['Chart pattern','Market structure'],'Cross-market':['Trend','Momentum'],
       'Economic release':['Volatility'],'Central bank':['Volatility','Trend'],'Risk':[]
     };
