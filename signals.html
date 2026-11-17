@@ -30,7 +30,7 @@
   </div>
   
   <h1 class="dg-title">Signal Board</h1>
-  <p class="dg-subtitle">3 Systems. Confluence Engine.</p>
+  <p class="dg-subtitle">Profile-driven market analysis. Each trading style has its own timeframe and detector mix.</p>
 
   <a class="dg-row dg-row--link dg-card" href="strategy-profiles.html" style="margin-top:16px;border-radius:16px">
     <span class="dg-row__icon dg-row__icon--amber">◈</span>
@@ -493,7 +493,7 @@
 
       // Visual Debug Box
       var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
-        '<b>Six-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
+        '<b>'+escapeNewsText(scannerProfileName())+' · active detector groups</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
         'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
         'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
         '<br><b>Group score:</b> BUY '+s.buyScore+'/12 · SELL '+s.sellScore+'/12 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
