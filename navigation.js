@@ -4,7 +4,7 @@
     ['⌂','Home','index.html'],['↗','Signals','signals.html'],['⌁','Chart','chart.html'],
     ['▤','Market News','news.html'],['◈','BOSS1','boss1.html'],['✳','AI Commander','ai.html'],
     ['▧','Journal','journal.html'],['◎','Trader Score','trader-score.html'],
-    ['⌘','Strategy Lab','strategy-lab.html'],['▣','Learn with Examples','learn.html'],['◉','Opportunity Intelligence','signal-insights.html'],
+    ['⌘','Strategy Lab','strategy-lab.html'],['◈','Trading Profiles','strategy-profiles.html'],['▣','Learn with Examples','learn.html'],['◉','Opportunity Intelligence','signal-insights.html'],
     ['⚙','Settings','settings.html']
   ];
   var style=document.createElement('style');
