@@ -247,6 +247,7 @@
   async function fetchPairData(pair, tf) {
     if (activeTradingProfile === 'scalping' && tf === '5' && !isScalpSessionNow()) return {pair:pair,final:'SESSION FILTER',sessionFiltered:true,buyScore:0,sellScore:0,strategy:'Scalping is restricted to 9:00 AM–6:00 PM Nigeria time (WAT).'};
     if (!marketSessionOpen(pair)) return {pair:pair,final:'MARKET CLOSED',marketClosed:true,buyScore:0,sellScore:0,strategy:'Market session is closed. Historical candles are not an executable signal.'};
+    if (!groupsForActiveProfile().length) return {pair:pair,final:'NO ACTIVE STRATEGIES',noMethods:true,buyScore:0,sellScore:0,strategy:'Enable at least one detector group in this trading profile.'};
     let url = `/api/market-data?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}`;
     
     try {
@@ -486,6 +487,7 @@
       }
 
       if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
+      if (s.noMethods) { listHtml += '<section class="dg-card"><strong>'+escapeNewsText(s.pair)+' · NO ACTIVE STRATEGIES</strong><div class="dg-muted" style="margin-top:6px">Enable at least one strategy in the selected Trading Profile to run this scan.</div></section>'; return; }
       if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
       var isBuy = s.final.includes('BUY');
       var isSell = s.final.includes('SELL');
@@ -502,7 +504,7 @@
         '<b>'+escapeNewsText(scannerProfileName())+' · active detector groups</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
         'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
         'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
-        '<br><b>Group score:</b> BUY '+s.buyScore+'/12 · SELL '+s.sellScore+'/12 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
+        '<br><b>Group score:</b> BUY '+s.buyScore+'/'+(s.totalMethods||12)+' · SELL '+s.sellScore+'/'+(s.totalMethods||12)+' · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
       
       var quota = getDailyRiskQuota();
       var quotaNotice = quota.exhausted ? '<div class="dg-pill dg-pill--sell" style="margin:0 0 9px;display:inline-flex">RISK QUOTA EXHAUSTED · SIGNAL ONLY</div>' : '';
