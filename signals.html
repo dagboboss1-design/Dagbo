@@ -111,14 +111,14 @@
   var enabledPairs = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : ['XAUUSD', 'EURUSD', 'GBPUSD', 'US30', 'BTCUSD'];
   
   var PAIR_TYPES = {
-    XAUUSD: 'GOLD', GOLD: 'GOLD',
+    XAUUSD: 'GOLD', GOLD: 'GOLD', XAGUSD: 'GOLD', SILVER: 'GOLD',
     EURUSD: 'FX', GBPUSD: 'FX', USDJPY: 'FX', GBPJPY: 'FX', AUDUSD: 'FX', USDCHF: 'FX', USDCAD: 'FX', NZDUSD: 'FX', EURJPY: 'FX', EURGBP: 'FX',
     US30: 'INDEX', US100: 'INDEX', NAS100: 'INDEX', US500: 'INDEX',
     BTCUSD: 'CRYPTO', BTCUSDT: 'CRYPTO', BTC: 'CRYPTO', ETHUSD: 'CRYPTO', ETHUSDT: 'CRYPTO', ETH: 'CRYPTO'
   };
 
   var API_SYMBOLS = {
-    XAUUSD: 'XAU/USD', GOLD: 'XAU/USD',
+    XAUUSD: 'XAU/USD', GOLD: 'XAU/USD', XAGUSD: 'XAG/USD', SILVER: 'XAG/USD',
     EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', GBPJPY: 'GBP/JPY',
     AUDUSD: 'AUD/USD', USDCHF: 'USD/CHF', USDCAD: 'USD/CAD', NZDUSD: 'NZD/USD', EURJPY: 'EUR/JPY', EURGBP: 'EUR/GBP',
     US30: 'DJI', US100: 'NDX', NAS100: 'NDX', US500: 'SPX',
@@ -225,7 +225,7 @@
   }
   function candleNumber(c, key){return Number(c[key]);}
   function analyseAllMethods(candles, profile) {
-    var engineProfile = profile === 'scalping' ? 'scalp' : profile;
+    var engineProfile = profile === 'scalping' ? 'scalp' : (profile === 'h4' ? 'swing' : profile);
     var result = window.DagboConfluence.analyze(candles, '', engineProfile, {enabledGroups:groupsForActiveProfile()});
     if (!result) return null;
     return {
