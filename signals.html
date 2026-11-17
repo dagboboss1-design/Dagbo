@@ -142,12 +142,12 @@
   function scannerProfileName(){return activeProfileConfig?activeProfileConfig.name:'Day Trading';}
   function groupsForActiveProfile(){
     var categoryMap={
-      'Trend':['Trend'],'Trend following':['Trend'],'Trend strength':['Trend'],'Macro trend':['Trend'],'Intermarket':['Trend'],
-      'Momentum':['Momentum'],'Trend pullback':['Trend','Momentum'],'Intraday value':['Momentum','Volatility','Volume'],'Value':['Momentum','Volatility'],
-      'Retracement':['Trend','Momentum'],'Trend flip':['Trend','Momentum'],'Relative strength':['Trend','Momentum'],'Carry':['Trend'],
-      'Breakout':['Market structure','Volatility'],'Session range':['Market structure'],'Key levels':['Market structure'],'Structure':['Market structure'],
-      'Liquidity':['Market structure'],'SMC':['Market structure'],'Session':['Market structure'],'Levels':['Market structure'],
-      'Pattern':['Chart pattern'],'Candlestick':['Chart pattern'],'Reversal':['Chart pattern','Market structure'],
+      'Trend':['Trend','Indicator setup'],'Trend following':['Trend','Indicator setup'],'Trend strength':['Trend','Indicator setup'],'Macro trend':['Trend','Indicator setup'],'Intermarket':['Trend','Indicator setup'],
+      'Momentum':['Momentum','Indicator setup'],'Trend pullback':['Trend','Momentum','Indicator setup'],'Intraday value':['Momentum','Volatility','Volume','Indicator setup'],'Value':['Momentum','Volatility','Indicator setup'],
+      'Retracement':['Trend','Momentum','Key levels'],'Trend flip':['Trend','Momentum','Key levels'],'Relative strength':['Trend','Momentum','Indicator setup'],'Carry':['Trend','Indicator setup'],
+      'Breakout':['Market structure','Volatility','Key levels'],'Session range':['Market structure','Key levels'],'Key levels':['Market structure','Key levels'],'Structure':['Market structure','Key levels'],
+      'Liquidity':['Market structure'],'SMC':['Market structure'],'Session':['Market structure','Key levels'],'Levels':['Market structure','Key levels'],
+      'Pattern':['Chart pattern','Candlestick'],'Candlestick':['Candlestick'],'Reversal':['Chart pattern','Candlestick','Market structure'],
       'Volatility':['Volatility'],'Price action':['Chart pattern','Market structure'],'Cross-market':['Trend','Momentum'],
       'Economic release':['Volatility'],'Central bank':['Volatility','Trend'],'Risk':[]
     };
@@ -233,13 +233,13 @@
       direction: result.signal.indexOf('BUY') >= 0 ? 'BUY' : result.signal.indexOf('SELL') >= 0 ? 'SELL' : 'WAIT',
       buyScore: result.buyScore, sellScore: result.sellScore, totalMethods: result.totalMethods,
       evidence: result.evidence, rsi: result.rsi, emaTrend: result.emaTrend, macd: result.macd,
-      candleName: 'Candlestick confirmation is secondary to grouped confluence',
+      candleName: result.candlePattern || 'No confirmed candle pattern',
       structure: result.structure, structureName: result.structure, sweep: result.sweep, fvg: result.fvg,
       bb: result.bb, volume: result.volume, pattern: result.pattern,
       patternDirection: result.patternDirection, patternConfirmed: result.patternConfirmed,
       confidence: result.confidence, quality: result.quality, source: result.source, threshold: result.threshold,
       momentumTrigger: result.momentumTrigger, atrOk: result.atrOk, candleTime: result.candleTime,
-      groups: result.groups
+      groups: result.groups, candlePattern: result.candlePattern, candleDirection: result.candleDirection, indicatorCombo: result.indicatorCombo, keyLevel: result.keyLevel
     };
   }
 
@@ -296,7 +296,7 @@
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
         lastCandleOpen:Number(lastC.open).toFixed(2),lastCandleClose:Number(lastC.close).toFixed(2),
         rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
-        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed,confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,momentumTrigger:analysis.momentumTrigger,atrOk:analysis.atrOk,candleTime:analysis.candleTime
+        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candlePattern||analysis.candleName,candleDirection:analysis.candleDirection,indicatorCombo:analysis.indicatorCombo,keyLevel:analysis.keyLevel,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed,confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,momentumTrigger:analysis.momentumTrigger,atrOk:analysis.atrOk,candleTime:analysis.candleTime
       };
     } catch(e) {
       console.error(e);
