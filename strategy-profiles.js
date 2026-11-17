@@ -83,6 +83,19 @@
       ]
     },
     {
+      id:'hedging', name:'Hedging', tag:'Basket · correlation and exposure management', timeframes:['1h'], primary:'1h', primaryTf:'60',
+      basketMode:true, sessions:['Multi-session'], nigeriaWindow:'Continuous monitoring · WAT display',
+      objective:'Separate basket-level hedge intelligence. Evaluate correlated instruments and combined currency exposure; never treat a single-pair directional setup as a hedge.',
+      filters:['Require synchronized, timestamped prices for both legs','Measure rolling correlation and currency exposure','Check both legs and combined basket risk before alerting','Do not call positively correlated same-direction exposure a hedge','Hedge alerts are informational; they do not guarantee risk reduction'],
+      indicators:['Rolling return correlation','Currency exposure by leg','Relative strength and direction','DXY / higher-timeframe context','Combined basket risk'],
+      priority:[
+        ['Cross-market','Pair correlation and relative strength','Only compare synchronized market data'],
+        ['Intermarket','DXY and higher-timeframe context','Use verified daily and 4H direction'],
+        ['Structure','Entry and invalidation on both legs','Both legs need independently defined risk'],
+        ['Risk','Combined exposure and hedge effectiveness','Flag when both legs increase the same currency exposure']
+      ]
+    },
+    {
       id:'position', name:'Position Trading', tag:'1d–1w · weeks to months', timeframes:['1d','1w'], primary:'1d', primaryTf:'1day',
       sessions:['Macro cycle'], nigeriaWindow:'No intraday session gate',
       objective:'Follow major macro and structural trends. Prioritize fundamental regime, broad levels and portfolio risk over frequent entries.',
