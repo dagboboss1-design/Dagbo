@@ -338,12 +338,17 @@
     monitor.textContent = '';
     var snapshots = {};
     try { snapshots = JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots')) || {}; } catch(e) {}
-    var otherTF = currentSignalTF === '5' ? '15' : currentSignalTF === '15' ? '5' : (activeProfileConfig && activeProfileConfig.timeframes.length>1 ? ({'30m':'30','1h':'60','4h':'240','1d':'1day','1w':'1week'}[activeProfileConfig.timeframes[1]]||'15') : '15');
+    var tfMap={'5m':'5','15m':'15','30m':'30','1h':'60','4h':'240','1d':'1day','1w':'1week','5':'5'};
+    var profileTimeframes=(activeProfileConfig&&activeProfileConfig.timeframes||[]).map(function(x){return tfMap[x]||x;});
+    var otherTF=profileTimeframes.filter(function(x){return String(x)!==String(currentSignalTF);})[0]||null;
     var current = snapshots[currentSignalTF] || {};
-    var other = snapshots[otherTF] || {};
+    var other = otherTF ? (snapshots[otherTF] || {}) : {};
     var pairs = Array.from(new Set(Object.keys(current).concat(Object.keys(other))));
+    if (!otherTF) {
+      var singleNote=document.createElement('p');singleNote.className='dg-muted';singleNote.textContent='This profile has one configured timeframe, so there is no second timeframe to compare.';monitor.appendChild(singleNote);return;
+    }
     if (!pairs.length) {
-      var note=document.createElement('p'); note.className='dg-muted'; note.textContent='No saved comparison for this profile yet. Run another timeframe in this profile to compare independent signals.'; monitor.appendChild(note); return;
+      var note=document.createElement('p'); note.className='dg-muted'; note.textContent='No saved comparison for this profile yet. Refresh another timeframe in this profile to compare independent signals.'; monitor.appendChild(note); return;
     }
     pairs.forEach(function(pair) {
       var a=directionOf(current[pair]), b=directionOf(other[pair]);
