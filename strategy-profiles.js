@@ -66,6 +66,23 @@
       ]
     },
     {
+      id:'h4', name:'H4', tag:'4h · dedicated higher-timeframe setups', timeframes:['4h'], primary:'4h', primaryTf:'240',
+      sessions:['Multi-session'], nigeriaWindow:'No intraday session gate',
+      objective:'Run an independent 4-hour technical setup scan. This profile is separate from multi-timeframe H4 intelligence and Hedging basket alerts.',
+      filters:['Use only fully closed 4H candles','Require trend, momentum and structure agreement','Use ATR-based invalidation and targets','No scalping session restriction'],
+      indicators:['EMA 20 / 50','RSI (14)','MACD (12,26,9)','ADX (14)','ATR (14)','Bollinger Bands','Swing highs/lows'],
+      priority:[
+        ['Trend','H4 EMA + MACD + RSI','4-hour trend direction and momentum confirmation'],
+        ['Trend strength','EMA + MACD + ADX','Filter weak and directionless conditions'],
+        ['Structure','BOS / CHoCH / MSS','Confirmed 4H swing break'],
+        ['Liquidity','Equal Highs/Lows Sweep','Sweep and close back through a confirmed level'],
+        ['SMC','H4 Order Block + FVG','Require displacement and measurable invalidation'],
+        ['Pattern','Head & Shoulders / Double Top-Bottom','Wait for neckline confirmation'],
+        ['Candlestick','Engulfing / Pin Bar','Only at a mapped 4H level'],
+        ['Risk','ATR + structure stop','Set risk from the 4H invalidation distance']
+      ]
+    },
+    {
       id:'position', name:'Position Trading', tag:'1d–1w · weeks to months', timeframes:['1d','1w'], primary:'1d', primaryTf:'1day',
       sessions:['Macro cycle'], nigeriaWindow:'No intraday session gate',
       objective:'Follow major macro and structural trends. Prioritize fundamental regime, broad levels and portfolio risk over frequent entries.',
