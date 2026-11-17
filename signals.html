@@ -328,7 +328,7 @@
       row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--dg-line)';
       var left = document.createElement('div');
       var name = document.createElement('strong'); name.textContent=(index+1)+'. '+item.pair;
-      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/12 confluence points · '+(scannerProfileName()+' scan');
+      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/'+(Number(signalsData[item.pair]&&signalsData[item.pair].totalMethods)||12)+' confluence points · '+(scannerProfileName()+' scan');
       left.appendChild(name); left.appendChild(detail);
       var pill = document.createElement('span'); pill.className='dg-pill '+(item.direction==='BUY'?'dg-pill--buy':'dg-pill--sell'); pill.textContent=item.signal;
       row.appendChild(left); row.appendChild(pill); best.appendChild(row);
@@ -337,19 +337,19 @@
     monitor.textContent = '';
     var snapshots = {};
     try { snapshots = JSON.parse(localStorage.getItem('dagbo_signal_tf_snapshots')) || {}; } catch(e) {}
-    var otherTF = currentSignalTF === '5' ? '15' : '5';
+    var otherTF = currentSignalTF === '5' ? '15' : currentSignalTF === '15' ? '5' : (activeProfileConfig && activeProfileConfig.timeframes.length>1 ? ({'30m':'30','1h':'60','4h':'240','1d':'1day','1w':'1week'}[activeProfileConfig.timeframes[1]]||'15') : '15');
     var current = snapshots[currentSignalTF] || {};
     var other = snapshots[otherTF] || {};
     var pairs = Array.from(new Set(Object.keys(current).concat(Object.keys(other))));
     if (!pairs.length) {
-      var note=document.createElement('p'); note.className='dg-muted'; note.textContent='No saved timeframe comparison yet. Refresh both 5m and 15m scans.'; monitor.appendChild(note); return;
+      var note=document.createElement('p'); note.className='dg-muted'; note.textContent='No saved comparison for this profile yet. Run another timeframe in this profile to compare independent signals.'; monitor.appendChild(note); return;
     }
     pairs.forEach(function(pair) {
       var a=directionOf(current[pair]), b=directionOf(other[pair]);
       var line=document.createElement('div'); line.style.cssText='display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--dg-line)';
       var label=document.createElement('strong'); label.textContent=pair;
       var value=document.createElement('span'); value.className='dg-muted'; value.style.fontSize='13px';
-      value.textContent='5m: '+(snapshots['5']&&snapshots['5'][pair]||'—')+' · 15m: '+(snapshots['15']&&snapshots['15'][pair]||'—')+' · '+(a===b&&a!=='WAIT'?'Aligned':a==='WAIT'||b==='WAIT'?'Incomplete':'Conflict');
+      value.textContent=timeframeLabel(currentSignalTF)+': '+(snapshots[currentSignalTF]&&snapshots[currentSignalTF][pair]||'—')+' · '+timeframeLabel(otherTF)+': '+(snapshots[otherTF]&&snapshots[otherTF][pair]||'—')+' · '+(a===b&&a!=='WAIT'?'Aligned':a==='WAIT'||b==='WAIT'?'Incomplete':'Conflict');
       line.appendChild(label); line.appendChild(value); monitor.appendChild(line);
     });
   }
@@ -382,7 +382,7 @@
     var previous = snapshots[currentSignalTF] || {};
     Object.keys(signalsData).forEach(function(pair) {
       var next = signalsData[pair].final;
-      if(currentSignalTF==='5' && directionOf(next)!=='WAIT' && !signalsData[pair].sessionFiltered){
+      if(activeTradingProfile==='scalping' && currentSignalTF==='5' && directionOf(next)!=='WAIT' && !signalsData[pair].sessionFiltered){
         var daily={};try{daily=JSON.parse(localStorage.getItem('dagbo_scalp_signal_count'))||{};}catch(e){}
         if(daily.date!==localDateKey())daily={date:localDateKey(),items:[]};
         var stamp=String(signalsData[pair].candleTime||'')||String(Date.now());
@@ -657,7 +657,7 @@
       lotSize:Number(settings.lotSize)||0.01,
       riskAmount:(Number(settings.accountSize)||100)*(Number(settings.risk)||1)/100,
       strategy:strategy||'3-System Confluence',
-      timeframe:currentSignalTF+'m',
+      timeframe:timeframeLabel(currentSignalTF),
       result:'OPEN',
       status:'OPEN',
       pnl:0,
@@ -718,13 +718,14 @@
   window.changeSignalTF = function(tf) {
     currentSignalTF = String(tf);
     renderProfileControls();
+    updateScalpStats();
     loadAllSignals();
   };
 
   // --- INITIALIZE ---
   async function loadAllSignals() {
     var loading = document.getElementById('loadingText');
-    if (loading) loading.innerText = "Downloading live candles...";
+    if (loading) loading.innerText = 'Scanning '+scannerProfileName()+' ('+timeframeLabel(currentSignalTF)+') live candles...';
     
     signalsData = {};
     await loadNewsSignalContext();
