@@ -17,7 +17,17 @@ module.exports = async function handler(req, res) {
   const rawPair = String(req.query && req.query.pair || "").toUpperCase().trim();
   const pair = rawPair.replace(/[^A-Z0-9]/g, "");
   const tf = String(req.query && req.query.tf || "15");
-  if (tf !== "5" && tf !== "15") return res.status(400).json({ error: "Timeframe must be 5 or 15 minutes" });
+  const intervals = {
+    "5": { twelve: "5min", binance: "5m", ms: 5 * 60 * 1000 },
+    "15": { twelve: "15min", binance: "15m", ms: 15 * 60 * 1000 },
+    "30": { twelve: "30min", binance: "30m", ms: 30 * 60 * 1000 },
+    "60": { twelve: "1h", binance: "1h", ms: 60 * 60 * 1000 },
+    "240": { twelve: "4h", binance: "4h", ms: 4 * 60 * 60 * 1000 },
+    "1day": { twelve: "1day", binance: "1d", ms: 24 * 60 * 60 * 1000 },
+    "1week": { twelve: "1week", binance: "1w", ms: 7 * 24 * 60 * 60 * 1000 }
+  };
+  const interval = intervals[tf];
+  if (!interval) return res.status(400).json({ error: "Unsupported timeframe. Use 5, 15, 30, 60, 240, 1day or 1week." });
 
   // Crypto is served directly from Binance's free, unauthenticated public market-data API.
   // This keeps BTC/ETH requests completely outside the Twelve Data credit quota.
@@ -65,7 +75,7 @@ module.exports = async function handler(req, res) {
   try {
     const url = "https://api.twelvedata.com/time_series?symbol=" +
       encodeURIComponent(symbol) +
-      "&interval=" + tf + "min&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+      "&interval=" + interval.twelve + "&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
     const response = await fetch(url);
     const data = await response.json();
 
