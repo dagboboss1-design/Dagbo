@@ -245,6 +245,9 @@
 
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
+    // Hedging is basket-level intelligence, not a single-pair BUY/SELL strategy.
+    // Its independent correlation/exposure alerts are produced by api/cron-scan.js.
+    if (activeTradingProfile === 'hedging') return {pair:pair,hedgingMode:true};
     if (activeTradingProfile === 'scalping' && tf === '5' && !isScalpSessionNow()) return {pair:pair,final:'SESSION FILTER',sessionFiltered:true,buyScore:0,sellScore:0,strategy:'Scalping is restricted to 9:00 AM–6:00 PM Nigeria time (WAT).'};
     if (!marketSessionOpen(pair)) return {pair:pair,final:'MARKET CLOSED',marketClosed:true,buyScore:0,sellScore:0,strategy:'Market session is closed. Historical candles are not an executable signal.'};
     if (!groupsForActiveProfile().length) return {pair:pair,final:'NO ACTIVE STRATEGIES',noMethods:true,buyScore:0,sellScore:0,strategy:'Enable at least one detector group in this trading profile.'};
@@ -481,6 +484,7 @@
       
       var s = signalsData[pair];
       if (!s) return;
+      if (s.hedgingMode) { listHtml += '<section class="dg-card"><strong>'+escapeNewsText(s.pair)+' · BASKET HEDGE MONITOR</strong><div class="dg-muted" style="margin-top:6px">Hedging is evaluated separately across correlated pairs and combined currency exposure. This screen will not invent a single-pair BUY/SELL signal. Independent Smart Pair Hedge alerts are delivered by the scheduled hedge engine.</div></section>'; return; }
       if (s.error) {
         listHtml += '<section class="dg-card" style="border:1px solid #b7791f"><strong>' + escapeNewsText(s.pair) + ' · DATA ERROR</strong><div class="dg-muted" style="margin-top:6px">' + escapeNewsText(s.error) + '</div></section>';
         return;
