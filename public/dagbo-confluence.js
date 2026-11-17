@@ -24,8 +24,8 @@ var slowKs=[];for(var j=0;j<raw.length;j++){var part=raw.slice(Math.max(0,j-kSmo
 var k=slowKs[slowKs.length-1],tail=slowKs.slice(-3),d=tail.reduce(function(a,b){return a+b},0)/tail.length;return {k:k,d:d};
 }
 function analyze(candles,pair,profile){
-profile=profile==="scalp"?"scalp":profile==="swing"?"swing":"intraday";
-var isScalp=profile==="scalp",rsiPeriod=isScalp?7:14,emaFast=isScalp?20:20,emaSlow=isScalp?50:50;
+profile=["scalp","day","intraday","swing","position","event"].indexOf(profile)>=0?profile:"intraday";
+var isScalp=profile==="scalp",isPosition=profile==="position",rsiPeriod=isScalp?7:14,emaFast=isPosition?50:20,emaSlow=isPosition?100:50;
 if(!Array.isArray(candles)||candles.length<(isScalp?30:60))return null;
 var cs=candles.map(function(x){return n(x.close)}),hs=candles.map(function(x){return n(x.high)}),ls=candles.map(function(x){return n(x.low)});
 if(cs.some(function(x){return x===null})||hs.some(function(x){return x===null})||ls.some(function(x){return x===null}))return null;
@@ -41,10 +41,10 @@ var prior=candles.slice(-(isScalp?7:21),-1),sHigh=Math.max.apply(null,prior.map(
 var sweepDir=high>sHigh&&close<sHigh?"SELL":low<sLow&&close>sLow?"BUY":"WAIT",twoBack=candles[candles.length-3],fvgDir=low>n(twoBack.high)?"BUY":high<n(twoBack.low)?"SELL":"WAIT";
 var structureVotes=[structureDir,sweepDir,fvgDir],structureBuys=structureVotes.filter(function(x){return x==="BUY"}).length,structureSells=structureVotes.filter(function(x){return x==="SELL"}).length,structureDirFinal=structureBuys>=2?"BUY":structureSells>=2?"SELL":"WAIT";
 var pattern=patternScan(candles,cs);
-var groups=[{name:"Trend",dir:trendDir,detail:"EMA20/50 + "+(isScalp?"MACD(6,13)":"MACD(12,26)")},{name:"Momentum",dir:momentumDir,detail:"RSI("+rsiPeriod+")"+(isScalp?" + Stochastic(5,3,3)":"")},{name:"Volatility",dir:bbDir,detail:"Bollinger Bands("+bbPeriod+",2) · ATR "+(atrOk?"active":"too quiet")},{name:"Volume",dir:volumeDir,detail:avg>0&&v!==null?(v/avg).toFixed(2)+"x average volume":"volume unavailable"},{name:"Chart pattern",dir:pattern.direction,detail:pattern.name},{name:"Market structure",dir:structureDirFinal,detail:"BOS "+structureDir+" · sweep "+sweepDir+" · FVG "+fvgDir}];
+var groups=[{name:"Trend",dir:trendDir,detail:"EMA"+emaFast+"/"+emaSlow+" + "+(isScalp?"MACD(6,13)":"MACD(12,26)")},{name:"Momentum",dir:momentumDir,detail:"RSI("+rsiPeriod+")"+(isScalp?" + Stochastic(5,3,3)":"")},{name:"Volatility",dir:bbDir,detail:"Bollinger Bands("+bbPeriod+",2) · ATR "+(atrOk?"active":"too quiet")},{name:"Volume",dir:volumeDir,detail:avg>0&&v!==null?(v/avg).toFixed(2)+"x average volume":"volume unavailable"},{name:"Chart pattern",dir:pattern.direction,detail:pattern.name},{name:"Market structure",dir:structureDirFinal,detail:"BOS "+structureDir+" · sweep "+sweepDir+" · FVG "+fvgDir}];
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=12,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
-var threshold=profile==="scalp"?65:profile==="swing"?75:70,minGroups=isScalp?3:4;
+var threshold=profile==="scalp"?65:(profile==="swing"||profile==="position")?75:70,minGroups=isScalp?3:4;
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
 var dir=atrOk&&lead!=="WAIT"&&leadConfidence>=threshold&&leadGroups>=minGroups?lead:"WAIT";
