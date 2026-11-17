@@ -576,10 +576,10 @@
 
       // Visual Debug Box
       var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
-        '<b>Seven-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
+        '<b>Seven-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+' · Candlestick: '+(s.candlePattern||'None confirmed')+'<br>' +
         'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
         'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
-        '<br><b>Group score:</b> BUY '+s.buyScore+'/12 · SELL '+s.sellScore+'/12 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
+        '<br><b>Group score:</b> BUY '+s.buyScore+'/14 · SELL '+s.sellScore+'/14 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
       
       var quota = getDailyRiskQuota();
       var quotaNotice = quota.exhausted ? '<div class="dg-pill dg-pill--sell" style="margin:0 0 9px;display:inline-flex">RISK QUOTA EXHAUSTED · SIGNAL ONLY</div>' : '';
