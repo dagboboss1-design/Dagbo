@@ -56,14 +56,11 @@
     <p class="dg-help" style="margin-top:8px">Each result names the evidence that actually contributed. A method is marked unavailable when its required data is not present.</p>
   </section>
 
-  <!-- TIMEFRAME TOGGLE -->
-  <div class="dg-seg" role="radiogroup" style="margin-bottom:16px">
-    <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_15" value="15" checked onchange="changeSignalTF('15')">
-    <label class="dg-seg__lb" for="tf_15">15m (Intraday)</label>
-    
-    <input class="dg-seg__in" type="radio" name="signal_tf" id="tf_5" value="5" onchange="changeSignalTF('5')">
-    <label class="dg-seg__lb" for="tf_5">5m (Scalping)</label>
-  </div>
+  <!-- PROFILE-DRIVEN SCANNER -->
+  <div style="margin:8px 0 7px;font-size:12px;font-weight:800;color:var(--dg-text-2)">TRADING STYLE</div>
+  <div class="dg-chips" id="tradingProfileChips" aria-label="Choose trading style" style="margin-bottom:10px"></div>
+  <div style="margin:8px 0 7px;font-size:12px;font-weight:800;color:var(--dg-text-2)">PROFILE TIMEFRAME</div>
+  <div class="dg-seg" id="profileTimeframes" role="radiogroup" style="margin-bottom:16px"></div>
   <section class="dg-card" id="scalpStats" style="margin:-4px 0 16px;padding:13px;display:none">
     <div style="font-weight:800;font-size:14px">5m SCALP PROFILE · LOWER THRESHOLD</div>
     <div id="scalpStatsText" class="dg-muted" style="font-size:12px;line-height:1.6;margin-top:6px">Loading today's signal and risk figures…</div>
@@ -103,6 +100,7 @@
 
 
 <script src="pwa.js" defer></script>
+<script src="strategy-profiles.js"></script>
 <script src="dagbo-confluence.js"></script>
 <script>
 (function(){
@@ -129,8 +127,59 @@
 
   var currentFilter = 'ALL';
   var signalsData = {};
-  var currentSignalTF = '15';
+  var profileApi = window.DagboStrategyProfiles;
+  var profileIds = profileApi ? profileApi.getProfiles().map(function(p){return p.id;}) : ['scalping','day','swing','position','event'];
+  var activeTradingProfile = 'day';
+  try { var savedProfile=localStorage.getItem('dagbo_active_trading_profile'); if(profileIds.indexOf(savedProfile)>=0) activeTradingProfile=savedProfile; } catch(e) {}
+  var activeProfileConfig = profileApi ? profileApi.getProfile(activeTradingProfile) : null;
+  var currentSignalTF = activeProfileConfig && activeProfileConfig.primaryTf || '15';
   var latestNewsCandidate = null;
+  var profilePreferenceStore = {};
+  try { profilePreferenceStore=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}; } catch(e) {}
+  var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
+  var TF_MILLISECONDS={'5':300000,'15':900000,'30':1800000,'60':3600000,'240':14400000,'1day':86400000,'1week':604800000};
+  function timeframeLabel(tf){return TF_LABELS[String(tf)]||String(tf);}
+  function scannerProfileName(){return activeProfileConfig?activeProfileConfig.name:'Day Trading';}
+  function groupsForActiveProfile(){
+    var categoryMap={
+      'Trend':['Trend'],'Trend following':['Trend'],'Trend strength':['Trend'],'Macro trend':['Trend'],'Intermarket':['Trend'],
+      'Momentum':['Momentum'],'Trend pullback':['Trend','Momentum'],'Intraday value':['Momentum','Volatility','Volume'],'Value':['Momentum','Volatility'],
+      'Retracement':['Trend','Momentum'],'Trend flip':['Trend','Momentum'],'Relative strength':['Trend','Momentum'],'Carry':['Trend'],
+      'Breakout':['Market structure','Volatility'],'Session range':['Market structure'],'Key levels':['Market structure'],'Structure':['Market structure'],
+      'Liquidity':['Market structure'],'SMC':['Market structure'],'Session':['Market structure'],'Levels':['Market structure'],
+      'Pattern':['Chart pattern'],'Candlestick':['Chart pattern'],'Reversal':['Chart pattern','Market structure'],
+      'Volatility':['Volatility'],'Price action':['Chart pattern','Market structure'],'Cross-market':['Trend','Momentum'],
+      'Economic release':['Volatility'],'Central bank':['Volatility','Trend'],'Risk':[]
+    };
+    var profile=activeProfileConfig,disabled=profilePreferenceStore.disabled||{},groups={};
+    if(!profile)return ['Trend','Momentum','Volatility','Volume','Chart pattern','Market structure'];
+    profile.priority.forEach(function(item){
+      var key=profile.id+'::'+item[1];if(disabled[key])return;
+      (categoryMap[item[0]]||[]).forEach(function(g){groups[g]=true;});
+    });
+    return Object.keys(groups);
+  }
+  function renderProfileControls(){
+    var tabs=document.getElementById('tradingProfileChips'),timeframes=document.getElementById('profileTimeframes');
+    if(!tabs||!timeframes||!profileApi)return;
+    tabs.textContent='';timeframes.textContent='';
+    profileApi.getProfiles().forEach(function(p){
+      var b=document.createElement('button');b.type='button';b.className='dg-chip'+(p.id===activeTradingProfile?' is-active':'');b.textContent=p.name;
+      b.addEventListener('click',function(){
+        activeTradingProfile=p.id;activeProfileConfig=p;currentSignalTF=p.primaryTf||'15';
+        try{localStorage.setItem('dagbo_active_trading_profile',p.id);}catch(e){}
+        renderProfileControls();updateScalpStats();loadAllSignals();
+      });tabs.appendChild(b);
+    });
+    (activeProfileConfig.timeframes||[activeProfileConfig.primary]).forEach(function(label){
+      var map={'5m':'5','15m':'15','30m':'30','1h':'60','4h':'240','1d':'1day','1w':'1week'};
+      var tf=map[label]||activeProfileConfig.primaryTf;
+      var input=document.createElement('input');input.type='radio';input.className='dg-seg__in';input.name='signal_tf';input.id='profile_tf_'+tf;input.value=tf;input.checked=String(tf)===String(currentSignalTF);
+      input.addEventListener('change',function(){changeSignalTF(tf);});
+      var lb=document.createElement('label');lb.className='dg-seg__lb';lb.htmlFor=input.id;lb.textContent=timeframeLabel(tf);
+      timeframes.appendChild(input);timeframes.appendChild(lb);
+    });
+  }
 
   // Nigeria scalping window: 09:00–18:00 Africa/Lagos local time.
   function isScalpSessionNow() { var parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Africa/Lagos",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()); var v={}; parts.forEach(function(x){v[x.type]=x.value;}); var m=Number(v.hour)*60+Number(v.minute); return m>=540&&m<1080; }
@@ -176,7 +225,7 @@
   }
   function candleNumber(c, key){return Number(c[key]);}
   function analyseAllMethods(candles, profile) {
-    var result = window.DagboConfluence.analyze(candles, '', profile);
+    var result = window.DagboConfluence.analyze(candles, '', profile, {enabledGroups:groupsForActiveProfile()});
     if (!result) return null;
     return {
       final: result.signal,
@@ -195,7 +244,7 @@
 
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
-    if (tf === '5' && !isScalpSessionNow()) return {pair:pair,final:'SESSION FILTER',sessionFiltered:true,buyScore:0,sellScore:0,strategy:'Scalping is restricted to 9:00 AM–6:00 PM Nigeria time (WAT).'};
+    if (activeTradingProfile === 'scalping' && tf === '5' && !isScalpSessionNow()) return {pair:pair,final:'SESSION FILTER',sessionFiltered:true,buyScore:0,sellScore:0,strategy:'Scalping is restricted to 9:00 AM–6:00 PM Nigeria time (WAT).'};
     if (!marketSessionOpen(pair)) return {pair:pair,final:'MARKET CLOSED',marketClosed:true,buyScore:0,sellScore:0,strategy:'Market session is closed. Historical candles are not an executable signal.'};
     let url = `/api/market-data?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}`;
     
@@ -214,7 +263,7 @@
         return { pair: pair, error: 'Provider returned ' + (Array.isArray(candles) ? candles.length : 0) + ' candles; at least 30 are required.', errorStage: 'candles' };
       }
       // Ignore the still-forming candle: pattern and indicator confirmation must use closed bars only.
-      var barMs = Number(tf) * 60 * 1000;
+      var barMs = TF_MILLISECONDS[String(tf)] || 15 * 60 * 1000;
       candles = candles.filter(function(c) {
         var raw = String(c.datetime || '');
         var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? '' : 'Z'));
@@ -224,7 +273,7 @@
         return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain after UTC time filtering.', errorStage: 'closed-candles' };
       }
 
-      var analysis=analyseAllMethods(candles, tf === '5' ? 'scalp' : 'intraday');
+      var analysis=analyseAllMethods(candles, activeTradingProfile);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
       var final=analysis.final;
       var entry=parseFloat(candles[candles.length-1].close);
@@ -279,7 +328,7 @@
       row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--dg-line)';
       var left = document.createElement('div');
       var name = document.createElement('strong'); name.textContent=(index+1)+'. '+item.pair;
-      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/12 confluence points · '+(currentSignalTF==='5'?'Scalping scan':'Intraday scan');
+      var detail = document.createElement('div'); detail.className='dg-muted'; detail.style.fontSize='12px'; detail.textContent=item.score+'/12 confluence points · '+(scannerProfileName()+' scan');
       left.appendChild(name); left.appendChild(detail);
       var pill = document.createElement('span'); pill.className='dg-pill '+(item.direction==='BUY'?'dg-pill--buy':'dg-pill--sell'); pill.textContent=item.signal;
       row.appendChild(left); row.appendChild(pill); best.appendChild(row);
@@ -317,8 +366,8 @@
   }
   function updateScalpStats(){
     var panel=document.getElementById('scalpStats');if(!panel)return;
-    panel.style.display=currentSignalTF==='5'?'block':'none';
-    if(currentSignalTF!=='5')return;
+    panel.style.display=activeTradingProfile==='scalping'?'block':'none';
+    if(activeTradingProfile!=='scalping')return;
     var stored={};try{stored=JSON.parse(localStorage.getItem('dagbo_scalp_signal_count'))||{};}catch(e){}
     var count=stored.date===localDateKey()&&Array.isArray(stored.items)?stored.items.length:0;
     var quota=getDailyRiskQuota(),money='$'+quota.remaining.toFixed(2);
@@ -341,7 +390,7 @@
         if(!daily.items.includes(unique)){daily.items.push(unique);daily.items=daily.items.slice(-500);localStorage.setItem('dagbo_scalp_signal_count',JSON.stringify(daily));}
       }
       if (previous[pair] && previous[pair] !== next) {
-        history.push({ id:String(Date.now())+'-'+pair, pair:pair, previous:previous[pair], current:next, timeframe:currentSignalTF+'m', at:new Date().toISOString(), type:'SIGNAL_CHANGE' });
+        history.push({ id:String(Date.now())+'-'+pair, pair:pair, previous:previous[pair], current:next, timeframe:timeframeLabel(currentSignalTF), at:new Date().toISOString(), type:'SIGNAL_CHANGE' });
       }
       previous[pair] = next;
     });
@@ -477,7 +526,7 @@
         cardInner =
           debugText + quotaNotice +
           '<div class="dg-signal__word ' + cls + '" style="font-size:28px;text-align:left">' + s.final + '</div>' +
-          '<div class="dg-muted" style="font-size:13px;margin-bottom:5px">' + (currentSignalTF === '5' ? 'Scalping Setup' : 'Intraday Setup') + ' · '+(s.quality||'LOW')+' CONFIDENCE · '+Number(s.confidence||0)+'%</div>' +
+          '<div class="dg-muted" style="font-size:13px;margin-bottom:5px">' + (scannerProfileName()+' Setup') + ' · '+(s.quality||'LOW')+' CONFIDENCE · '+Number(s.confidence||0)+'%</div>' +
           '<div class="dg-muted" style="font-size:11px;margin-bottom:12px">Source: '+escapeNewsText(s.source||'Main confluence')+(s.momentumTrigger?' · '+escapeNewsText(s.momentumTrigger):'')+'</div>' +
           '<div class="dg-grid-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + fEntry + '</strong></div>' +
@@ -497,7 +546,7 @@
               '<span class="dg-pill ' + pillCls + '" style="min-height:22px;font-size:11px;padding:0 8px">' + pillText + '</span>' +
               (newsConfirmed ? '<span class="dg-pill dg-pill--buy" style="min-height:22px;font-size:10px;padding:0 7px">NEWS CONFIRMED</span>' : '') +
             '</div>' +
-            '<span style="font-size:11px;color:var(--dg-text-2)">' + currentSignalTF + 'm</span>' +
+            '<span style="font-size:11px;color:var(--dg-text-2)">' + timeframeLabel(currentSignalTF) + '</span>' +
           '</div>' +
           cardInner +
           '<div style="margin-top:12px;display:flex;gap:7px;align-items:center;">' +
@@ -528,7 +577,7 @@
       'DAGBO SIGNAL',
       'Pair: ' + pair,
       'Signal: ' + signal,
-      'Timeframe: ' + currentSignalTF + 'm',
+      'Timeframe: ' + timeframeLabel(currentSignalTF),
       'Entry: ' + entry,
       'Stop Loss: ' + sl,
       'Take Profit 1: ' + tp1,
@@ -667,7 +716,8 @@
   });
 
   window.changeSignalTF = function(tf) {
-    currentSignalTF = tf;
+    currentSignalTF = String(tf);
+    renderProfileControls();
     loadAllSignals();
   };
 
@@ -690,6 +740,8 @@
     renderCards();
   }
 
+  renderProfileControls();
+  updateScalpStats();
   loadAllSignals();
 
   window.addEventListener('load', async function() {
