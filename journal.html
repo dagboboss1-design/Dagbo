@@ -495,8 +495,8 @@
             Number.isFinite(Number(c.high)) && Number.isFinite(Number(c.low)) &&
             Number(c.high)>0 && Number(c.low)>0;
         }).sort(function(a,b) {
-          var at=Date.parse(String(a.datetime||'').replace(' ','T')+'Z');
-          var bt=Date.parse(String(b.datetime||'').replace(' ','T')+'Z');
+          var at=Date.parse(String(a.datetime||'').replace(' ','T'));
+          var bt=Date.parse(String(b.datetime||'').replace(' ','T'));
           return at-bt;
         });
         if (!candles.length) continue;
