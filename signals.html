@@ -238,6 +238,38 @@
       var analysis=analyseAllMethods(candles, tf === '5' ? 'scalp' : 'intraday');
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
       var final=analysis.final;
+      var strategyEngine=null, strategyEngineError='', strategyEngineConflict=false;
+      try {
+        var engineResponse=await fetch('/api/strategy-engine',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            pair:pair,
+            timeframe:String(tf),
+            candles:candles.map(function(c){return {
+              open:Number(c.open),high:Number(c.high),low:Number(c.low),
+              close:Number(c.close),volume:Number(c.volume)||0
+            };})
+          })
+        });
+        var engineData=await engineResponse.json();
+        if(engineResponse.ok && engineData && engineData.status==='READY' &&
+           Number(engineData.strategyCount)===335 && Number(engineData.evaluated)===335 &&
+           Number(engineData.errorCount)===0) {
+          strategyEngine=engineData;
+        } else {
+          strategyEngineError=engineData && engineData.error ? String(engineData.error) : 'Engine returned an incomplete evaluation';
+        }
+      } catch(engineError) {
+        strategyEngineError='Engine request failed';
+        console.warn('DAGBO 335 strategy engine unavailable:',engineError);
+      }
+      var baseDirection=String(final||'').includes('BUY')?'BUY':
+        String(final||'').includes('SELL')?'SELL':'WAIT';
+      if(baseDirection!=='WAIT' && (!strategyEngine || strategyEngine.direction!==baseDirection)) {
+        strategyEngineConflict=true;
+        final='NO TRADE';
+      }
       var entry=parseFloat(candles[candles.length-1].close);
       var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
       var atrSum=0;
@@ -256,7 +288,7 @@
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
         lastCandleOpen:Number(lastC.open).toFixed(2),lastCandleClose:Number(lastC.close).toFixed(2),
         rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
-        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName,candleDirection:analysis.candleDirection,emaFastValue:analysis.emaFastValue,emaSlowValue:analysis.emaSlowValue,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed,confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,momentumTrigger:analysis.momentumTrigger,atrOk:analysis.atrOk,candleTime:analysis.candleTime
+        macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candleName,candleDirection:analysis.candleDirection,emaFastValue:analysis.emaFastValue,emaSlowValue:analysis.emaSlowValue,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed,confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,momentumTrigger:analysis.momentumTrigger,atrOk:analysis.atrOk,candleTime:analysis.candleTime,strategyEngine:strategyEngine,strategyEngineError:strategyEngineError,strategyEngineConflict:strategyEngineConflict
       };
     } catch(e) {
       console.error(e);
@@ -579,17 +611,26 @@
         '<b>Seven-group confluence scan</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+' · Candlestick: '+(s.candlePattern||'None confirmed')+'<br>' +
         'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
         'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
-        '<br><b>Group score:</b> BUY '+s.buyScore+'/14 · SELL '+s.sellScore+'/14 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
+        '<br><b>Group score:</b> BUY '+s.buyScore+'/14 · SELL '+s.sellScore+'/14 · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence' +
+        '<br><b>335 strategy engine:</b> '+(s.strategyEngine ? escapeNewsText(s.strategyEngine.direction)+' · '+Number(s.strategyEngine.agreementPct||0)+'% group agreement · '+Number(s.strategyEngine.buyGroups||0)+' BUY / '+Number(s.strategyEngine.sellGroups||0)+' SELL groups' : 'UNAVAILABLE') +
+        (s.strategyEngineConflict ? ' · NO TRADE' : '')+'</div>';
       
       var quota = getDailyRiskQuota();
       var quotaNotice = quota.exhausted ? '<div class="dg-pill dg-pill--sell" style="margin:0 0 9px;display:inline-flex">RISK QUOTA EXHAUSTED · SIGNAL ONLY</div>' : '';
+      var noTradeReason = s.strategyEngineError
+        ? '335-strategy engine unavailable. No executable signal until it responds.'
+        : s.strategyEngineConflict
+          ? 'The 335-strategy engine does not agree with the confluence scan. Wait for alignment.'
+          : (s.strategyEngine && s.strategyEngine.direction === 'WAIT')
+            ? 'The 335-strategy engine found no clear group consensus. Wait for confirmation.'
+            : 'Market is quiet. Systems say WAIT.';
       var cardInner = '';
       if (s.final === 'NO TRADE') {
         cardInner = 
           debugText +
           '<div style="text-align:center;padding:16px 0">' +
             '<div class="dg-signal__word ' + cls + '" style="font-size:28px">NO TRADE</div>' +
-            '<div class="dg-muted" style="font-size:13px;margin-top:4px">Market is quiet. Systems say WAIT.</div>' +
+            '<div class="dg-muted" style="font-size:13px;margin-top:4px">' + escapeNewsText(noTradeReason) + '</div>' +
           '</div>';
       } else {
         // Smart Decimal Logic: format each market with its appropriate price precision.
@@ -826,10 +867,12 @@
     signalsData = {};
     await loadNewsSignalContext();
 
-    for (let pair of enabledPairs) {
-      let data = await fetchPairData(pair, currentSignalTF);
-      if (data) signalsData[pair] = data;
-    }
+    var pairResults = await Promise.all(enabledPairs.map(async function(pair) {
+      return { pair: pair, data: await fetchPairData(pair, currentSignalTF) };
+    }));
+    pairResults.forEach(function(item) {
+      if (item.data) signalsData[item.pair] = item.data;
+    });
     
     recordSignalSnapshot();
     var now = new Date();
