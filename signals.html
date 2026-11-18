@@ -240,7 +240,7 @@
       var final=analysis.final;
       var strategyEngine=null, strategyEngineError='', strategyEngineConflict=false;
       try {
-        var engineResponse=await fetch('/api/strategy-engine',{
+        var engineResponse=await fetch('/api/market-data',{
           method:'POST',
           headers:{'Content-Type':'application/json'},
           body:JSON.stringify({
