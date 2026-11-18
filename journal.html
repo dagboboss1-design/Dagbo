@@ -485,14 +485,9 @@
   window.addEventListener('focus', syncCloudTrades);
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) syncCloudTrades(); });
 
-  // The Add to Journal action from Signals opens the saved trade with its strategy and levels already filled in.
-  try {
-    var pendingJournalId = sessionStorage.getItem('dagbo_open_journal_trade');
-    if (pendingJournalId) {
-      sessionStorage.removeItem('dagbo_open_journal_trade');
-      window.editTrade(pendingJournalId);
-    }
-  } catch(e) {}
+  // Signal hand-offs are saved before navigation. Open the Journal directly;
+  // never interrupt the user with the manual trade-entry/edit form.
+  try { sessionStorage.removeItem('dagbo_open_journal_trade'); } catch(e) {}
 })();
 </script>
 <script src="navigation.js" defer></script>
