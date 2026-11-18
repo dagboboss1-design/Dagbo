@@ -1,20 +1,17 @@
-name: DAGBO SIGNAL scheduled alerts
+name: DAGBO SIGNAL manual alert diagnostics
 
 on:
-  schedule:
-    # Offset from the hour to reduce GitHub Actions queue delays.
-    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: dagbo-scheduled-alerts
+  group: dagbo-manual-alert-diagnostics
   cancel-in-progress: false
 
 jobs:
-  scan-and-news-alerts:
+  check-alert-endpoints:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -23,29 +20,30 @@ jobs:
           DAGBO_CRON_SECRET: ${{ secrets.DAGBO_CRON_SECRET }}
         run: |
           if [ -z "$DAGBO_CRON_SECRET" ]; then
-            echo "::error::Add DAGBO_CRON_SECRET in GitHub repository Settings > Secrets and variables > Actions."
+            echo "::error::Missing repository secret DAGBO_CRON_SECRET"
             exit 1
           fi
 
-      - name: Run 15-minute market scanner
+      - name: Check market scanner
         env:
+          DAGBO_BASE_URL: https://dagboboss.vercel.app
           DAGBO_CRON_SECRET: ${{ secrets.DAGBO_CRON_SECRET }}
         run: |
-          curl --fail-with-body --silent --show-error --max-time 120 \
+          curl --fail-with-body --silent --show-error --max-time 150 \
             --request POST \
-            --header "Authorization: Bearer $DAGBO_CRON_SECRET" \
-            --header "Content-Type: application/json" \
+            -H "Authorization: Bearer $DAGBO_CRON_SECRET" \
+            -H "Content-Type: application/json" \
             --data '{}' \
-            "https://dagbo-beige.vercel.app/api/cron-scan"
+            "$DAGBO_BASE_URL/api/cron-scan" | jq .
 
-      - name: Run economic news alerts
-        if: always()
+      - name: Check news and spike monitor
         env:
+          DAGBO_BASE_URL: https://dagboboss.vercel.app
           DAGBO_CRON_SECRET: ${{ secrets.DAGBO_CRON_SECRET }}
         run: |
           curl --fail-with-body --silent --show-error --max-time 120 \
             --request POST \
-            --header "Authorization: Bearer $DAGBO_CRON_SECRET" \
-            --header "Content-Type: application/json" \
+            -H "Authorization: Bearer $DAGBO_CRON_SECRET" \
+            -H "Content-Type: application/json" \
             --data '{}' \
-            "https://dagbo-beige.vercel.app/api/cron-signal"
+            "$DAGBO_BASE_URL/api/news-monitor" | jq .
