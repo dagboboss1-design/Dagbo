@@ -89,7 +89,9 @@
       <label class="dg-field" style="margin:0"><span class="dg-label">Planned Risk (USD)</span><input type="number" id="fRiskAmount" class="dg-input" step="any" min="0.01"></label>
       <label class="dg-field" style="margin:0"><span class="dg-label">Exit Price (optional)</span><input type="number" id="fExit" class="dg-input" step="any" placeholder="Auto: TP / SL"></label>
       <label class="dg-field" style="margin:0"><span class="dg-label">P&amp;L (USD)</span><input type="number" id="fPnl" class="dg-input" step="any" placeholder="Auto-calculated where supported"></label>
-    </div><p id="tradeCalcHint" class="dg-help" style="margin-top:10px">Automatic risk and reward estimates use standard FX and XAUUSD contract assumptions where supported.</p>
+    </div>
+    <button type="button" class="dg-btn dg-btn--block" style="margin-top:12px" onclick="autoCalculateLevels()">Calculate SL &amp; TP from live ATR</button>
+    <p id="tradeCalcHint" class="dg-help" style="margin-top:10px">Uses fresh 5m or 15m candles: SL = 1.5 × ATR, TP = 2R. Signal-provided levels are preserved.</p>
     <div style="margin-top:24px"><button class="dg-btn dg-btn--primary dg-btn--block" onclick="saveTrade()">Save Trade</button></div>
   </div>
 </div>
@@ -294,7 +296,7 @@
       card.appendChild(head);
       addText(card,'div','dg-muted',(t.direction || '') + ' · Entry ' + (t.entry ?? '—') + ' · SL ' + (t.stopLoss ?? '—') + ' · TP ' + (t.takeProfit ?? '—'));
       addText(card,'div','dg-muted',(t.strategy || 'Strategy not tagged') + ' · ' + (t.timeframe || 'Timeframe not tagged'));
-      addText(card,'div',Number(t.pnl)>0?'dg-pos':Number(t.pnl)<0?'dg-neg':'dg-muted',t.result === 'OPEN' ? 'Open trade · TP/SL checks every 5 minutes while Journal is open' + (t.monitoringNote ? ' · ' + t.monitoringNote : '') : money(t.pnl) + (t.closeReason ? ' · ' + t.closeReason.replace('_',' ') : '') + (t.pnlNeedsBrokerReview ? ' · Broker P&L required' : ''));
+      addText(card,'div',Number(t.pnl)>0?'dg-pos':Number(t.pnl)<0?'dg-neg':'dg-muted',t.result === 'OPEN' ? 'Open trade · ' + (t.serverTracked ? 'cloud monitoring active' : 'checks while Journal is open') + (t.monitoringNote ? ' · ' + t.monitoringNote : '') : (t.pnlNeedsBrokerReview ? 'P&L needs broker contract/conversion details' : money(t.pnl)) + (t.closeReason ? ' · ' + t.closeReason.replace('_',' ') : '') + (t.monitoringNote ? ' · ' + t.monitoringNote : ''));
       list.appendChild(card);
     });
   }
@@ -418,6 +420,41 @@
     if(base==='USD')return quotePnl/exit;
     return null;
   }
+  window.autoCalculateLevels = async function() {
+    var pair=document.getElementById('fPair').value;
+    var direction=document.getElementById('fDir').value;
+    var entry=Number(document.getElementById('fEntry').value);
+    var tf=document.getElementById('fTimeframe').value==='5m'?'5':'15';
+    var hint=document.getElementById('tradeCalcHint');
+    if(!pair||!Number.isFinite(entry)||entry<=0){hint.textContent='Enter a valid pair and entry price first.';return;}
+    hint.textContent='Loading fresh '+tf+'m candles and calculating ATR…';
+    try {
+      var response=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+tf,{cache:'no-store'});
+      if(!response.ok) throw new Error('Market data unavailable ('+response.status+').');
+      var data=await response.json();
+      if(!Array.isArray(data.values)||data.values.length<20) throw new Error(data.error||'Not enough candles to calculate ATR.');
+      var rows=data.values.slice().reverse().filter(function(c){
+        var stamp=Date.parse(String(c.datetime||'').replace(' ','T')+(String(c.datetime||'').endsWith('Z')?'':'Z'));
+        return Number.isFinite(stamp)&&stamp+(Number(tf)*60000)<=Date.now()&&[c.high,c.low,c.close].every(function(v){return Number.isFinite(Number(v));});
+      });
+      if(rows.length<15) throw new Error('Waiting for at least 15 completed candles.');
+      var ranges=[];
+      for(var i=Math.max(1,rows.length-14);i<rows.length;i++){
+        var hi=Number(rows[i].high),lo=Number(rows[i].low),pc=Number(rows[i-1].close);
+        ranges.push(Math.max(hi-lo,Math.abs(hi-pc),Math.abs(lo-pc)));
+      }
+      if(!ranges.length) throw new Error('ATR could not be calculated from the returned candles.');
+      var atr=ranges.reduce(function(a,b){return a+b;},0)/ranges.length;
+      var risk=atr*1.5, reward=risk*2;
+      var decimals=/JPY/.test(pair)?3:/XAU/.test(pair)?2:/BTC|ETH/.test(pair)?2:/US30|US100|US500|NAS100/.test(pair)?1:5;
+      var sl=direction==='BUY'?entry-risk:entry+risk;
+      var tp=direction==='BUY'?entry+reward:entry-reward;
+      document.getElementById('fSl').value=sl.toFixed(decimals);
+      document.getElementById('fTp').value=tp.toFixed(decimals);
+      hint.textContent='Calculated from '+rows.length+' completed '+tf+'m candles · ATR '+atr.toFixed(decimals)+' · Risk 1.5 ATR · Reward 2R. Review levels before saving.';
+      updateTradeEstimate();
+    } catch(error){hint.textContent='Could not calculate levels: '+error.message+' No values were guessed.';}
+  };
   function updateTradeEstimate() {
     var pair=document.getElementById('fPair').value,dir=document.getElementById('fDir').value;
     var e=Number(document.getElementById('fEntry').value),sl=Number(document.getElementById('fSl').value),tp=Number(document.getElementById('fTp').value),lot=Number(document.getElementById('fLot').value);
@@ -434,7 +471,7 @@
   async function monitorOpenTrades() {
     if (monitorBusy || document.hidden || !navigator.onLine) return;
     var openTrades = trades.filter(function(t) {
-      return t.result === 'OPEN' && Number(t.stopLoss) > 0 && Number(t.takeProfit) > 0;
+      return t.result === 'OPEN' && !t.serverTracked && Number(t.stopLoss) > 0 && Number(t.takeProfit) > 0;
     });
     if (!openTrades.length) return;
     // Keep within the Twelve Data request budget: no more than one scan every 5 minutes.
@@ -480,7 +517,7 @@
           t.status = 'CLOSED';
           t.closeReason = tpHit ? 'TAKE_PROFIT' : 'STOP_LOSS';
           t.exit = exitPrice;
-          t.pnl = pnlValue === null ? 0 : pnlValue;
+          t.pnl = pnlValue === null ? null : pnlValue;
           t.pnlNeedsBrokerReview = pnlValue === null;
           t.dateClosed = new Date().toISOString();
           t.lastCheckedAt = t.dateClosed;
@@ -521,26 +558,31 @@
           });
           if (candidates.length === 1) local = candidates[0];
         }
-        if (local && remote.status === 'CLOSED' && local.result === 'OPEN') {
-          local.result = remote.result || 'CLOSED';
-          local.exit = remote.exit;
-          var autoRemotePnl=calculatePnlUsd(local.pair,local.direction,Number(local.entry),Number(remote.exit),Number(local.lotSize));
-          local.pnl=autoRemotePnl!==null?autoRemotePnl:(Number(remote.pnl)||0);
-          // Count a closed trade from its verified P&L if the server did not return a WIN/LOSS label.
-          const remoteResult = String(remote.result || "").toUpperCase();
-          local.result = ["WIN","LOSS","BREAKEVEN"].includes(remoteResult)
-            ? remoteResult
-            : local.pnl > 0 ? "WIN" : local.pnl < 0 ? "LOSS" : "BREAKEVEN";
-          local.pnlNeedsBrokerReview=autoRemotePnl===null;
-          local.serverTradeId=remote.id;
-          if (Number(local.riskAmount) > 0) {
-            local.rMultiple = Math.round((local.pnl / Number(local.riskAmount)) * 10) / 10;
-          } else {
-            delete local.rMultiple;
+        if (local) {
+          local.serverTracked = true;
+          local.serverTradeId = remote.id;
+          if (remote.status === 'CLOSED' && local.result === 'OPEN') {
+            local.result = ['WIN','LOSS','BREAKEVEN'].includes(String(remote.result || '').toUpperCase())
+              ? String(remote.result).toUpperCase() : 'CLOSED';
+            local.exit = remote.exit;
+            var autoRemotePnl = calculatePnlUsd(local.pair,local.direction,Number(local.entry),Number(remote.exit),Number(local.lotSize));
+            var serverPnl = Number(remote.pnl);
+            local.pnl = autoRemotePnl !== null ? autoRemotePnl :
+              (Number.isFinite(serverPnl) ? serverPnl : null);
+            local.pnlNeedsBrokerReview = !!remote.pnlNeedsBrokerReview || (autoRemotePnl === null && !Number.isFinite(serverPnl));
+            if (local.pnlNeedsBrokerReview && !Number.isFinite(serverPnl)) local.pnl = null;
+            local.pnlNote = remote.pnlNote || null;
+            if (!['WIN','LOSS','BREAKEVEN'].includes(local.result)) {
+              local.result = local.pnl === null ? (remote.closeReason === 'TAKE_PROFIT' ? 'WIN' : 'LOSS') :
+                local.pnl > 0 ? 'WIN' : local.pnl < 0 ? 'LOSS' : 'BREAKEVEN';
+            }
+            if (Number(local.riskAmount) > 0 && Number.isFinite(Number(local.pnl))) {
+              local.rMultiple = Math.round((Number(local.pnl) / Number(local.riskAmount)) * 10) / 10;
+            } else delete local.rMultiple;
+            local.closeReason = remote.closeReason;
+            local.dateClosed = remote.dateClosed;
+            local.monitoringNote = remote.pnlNote || 'TP/SL detected from scheduled 5-minute market monitoring; confirm actual fill with broker.';
           }
-          local.exit = remote.exit;
-          local.closeReason = remote.closeReason;
-          local.dateClosed = remote.dateClosed;
         }
       });
       persist();
