@@ -309,20 +309,42 @@ module.exports = async function handler(req, res) {
             { role: "user", content: question.trim() + (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") + (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "") + (fundamentalContext ? "\n\n" + fundamentalContext + "\nUse these verified fields as context only; distinguish actual, estimate and previous, state dates, and say when a dataset is missing. Do not infer a market direction from one data point." : "") }
           ],
           temperature: 0.3,
-          max_tokens: 220
+          // GPT-OSS spends part of its completion budget on reasoning.
+          // The old 220-token cap could leave no user-facing answer.
+          max_completion_tokens: 1024,
+          reasoning_effort: "low",
+          include_reasoning: false
         })
       });
 
-      const groqData = await groqRes.json();
+      let groqData;
+      try {
+        groqData = await groqRes.json();
+      } catch (parseError) {
+        console.error("DAGBO GROQ returned invalid JSON:", parseError.message);
+        return res.status(502).json({ error: "The AI service returned an unreadable response. Please try again." });
+      }
       if (!groqRes.ok) {
         console.error("DAGBO GROQ ERROR:", groqData.error && groqData.error.message);
-        return res.status(502).json({ error: "The AI service could not answer right now" });
+        return res.status(502).json({ error: "The AI service could not answer right now. Please try again." });
       }
 
-      const rawAnswer = groqData.choices && groqData.choices[0] &&
-        groqData.choices[0].message && groqData.choices[0].message.content;
+      const message = groqData.choices && groqData.choices[0] && groqData.choices[0].message;
+      let rawAnswer = message && message.content;
+      // Accept text-block content formats, but never expose private reasoning.
+      if (Array.isArray(rawAnswer)) {
+        rawAnswer = rawAnswer.map(part => {
+          if (typeof part === "string") return part;
+          return part && part.type === "text" && typeof part.text === "string" ? part.text : "";
+        }).join("\\n");
+      }
       if (typeof rawAnswer !== "string" || !rawAnswer.trim()) {
-        return res.status(502).json({ error: "The AI returned an empty answer" });
+        console.error("DAGBO GROQ empty final answer:", JSON.stringify({
+          finishReason: groqData.choices && groqData.choices[0] && groqData.choices[0].finish_reason,
+          hasReasoning: !!(message && message.reasoning),
+          usage: groqData.usage || null
+        }));
+        return res.status(502).json({ error: "Dagbo AI did not produce a final answer. Please send your question again." });
       }
 
       // Notify only the device that asked the question, never every app subscriber.
