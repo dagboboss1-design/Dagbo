@@ -282,26 +282,70 @@ async function sendNewsAlerts(apiKey) {
 async function fetchTradeMarket(pair, apiKey) {
   const symbol = SYMBOLS[pair];
   if (!symbol) throw new Error("Unsupported trade pair " + pair);
+  // Use 5-minute OHLC, not the 15-minute signal-analysis object. This is
+  // fetched independently for every open trade pair so scanner watchlists
+  // can never accidentally suppress the Journal's price monitor.
   const url = "https://api.twelvedata.com/time_series?symbol=" +
-    encodeURIComponent(symbol) + "&interval=15min&outputsize=3&timezone=UTC&apikey=" +
+    encodeURIComponent(symbol) + "&interval=5min&outputsize=4&timezone=UTC&apikey=" +
     encodeURIComponent(apiKey);
   const response = await fetch(url);
   const data = await response.json();
   if (!response.ok || data.status === "error" || !Array.isArray(data.values) || !data.values.length) {
-    throw new Error(data.message || "No trade-monitor candles");
+    throw new Error(data.message || "No 5-minute trade-monitor candles");
   }
-  // Twelve Data returns newest candles first. The newest candle's high/low
-  // captures an intrabar touch even if price later moves away before close.
-  const candle = data.values[0];
+  const candle = data.values[0]; // newest first; high/low includes intrabar touches
   const high = num(candle.high), low = num(candle.low), close = num(candle.close);
-  if ([high, low, close].some(v => v === null)) throw new Error("Invalid trade-monitor candle");
-  return {
-    pair, entry: close, candleHigh: high, candleLow: low,
-    candleTime: candle.datetime || null, signal: null
-  };
+  const rawTime = String(candle.datetime || "");
+  const stamp = Date.parse(rawTime.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(rawTime) ? "" : "Z"));
+  if ([high, low, close].some(v => v === null) || !Number.isFinite(stamp)) throw new Error("Invalid 5-minute trade-monitor candle");
+  if (Date.now() - stamp > 12 * 60 * 1000) throw new Error("5-minute trade-monitor candle is stale");
+  return { pair, entry: close, candleHigh: high, candleLow: low, candleTime: rawTime, candleStartMs: stamp, signal: null };
 }
 
-async function monitorTrades(marketData, apiKey) {
+async function quoteCurrencyToUsd(currency, apiKey) {
+  if (currency === "USD") return 1;
+  const direct = currency + "/USD";
+  const inverse = "USD/" + currency;
+  async function rateFor(symbol) {
+    const url = "https://api.twelvedata.com/exchange_rate?symbol=" + encodeURIComponent(symbol) +
+      "&apikey=" + encodeURIComponent(apiKey);
+    const response = await fetch(url);
+    const data = await response.json();
+    const value = num(data && data.rate);
+    if (!response.ok || !value || data.status === "error") throw new Error((data && data.message) || "FX conversion unavailable for " + symbol);
+    return value;
+  }
+  try { return await rateFor(direct); }
+  catch (directError) { return 1 / await rateFor(inverse); }
+}
+
+async function calculateClosedTradePnlUsd(trade, exitPrice, apiKey) {
+  const pair = String(trade.pair || "").toUpperCase();
+  const directionSign = String(trade.direction).toUpperCase() === "BUY" ? 1 : -1;
+  const entry = num(trade.entry), lot = num(trade.lotSize) || 0.01, exit = num(exitPrice);
+  if (entry === null || exit === null || lot <= 0) return { pnl: null, needsBrokerReview: true };
+  if (pair === "XAUUSD" || pair === "GOLD") {
+    // Standard 100 troy-ounce XAUUSD contract assumption; broker terms may differ.
+    return { pnl: (exit - entry) * directionSign * lot * 100, needsBrokerReview: false, contractAssumption: "100 oz per lot" };
+  }
+  if (/^[A-Z]{6}$/.test(pair)) {
+    const base = pair.slice(0,3), quote = pair.slice(3,6);
+    const currencies = ["USD","EUR","GBP","JPY","CHF","CAD","AUD","NZD","SEK","NOK","DKK","SGD","HKD","ZAR","MXN","TRY","PLN","CNY","CNH"];
+    if (!currencies.includes(base) || !currencies.includes(quote)) return { pnl: null, needsBrokerReview: true };
+    const units = lot * 100000;
+    const pnlQuote = (exit - entry) * directionSign * units;
+    try {
+      const conversion = await quoteCurrencyToUsd(quote, apiKey);
+      return { pnl: pnlQuote * conversion, needsBrokerReview: false, contractAssumption: "100,000 base units per lot" };
+    } catch (error) {
+      return { pnl: null, needsBrokerReview: true, conversionError: error.message };
+    }
+  }
+  // CFD index and crypto lot sizes vary by broker. Never invent their contract value.
+  return { pnl: null, needsBrokerReview: true, conversionError: "Broker contract size/tick value required for this instrument" };
+}
+
+async function monitorTrades(_signalResults, apiKey) {
   const devices = await redis.smembers("dagbo:trades:devices");
   let closed = 0, warnings = 0, checked = 0, dataErrors = [];
   const openTrades = [];
@@ -316,20 +360,17 @@ async function monitorTrades(marketData, apiKey) {
     }
   }
 
-  // Do not depend on the user's normal signal-watchlist: every distinct pair
-  // with an OPEN tracked trade must have market data for its TP/SL check.
   const neededPairs = Array.from(new Set(openTrades.map(x => String(x.trade.pair || "").toUpperCase())))
-    .filter(pair => SYMBOLS[pair] && !marketData[pair]);
-  const extraMarkets = await Promise.all(neededPairs.map(async pair => {
+    .filter(pair => SYMBOLS[pair]);
+  const marketResults = await Promise.all(neededPairs.map(async pair => {
     try {
-      if (!isMarketOpen(pair)) return { pair, closed: true };
+      if (!isMarketOpen(pair)) return { pair, marketClosed: true };
       return { pair, market: await fetchTradeMarket(pair, apiKey) };
-    } catch (error) {
-      return { pair, error: error.message };
-    }
+    } catch (error) { return { pair, error: error.message }; }
   }));
-  for (const item of extraMarkets) {
-    if (item.market) marketData[item.pair] = item.market;
+  const markets = {};
+  for (const item of marketResults) {
+    if (item.market) markets[item.pair] = item.market;
     if (item.error) dataErrors.push({ pair: item.pair, error: item.error });
   }
 
@@ -337,83 +378,83 @@ async function monitorTrades(marketData, apiKey) {
     const { deviceId, tradeId, key, trade } = item;
     const pair = String(trade.pair || "").toUpperCase();
     if (!isMarketOpen(pair)) continue;
-    const market = marketData[pair];
-    if (!market || market.marketClosed) continue;
+    const market = markets[pair];
+    if (!market) continue;
+    // Do not evaluate a candle that began before this trade was recorded.
+    const openedAt = Date.parse(trade.dateOpened || "");
+    if (Number.isFinite(openedAt) && market.candleStartMs < openedAt) continue;
+    if (trade.lastCheckedCandle === market.candleTime) continue;
     const buy = String(trade.direction).toUpperCase() === "BUY";
     const sl = num(trade.stopLoss), tp = num(trade.takeProfit);
     if (sl === null || tp === null) continue;
     checked++;
-    const high = num(market.candleHigh), low = num(market.candleLow);
-    if (high === null || low === null) continue;
+    const high = market.candleHigh, low = market.candleLow;
     const hitSL = buy ? low <= sl : high >= sl;
     const hitTP = buy ? high >= tp : low <= tp;
+    trade.lastCheckedCandle = market.candleTime;
+    trade.lastPrice = market.entry;
+    trade.lastCheckedAt = new Date().toISOString();
+
     if (hitSL && hitTP) {
-      const flag = "both-hit:" + (market.candleTime || "unknown");
+      const flag = "both-hit:" + market.candleTime;
       if (trade.lastWarning !== flag) {
-        await sendToDevice(deviceId, "⚠️ TRADE REVIEW NEEDED", trade.pair + ": TP and SL both fell inside the same 15m candle. The order is unknown; check your broker/chart manually. DAGBO has not guessed the result.", "trade-review-" + tradeId, "/journal.html");
+        await sendToDevice(deviceId, "⚠️ TRADE REVIEW NEEDED",
+          trade.pair + ": TP and SL both fell inside the same 5-minute candle. The order is unknown; check broker/chart history. DAGBO has not guessed the result.",
+          "trade-review-" + tradeId, "/journal.html");
         trade.lastWarning = flag;
-        await redis.set(key, JSON.stringify(trade));
         warnings++;
       }
+      await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
       continue;
     }
+
     if (hitSL || hitTP) {
+      const exit = hitTP ? tp : sl;
+      const pnl = await calculateClosedTradePnlUsd(trade, exit, apiKey);
       trade.status = "CLOSED";
       trade.result = hitTP ? "WIN" : "LOSS";
-      trade.exit = hitTP ? tp : sl;
+      trade.exit = exit;
+      trade.pnl = pnl.pnl === null ? null : Number(pnl.pnl.toFixed(2));
+      trade.pnlNeedsBrokerReview = pnl.needsBrokerReview;
+      trade.contractAssumption = pnl.contractAssumption || null;
+      trade.pnlNote = pnl.needsBrokerReview ? (pnl.conversionError || "Broker contract details required") : null;
       trade.closeReason = hitTP ? "TAKE_PROFIT" : "STOP_LOSS";
       trade.dateClosed = new Date().toISOString();
       await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
       closed++;
       try {
         await sendToDevice(deviceId, hitTP ? "🎯 TAKE PROFIT HIT" : "🛑 STOP LOSS HIT",
-          trade.pair + " " + trade.direction + " reached " + (hitTP ? "Take Profit" : "Stop Loss") + " at " + trade.exit + ". Open Journal to see the recorded result.",
+          trade.pair + " " + trade.direction + " reached " + (hitTP ? "Take Profit" : "Stop Loss") +
+          " at " + trade.exit + ". Journal result: " + trade.result +
+          (pnl.needsBrokerReview ? ". USD P&L needs verified broker contract/conversion details." : ". Estimated P&L: $" + trade.pnl),
           "trade-close-" + tradeId, "/journal.html");
-      } catch (pushError) {
-        console.error("Trade result saved; push notification failed:", pushError.message);
-      }
+      } catch (pushError) { console.error("Trade result saved; push failed:", pushError.message); }
       continue;
     }
-    const current = num(market.entry);
+
+    const current = market.entry;
     const riskDistance = Math.abs(Number(trade.entry) - sl);
     const rewardDistance = Math.abs(tp - Number(trade.entry));
-    if (current !== null && riskDistance > 0 && rewardDistance > 0) {
+    if (riskDistance > 0 && rewardDistance > 0) {
       const adverseRemaining = buy ? current - sl : sl - current;
       const targetRemaining = buy ? tp - current : current - tp;
       if (adverseRemaining > 0 && adverseRemaining / riskDistance <= 0.20 && !trade.nearSlAlerted) {
         await sendToDevice(deviceId, "⚠️ PRICE NEAR STOP LOSS",
           trade.pair + " is within about 20% of the remaining distance to your Stop Loss. Review risk and your broker position.",
           "trade-near-sl-" + tradeId, "/journal.html");
-        trade.nearSlAlerted = true;
-        await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
-        warnings++;
+        trade.nearSlAlerted = true; warnings++;
       }
       if (targetRemaining > 0 && targetRemaining / rewardDistance <= 0.20 && !trade.nearTpAlerted) {
         await sendToDevice(deviceId, "🎯 PRICE NEAR TAKE PROFIT",
           trade.pair + " is within about 20% of your Take Profit distance. Consider your trade-management plan.",
           "trade-near-tp-" + tradeId, "/journal.html");
-        trade.nearTpAlerted = true;
-        await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
-        warnings++;
+        trade.nearTpAlerted = true; warnings++;
       }
     }
-    const opposite = market.signal && market.signal !== "NO TRADE" &&
-      ((buy && market.signal.includes("SELL")) || (!buy && market.signal.includes("BUY")));
-    if (opposite) {
-      const flag = "opposite:" + market.signal;
-      if (trade.lastWarning !== flag) {
-        await sendToDevice(deviceId, "⚠️ TRADE DIRECTION WARNING",
-          market.signal + " signal appeared for " + trade.pair + " while your " + trade.direction + " trade is open. Review your risk; this does not close the trade.",
-          "trade-opposite-" + tradeId, "/journal.html");
-        trade.lastWarning = flag;
-        await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
-        warnings++;
-      }
-    }
+    await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
   }
-  return { closed, warnings, checked, monitoredPairs: Array.from(new Set(openTrades.map(x => x.trade.pair))), dataErrors };
+  return { closed, warnings, checked, monitoredPairs: neededPairs, dataErrors };
 }
-
 
 // --- SMART PAIR HEDGE + HIGHER-TIMEFRAME ENGINE ---
 // Uses cached Twelve Data candles so the 5-minute cron does not repeatedly
