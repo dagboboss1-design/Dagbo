@@ -496,14 +496,20 @@
         });
         if (!candles.length) continue;
         var candle = candles[candles.length - 1];
+        var candleTime = String(candle.datetime || '');
+        var candleStamp = Date.parse(candleTime.replace(' ','T') + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(candleTime) ? '' : 'Z'));
         var high = Number(candle.high), low = Number(candle.low), close = Number(candle.close);
         openTrades.filter(function(t){return String(t.pair || '').toUpperCase() === pair && t.result === 'OPEN';}).forEach(function(t) {
+          var openedAt = Date.parse(t.dateOpened || '');
+          if (t.lastCheckedCandle === candleTime || (Number.isFinite(openedAt) && Number.isFinite(candleStamp) && candleStamp < openedAt)) return;
+          t.lastCheckedCandle = candleTime;
+          t.lastCheckedAt = new Date().toISOString();
           var buy = String(t.direction).toUpperCase() === 'BUY';
           var slHit = buy ? low <= Number(t.stopLoss) : high >= Number(t.stopLoss);
           var tpHit = buy ? high >= Number(t.takeProfit) : low <= Number(t.takeProfit);
           if (slHit && tpHit) {
             t.monitoringNote = 'Both TP and SL were inside the same 5m candle. Exact hit order is unknown; check broker history.';
-            t.lastCheckedAt = new Date().toISOString();
+            t.monitoringNote = 'Both TP and SL were inside the same 5m candle. Exact hit order is unknown; check broker history.';
             return;
           }
           if (!slHit && !tpHit) {
@@ -568,9 +574,9 @@
             var autoRemotePnl = calculatePnlUsd(local.pair,local.direction,Number(local.entry),Number(remote.exit),Number(local.lotSize));
             var serverPnl = Number(remote.pnl);
             local.pnl = autoRemotePnl !== null ? autoRemotePnl :
-              (Number.isFinite(serverPnl) ? serverPnl : null);
-            local.pnlNeedsBrokerReview = !!remote.pnlNeedsBrokerReview || (autoRemotePnl === null && !Number.isFinite(serverPnl));
-            if (local.pnlNeedsBrokerReview && !Number.isFinite(serverPnl)) local.pnl = null;
+              (remote.pnl !== null && remote.pnl !== undefined && Number.isFinite(serverPnl) ? serverPnl : null);
+            local.pnlNeedsBrokerReview = !!remote.pnlNeedsBrokerReview || (autoRemotePnl === null && (remote.pnl === null || remote.pnl === undefined || !Number.isFinite(serverPnl)));
+            if (local.pnlNeedsBrokerReview && (remote.pnl === null || remote.pnl === undefined || !Number.isFinite(serverPnl))) local.pnl = null;
             local.pnlNote = remote.pnlNote || null;
             if (!['WIN','LOSS','BREAKEVEN'].includes(local.result)) {
               local.result = local.pnl === null ? (remote.closeReason === 'TAKE_PROFIT' ? 'WIN' : 'LOSS') :
