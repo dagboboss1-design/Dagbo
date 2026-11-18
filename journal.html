@@ -427,6 +427,78 @@
     hint.textContent='Estimated risk at SL: ' + plainMoney(Math.abs(risk)) + ' | Potential reward: ' + plainMoney(Math.abs(reward));
   }
 
+  // Check live 5-minute OHLC candles for TP/SL touches. One request per open pair,
+  // shared by all trades on that pair. This runs while the Journal is open.
+  var monitorBusy = false;
+  var lastMonitorAt = 0;
+  async function monitorOpenTrades() {
+    if (monitorBusy || document.hidden || !navigator.onLine) return;
+    var openTrades = trades.filter(function(t) {
+      return t.result === 'OPEN' && Number(t.stopLoss) > 0 && Number(t.takeProfit) > 0;
+    });
+    if (!openTrades.length) return;
+    // Keep within the Twelve Data request budget: no more than one scan every 5 minutes.
+    if (Date.now() - lastMonitorAt < 5 * 60 * 1000) return;
+    monitorBusy = true;
+    lastMonitorAt = Date.now();
+    try {
+      var pairs = Array.from(new Set(openTrades.map(function(t){ return String(t.pair || '').toUpperCase(); })));
+      for (var i = 0; i < pairs.length; i++) {
+        var pair = pairs[i];
+        var response = await fetch('/api/market-data?pair=' + encodeURIComponent(pair) + '&tf=5', {cache:'no-store'});
+        if (!response.ok) throw new Error('Market data unavailable for ' + pair + ' (' + response.status + ')');
+        var payload = await response.json();
+        if (payload.error || payload.status === 'error' || !Array.isArray(payload.values) || !payload.values.length) {
+          throw new Error('No valid live candles returned for ' + pair);
+        }
+        var candles = payload.values.slice().filter(function(c) {
+          return Number.isFinite(Number(c.high)) && Number.isFinite(Number(c.low)) &&
+            Number(c.high) > 0 && Number(c.low) > 0;
+        }).sort(function(a,b) {
+          return Date.parse(String(a.datetime || '').replace(' ','T')) - Date.parse(String(b.datetime || '').replace(' ','T'));
+        });
+        if (!candles.length) continue;
+        var candle = candles[candles.length - 1];
+        var high = Number(candle.high), low = Number(candle.low), close = Number(candle.close);
+        openTrades.filter(function(t){return String(t.pair || '').toUpperCase() === pair && t.result === 'OPEN';}).forEach(function(t) {
+          var buy = String(t.direction).toUpperCase() === 'BUY';
+          var slHit = buy ? low <= Number(t.stopLoss) : high >= Number(t.stopLoss);
+          var tpHit = buy ? high >= Number(t.takeProfit) : low <= Number(t.takeProfit);
+          if (slHit && tpHit) {
+            t.monitoringNote = 'Both TP and SL were inside the same 5m candle. Exact hit order is unknown; check broker history.';
+            t.lastCheckedAt = new Date().toISOString();
+            return;
+          }
+          if (!slHit && !tpHit) {
+            t.lastCheckedAt = new Date().toISOString();
+            t.lastObservedPrice = Number.isFinite(close) ? close : null;
+            return;
+          }
+          var exitPrice = slHit ? Number(t.stopLoss) : Number(t.takeProfit);
+          var pnlValue = calculatePnlUsd(t.pair,t.direction,Number(t.entry),exitPrice,Number(t.lotSize));
+          t.result = tpHit ? 'WIN' : 'LOSS';
+          t.status = 'CLOSED';
+          t.closeReason = tpHit ? 'TAKE_PROFIT' : 'STOP_LOSS';
+          t.exit = exitPrice;
+          t.pnl = pnlValue === null ? 0 : pnlValue;
+          t.pnlNeedsBrokerReview = pnlValue === null;
+          t.dateClosed = new Date().toISOString();
+          t.lastCheckedAt = t.dateClosed;
+          t.monitoringNote = 'TP/SL touch detected from the latest 5m market candle. Confirm execution price with your broker.';
+          if (Number(t.riskAmount) > 0 && pnlValue !== null) t.rMultiple = Math.round((pnlValue / Number(t.riskAmount)) * 10) / 10;
+          syncServerTrade(t);
+        });
+      }
+      persist();
+      renderStats();
+      renderList();
+    } catch (error) {
+      console.warn('DAGBO Journal TP/SL monitor could not refresh:', error);
+    } finally {
+      monitorBusy = false;
+    }
+  }
+
   async function syncCloudTrades() {
     if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
     try {
@@ -480,10 +552,13 @@
   document.getElementById('currencyNGN').setAttribute('aria-pressed',String(journalCurrency==='NGN'));
   renderStats();renderList();renderFxStatus();refreshUsdNgnRate();setInterval(refreshUsdNgnRate,5*60*1000);
   syncCloudTrades();
+  monitorOpenTrades();
+  // Recheck TP/SL every five minutes while Journal is open.
+  setInterval(monitorOpenTrades, 60 * 1000);
   // Keep the journal current while it remains open, and refresh immediately when the user returns.
   setInterval(syncCloudTrades, 60 * 1000);
-  window.addEventListener('focus', syncCloudTrades);
-  document.addEventListener('visibilitychange', function(){ if (!document.hidden) syncCloudTrades(); });
+  window.addEventListener('focus', function(){ syncCloudTrades(); monitorOpenTrades(); });
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) { syncCloudTrades(); monitorOpenTrades(); } });
 
   // Signal hand-offs are saved before navigation. Open the Journal directly;
   // never interrupt the user with the manual trade-entry/edit form.
