@@ -784,10 +784,7 @@
       return String(t.pair).toUpperCase()===String(pair).toUpperCase() && t.result==='OPEN';
     });
     if (duplicate) {
-      // Do not leave the button appearing dead: take the user to the existing open
-      // trade instead of silently blocking the Journal hand-off.
-      try { sessionStorage.setItem('dagbo_open_journal_trade', duplicate.id); }
-      catch (e) { alert('Could not open the existing Journal trade. Please check browser storage.'); return; }
+      // One open trade per pair: keep the existing entry and go straight to Journal.
       window.location.href='journal.html';
       return;
     }
@@ -817,7 +814,6 @@
     try {
       journal.push(trade);
       localStorage.setItem('dagbo_journal',JSON.stringify(journal));
-      sessionStorage.setItem('dagbo_open_journal_trade',trade.id);
     } catch(e) {
       alert('Could not save this trade on your device. Check your phone storage and try again.');
       return;
