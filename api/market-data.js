@@ -18,7 +18,7 @@ async function coinbaseCandles(pair, tf) {
   const response = await fetch(url, { headers: { "Accept": "application/json", "User-Agent": "DAGBO-SIGNAL/1.0" } });
   const rows = await response.json();
   if (!response.ok || !Array.isArray(rows)) throw new Error("Coinbase backup did not return candles");
-  const values = rows.slice(0, 100).reverse().map(row => ({
+  const values = rows.slice(0, 250).reverse().map(row => ({
     datetime: new Date(Number(row[0]) * 1000).toISOString().slice(0, 19).replace("T", " "),
     low: String(row[1]), high: String(row[2]), open: String(row[3]), close: String(row[4]), volume: String(row[5])
   }));
@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
   if (binanceSymbol) {
     res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
     try {
-      const url = "https://data-api.binance.vision/api/v3/klines?symbol=" + encodeURIComponent(binanceSymbol) + "&interval=" + tf + "m&limit=100";
+      const url = "https://data-api.binance.vision/api/v3/klines?symbol=" + encodeURIComponent(binanceSymbol) + "&interval=" + tf + "m&limit=250";
       const response = await fetch(url, { headers: { "Accept": "application/json" } });
       const rows = await response.json();
       if (!response.ok || !Array.isArray(rows)) throw new Error(rows && rows.msg ? rows.msg : "Binance candles unavailable");
@@ -66,7 +66,7 @@ module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
   try {
     const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
-      "&interval=" + tf + "min&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+      "&interval=" + tf + "min&outputsize=250&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
     const response = await fetch(url);
     const data = await response.json();
     if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
