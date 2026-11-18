@@ -19,13 +19,21 @@ jobs:
     steps:
       - name: Run 15-minute market scanner
         env:
-          DAGBO_BASE_URL: https://dagbo-dagbo1.vercel.app
-          SIGNAL_PUSH_SECRET: ${{ secrets.SIGNAL_PUSH_SECRET }}
+          DAGBO_BASE_URL: https://dagboboss.vercel.app
+          DAGBO_CRON_SECRET: ${{ secrets.DAGBO_CRON_SECRET }}
         run: |
-          if [ -z "$SIGNAL_PUSH_SECRET" ]; then
-            echo "Missing repository secret SIGNAL_PUSH_SECRET"
+          if [ -z "$DAGBO_CRON_SECRET" ]; then
+            echo "::error::Missing repository secret DAGBO_CRON_SECRET"
             exit 1
           fi
-          curl --fail-with-body --silent --show-error --retry 2 --retry-delay 5 \
-            -H "Authorization: Bearer $SIGNAL_PUSH_SECRET" \
-            "$DAGBO_BASE_URL/api/cron-scan"
+          response=$(curl --fail-with-body --silent --show-error --retry 2 --retry-delay 5 --max-time 150 \
+            --request POST \
+            -H "Authorization: Bearer $DAGBO_CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{}' \
+            "$DAGBO_BASE_URL/api/cron-scan")
+          echo "$response" | jq .
+          echo "$response" | jq -e '.success == true and (.scanned | length > 0) and (.errors | length == 0)' >/dev/null || {
+            echo "::error::Scanner returned no complete market scan. Check Twelve Data and Vercel runtime logs."
+            exit 1
+          }
