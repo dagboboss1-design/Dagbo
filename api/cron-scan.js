@@ -697,6 +697,9 @@ module.exports = async function handler(req, res) {
   if (acquired !== "OK") return res.status(200).json({ skipped: true, reason: "A scan is already running" });
 
   try {
+    // Prioritise Journal TP/SL monitoring before the heavier signal and HTF scans,
+    // so an approaching serverless execution limit cannot skip open-trade checks.
+    const tradeSummary = await monitorTrades({}, apiKey);
     const results = {}, errors = [];
     const pairsToScan = await getConfiguredPairs();
     const fetched = await Promise.all(pairsToScan.map(async pair => {
@@ -761,7 +764,6 @@ module.exports = async function handler(req, res) {
       console.error("DAGBO pair-intelligence scan failed:", pairError.message);
     }
 
-    const tradeSummary = await monitorTrades(results, apiKey);
     const newsSummary = { delegatedTo: "/api/news-monitor", note: "Economic-news and spike alerts run in the dedicated 5-minute news monitor." };
     const errorKey = "dagbo:scan:error:last";
     const previousErrorRaw = await redis.get(errorKey);
