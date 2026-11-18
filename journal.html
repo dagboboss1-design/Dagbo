@@ -489,10 +489,15 @@
           throw new Error('No valid live candles returned for ' + pair);
         }
         var candles = payload.values.slice().filter(function(c) {
-          return Number.isFinite(Number(c.high)) && Number.isFinite(Number(c.low)) &&
-            Number(c.high) > 0 && Number(c.low) > 0;
+          var raw=String(c.datetime||'');
+          var stamp=Date.parse(raw.replace(' ','T')+(/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw)?'':'Z'));
+          return Number.isFinite(stamp) && stamp+5*60*1000<=Date.now() &&
+            Number.isFinite(Number(c.high)) && Number.isFinite(Number(c.low)) &&
+            Number(c.high)>0 && Number(c.low)>0;
         }).sort(function(a,b) {
-          return Date.parse(String(a.datetime || '').replace(' ','T')) - Date.parse(String(b.datetime || '').replace(' ','T'));
+          var at=Date.parse(String(a.datetime||'').replace(' ','T')+'Z');
+          var bt=Date.parse(String(b.datetime||'').replace(' ','T')+'Z');
+          return at-bt;
         });
         if (!candles.length) continue;
         var candle = candles[candles.length - 1];
