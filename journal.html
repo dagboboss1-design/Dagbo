@@ -613,9 +613,47 @@
   window.addEventListener('focus', function(){ syncCloudTrades(); monitorOpenTrades(); });
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) { syncCloudTrades(); monitorOpenTrades(); } });
 
-  // Signal hand-offs are saved before navigation. Open the Journal directly;
-  // never interrupt the user with the manual trade-entry/edit form.
-  try { sessionStorage.removeItem('dagbo_open_journal_trade'); } catch(e) {}
+  // Signal hand-offs are saved before navigation. Show the saved trade in the list;
+  // do not open the manual edit form over the Journal.
+  function refreshJournalFromStorage() {
+    try {
+      var latest = JSON.parse(localStorage.getItem('dagbo_journal') || '[]');
+      if (Array.isArray(latest)) {
+        trades = latest;
+        renderStats();
+        renderList();
+      }
+    } catch(e) { console.warn('Journal refresh failed:', e); }
+  }
+  window.addEventListener('storage', function(event) {
+    if (event.key === 'dagbo_journal') refreshJournalFromStorage();
+  });
+  window.addEventListener('pageshow', refreshJournalFromStorage);
+  window.addEventListener('focus', refreshJournalFromStorage);
+  try {
+    var pendingJournalId = sessionStorage.getItem('dagbo_open_journal_trade');
+    if (pendingJournalId) {
+      sessionStorage.removeItem('dagbo_open_journal_trade');
+      refreshJournalFromStorage();
+      currentFilter = 'ALL';
+      var allFilter = document.getElementById('f1');
+      if (allFilter) allFilter.checked = true;
+      renderList();
+      var pendingTrade = trades.find(function(t){ return String(t.id) === String(pendingJournalId); });
+      if (pendingTrade) {
+        var cards = Array.prototype.slice.call(document.getElementById('tradeList').children);
+        var target = cards.find(function(card) {
+          return card.textContent.indexOf(String(pendingTrade.pair || '')) >= 0 &&
+            card.textContent.indexOf(new Date(pendingTrade.dateOpened || 0).toLocaleString('en-GB')) >= 0;
+        });
+        if (target) {
+          target.style.outline = '2px solid var(--dg-text)';
+          target.scrollIntoView({behavior:'smooth',block:'center'});
+          setTimeout(function(){ target.style.outline = ''; }, 2200);
+        }
+      }
+    }
+  } catch(e) { console.warn('Journal hand-off refresh failed:', e); }
 })();
 </script>
 <script src="navigation.js" defer></script>
