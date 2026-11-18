@@ -293,13 +293,20 @@ async function fetchTradeMarket(pair, apiKey) {
   if (!response.ok || data.status === "error" || !Array.isArray(data.values) || !data.values.length) {
     throw new Error(data.message || "No 5-minute trade-monitor candles");
   }
-  const candle = data.values[0]; // newest first; high/low includes intrabar touches
+  // Use the most recent COMPLETED candle so an unfinished bar cannot
+  // close a trade early before the same bar later touches the other level.
+  const completed = data.values.map(c => {
+    const rawTime = String(c.datetime || "");
+    const stamp = Date.parse(rawTime.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(rawTime) ? "" : "Z"));
+    return { candle: c, rawTime, stamp };
+  }).filter(x => Number.isFinite(x.stamp) && x.stamp + 5 * 60 * 1000 <= Date.now())
+    .sort((a,b) => b.stamp - a.stamp);
+  if (!completed.length) throw new Error("Waiting for a completed 5-minute candle");
+  const chosen = completed[0], candle = chosen.candle;
   const high = num(candle.high), low = num(candle.low), close = num(candle.close);
-  const rawTime = String(candle.datetime || "");
-  const stamp = Date.parse(rawTime.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(rawTime) ? "" : "Z"));
-  if ([high, low, close].some(v => v === null) || !Number.isFinite(stamp)) throw new Error("Invalid 5-minute trade-monitor candle");
-  if (Date.now() - stamp > 12 * 60 * 1000) throw new Error("5-minute trade-monitor candle is stale");
-  return { pair, entry: close, candleHigh: high, candleLow: low, candleTime: rawTime, candleStartMs: stamp, signal: null };
+  if ([high, low, close].some(v => v === null)) throw new Error("Invalid 5-minute trade-monitor candle");
+  if (Date.now() - (chosen.stamp + 5 * 60 * 1000) > 12 * 60 * 1000) throw new Error("5-minute trade-monitor candle is stale");
+  return { pair, entry: close, candleHigh: high, candleLow: low, candleTime: chosen.rawTime, candleStartMs: chosen.stamp, signal: null };
 }
 
 async function quoteCurrencyToUsd(currency, apiKey) {
