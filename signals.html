@@ -659,7 +659,21 @@
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + fTp1 + '</strong></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + fTp2 + '</strong></div>' +
           '</div>' +
-          '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Signal sources / evidence:</b><br>' + (s.evidence||[]).join('<br>') + '</div>' +
+          '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;"><b>Signal sources / evidence:</b><br>' + (s.evidence||[]).map(escapeNewsText).join('<br>') + '</div>' +
+          (s.strategyEngine ? (function(){
+            var engine=s.strategyEngine;
+            var triggered=isBuy?(engine.buyStrategies||[]):(engine.sellStrategies||[]);
+            var families=engine.groupVotes||{};
+            var familyLines=Object.keys(families).map(function(key){
+              var group=families[key];
+              return escapeNewsText(group.label)+': '+escapeNewsText(group.direction)+' ('+Number(group.buy||0)+' BUY / '+Number(group.sell||0)+' SELL)';
+            });
+            return '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px;padding:10px;border-radius:9px;background:var(--dg-inset)">' +
+              '<b>335-engine strategy source:</b> '+escapeNewsText(engine.direction)+' · '+Number(engine.agreementPct||0)+'% family agreement<br>' +
+              '<b>Triggered strategies:</b><br>'+(triggered.length?triggered.map(escapeNewsText).join('<br>'):'No individual strategy names returned')+
+              '<br><b>Family breakdown:</b><br>'+familyLines.join('<br>')+
+              '<br><b>Evaluation:</b> '+Number(engine.evaluated||0)+' / 335 strategies · '+Number(engine.errorCount||0)+' errors</div>';
+          })() : '<div style="font-size:12px;color:var(--dg-text-2);margin-top:10px"><b>335-engine source:</b> unavailable — no trade is allowed.</div>') +
           (newsConfirmed ? '<div style="font-size:12px;margin-top:8px;padding:9px;border-radius:9px;background:var(--dg-inset);color:var(--dg-text-2)"><b>News confirmation:</b> ' + escapeNewsText(latestNewsCandidate.event) + ' bias agrees with the technical scan. ' + escapeNewsText(latestNewsCandidate.evidence) + '</div>' : '');
       }
 
