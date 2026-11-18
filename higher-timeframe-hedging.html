@@ -22,7 +22,7 @@ var ms={'60':3600000,'240':14400000,'1day':86400000};
 function el(id){return document.getElementById(id)}
 function fmt(n){return Number.isFinite(Number(n))?Number(n).toFixed(5):'—'}
 function dir(s){return s&&s.signal&&String(s.signal).includes('BUY')?'BUY':s&&s.signal&&String(s.signal).includes('SELL')?'SELL':'WAIT'}
-function closed(values,tf){var duration=ms[tf]||14400000;return (values||[]).filter(function(c){var raw=String(c.datetime||'');var t=Date.parse(raw.replace(' ','T')+(/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw)?'':'Z'));return Number.isFinite(t)&&t+duration<=Date.now()}).reverse()}
+function closed(values,tf){var duration=ms[tf]||14400000;return (values||[]).filter(function(c){var raw=String(c.datetime||'');var t=Date.parse(raw.replace(' ','T')+(/(Z|[+-]\d\d:\d\d)$/.test(raw)?'':'Z'));return Number.isFinite(t)&&t+duration<=Date.now()}).reverse()}
 async function candles(pair,tf){var r=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(tf));var d=await r.json();if(!r.ok||d.error||!Array.isArray(d.values))throw Error(d.error||d.message||'Market data unavailable');var c=closed(d.values,tf);if(c.length<35)throw Error('Not enough closed '+(map[tf]||tf)+' candles');return c}
 function analyse(c,profile){var x=window.DagboConfluence&&window.DagboConfluence.analyze(c,'',profile||'swing');if(!x)throw Error('Confluence engine unavailable');return x}
 function atr(c){var s=0;for(var i=c.length-14;i<c.length;i++){var a=c[i],p=c[i-1];s+=Math.max(+a.high- +a.low,Math.abs(+a.high- +p.close),Math.abs(+a.low- +p.close))}return s/14}
