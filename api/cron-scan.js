@@ -331,25 +331,39 @@ async function calculateClosedTradePnlUsd(trade, exitPrice, apiKey) {
   const directionSign = String(trade.direction).toUpperCase() === "BUY" ? 1 : -1;
   const entry = num(trade.entry), lot = num(trade.lotSize) || 0.01, exit = num(exitPrice);
   if (entry === null || exit === null || lot <= 0) return { pnl: null, needsBrokerReview: true };
+  const priceMove = (exit - entry) * directionSign;
+
+  // Exness published standard contract sizes. Excludes spread, commission,
+  // swaps, dividend adjustments and account-currency conversion fees.
   if (pair === "XAUUSD" || pair === "GOLD") {
-    // Standard 100 troy-ounce XAUUSD contract assumption; broker terms may differ.
-    return { pnl: (exit - entry) * directionSign * lot * 100, needsBrokerReview: false, contractAssumption: "100 oz per lot" };
+    return { pnl: priceMove * lot * 100, needsBrokerReview: false, contractAssumption: "Exness XAUUSD: 100 troy oz/lot; before fees" };
+  }
+  if (pair === "XAGUSD" || pair === "SILVER") {
+    return { pnl: priceMove * lot * 5000, needsBrokerReview: false, contractAssumption: "Exness XAGUSD: 5,000 troy oz/lot; before fees" };
+  }
+  if (["BTCUSD","BTC","ETHUSD","ETH"].includes(pair)) {
+    // Exness common crypto CFD contract size: 1 coin per lot.
+    const coin = pair.startsWith("BTC") ? "BTC" : "ETH";
+    return { pnl: priceMove * lot, needsBrokerReview: false, contractAssumption: "Exness " + coin + ": 1 coin/lot; before fees" };
+  }
+  const indexContracts = { US30: 1, US100: 1, NAS100: 1, US500: 1 };
+  if (Object.prototype.hasOwnProperty.call(indexContracts, pair)) {
+    return { pnl: priceMove * lot * indexContracts[pair], needsBrokerReview: false, contractAssumption: "Exness " + pair + ": 1 index contract/lot; verify exact account symbol and suffix; before fees" };
   }
   if (/^[A-Z]{6}$/.test(pair)) {
     const base = pair.slice(0,3), quote = pair.slice(3,6);
     const currencies = ["USD","EUR","GBP","JPY","CHF","CAD","AUD","NZD","SEK","NOK","DKK","SGD","HKD","ZAR","MXN","TRY","PLN","CNY","CNH"];
     if (!currencies.includes(base) || !currencies.includes(quote)) return { pnl: null, needsBrokerReview: true };
     const units = lot * 100000;
-    const pnlQuote = (exit - entry) * directionSign * units;
+    const pnlQuote = priceMove * units;
     try {
       const conversion = await quoteCurrencyToUsd(quote, apiKey);
-      return { pnl: pnlQuote * conversion, needsBrokerReview: false, contractAssumption: "100,000 base units per lot" };
+      return { pnl: pnlQuote * conversion, needsBrokerReview: false, contractAssumption: "Exness FX: 100,000 base units/lot; converted to USD; before fees" };
     } catch (error) {
       return { pnl: null, needsBrokerReview: true, conversionError: error.message };
     }
   }
-  // CFD index and crypto lot sizes vary by broker. Never invent their contract value.
-  return { pnl: null, needsBrokerReview: true, conversionError: "Broker contract size/tick value required for this instrument" };
+  return { pnl: null, needsBrokerReview: true, conversionError: "Exness contract size not yet configured for this instrument" };
 }
 
 async function monitorTrades(_signalResults, apiKey) {
