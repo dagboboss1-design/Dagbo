@@ -695,31 +695,7 @@
       return;
     }
 
-    // Cloud monitoring is optional and must never block the local journal save or page navigation.
-    try {
-      if (window.DagboPWA && window.DagboPWA.getSubscription) {
-        window.DagboPWA.getSubscription().then(function(subscription) {
-          if (!subscription) return;
-          return fetch('/api/trades?action=open',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            keepalive:true,
-            body:JSON.stringify({
-              subscription:subscription,
-              pair:trade.pair,
-              direction:trade.direction,
-              entry:trade.entry,
-              stopLoss:trade.stopLoss,
-              takeProfit:trade.takeProfit,
-              lotSize:trade.lotSize,
-              journalTradeId:trade.id
-            })
-          });
-        }).catch(function(error){console.warn('Cloud trade monitoring unavailable; local journal entry was saved.',error);});
-      }
-    } catch(error) {
-      console.warn('Cloud trade monitoring unavailable; local journal entry was saved.',error);
-    }
+    // The Journal page owns cloud registration. This avoids duplicate server trades and works without push permission.
 
     window.location.href='journal.html';
   };
