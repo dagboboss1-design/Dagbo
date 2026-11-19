@@ -277,14 +277,14 @@
       var barMs = TF_MILLISECONDS[String(tf)] || 15 * 60 * 1000;
       candles = candles.filter(function(c) {
         var raw = String(c.datetime || '');
-        var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? '' : 'Z'));
+        var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\d{2}:\d{2})$/.test(raw) ? '' : 'Z'));
         return Number.isFinite(stamp) && stamp + barMs <= Date.now();
       }).sort(function(a, b) {
         // Twelve Data returns newest-first; Binance klines are oldest-first.
         // Normalize both providers to chronological order before indicators run.
         function candleTime(c) {
           var raw = String(c.datetime || '');
-          return Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? '' : 'Z'));
+          return Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\d{2}:\d{2})$/.test(raw) ? '' : 'Z'));
         }
         return candleTime(a) - candleTime(b);
       });
