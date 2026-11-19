@@ -106,6 +106,7 @@
   if (!Array.isArray(trades)) trades = [];
   var currentFilter = 'ALL';
   var editingId = null;
+  var serverSyncInFlight = {};
   var initialBalance = Number(settings.accountSize) || 100;
   var journalCurrency = localStorage.getItem('dagbo_journal_currency') === 'NGN' ? 'NGN' : 'USD';
   var usdNgnRate = null, usdNgnUpdated = null;
@@ -175,8 +176,8 @@
     return key;
   }
   async function syncServerOpenTrade(trade) {
-    if (!trade || trade.result !== 'OPEN' || trade.serverTracked || trade.serverSyncInFlight) return;
-    trade.serverSyncInFlight = true;
+    if (!trade || trade.result !== 'OPEN' || trade.serverTracked || serverSyncInFlight[trade.id]) return;
+    serverSyncInFlight[trade.id] = true;
     try {
       var subscription = null;
       if (window.DagboPWA && window.DagboPWA.getSubscription) {
@@ -197,7 +198,7 @@
         })
       });
       var data = await response.json().catch(function(){ return {}; });
-      if (response.status === 409 && data.trade && data.trade.id) {
+      if (response.status === 409 && data.trade && data.trade.id && data.trade.journalTradeId === String(trade.id)) {
         data.success = true;
       }
       if (!response.ok || !data.success || !data.trade || !data.trade.id) {
@@ -214,7 +215,7 @@
     } catch(err) {
       console.warn('Cloud trade open sync failed; trade remains saved locally:', err);
     } finally {
-      trade.serverSyncInFlight = false;
+      delete serverSyncInFlight[trade.id];
     }
   }
   function syncServerTrade(trade) {
