@@ -61,7 +61,7 @@
 
   <div class="dg-stack" id="tradeList"></div>
   <div style="margin-top:24px"><button class="dg-btn dg-btn--primary dg-btn--block" onclick="openForm()">+ Add New Trade</button></div>
-  <p class="dg-note" style="margin-top:24px">DAGBO SIGNAL tracks journal entries and monitors supported open trades when push notifications are enabled. It does not connect to or execute orders through your broker. Automatically detected TP/SL events are based on market candles; confirm fills with your broker.</p>
+  <p class="dg-note" style="margin-top:24px">DAGBO SIGNAL tracks supported open trades even when push notifications are off. Enable push for phone alerts. It does not connect to or execute orders through your broker. Automatically detected TP/SL events are based on market candles; confirm fills with your broker.</p>
 </main>
 
 
@@ -165,16 +165,28 @@
     renderFxStatus();
   };
   function persist() { localStorage.setItem('dagbo_journal', JSON.stringify(trades)); }
+  function getJournalDeviceKey() {
+    var key = localStorage.getItem('dagbo_journal_device_key');
+    if (!key) {
+      key = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() + crypto.randomUUID() :
+        String(Date.now()) + '-' + Math.random().toString(36).slice(2) + '-' + Math.random().toString(36).slice(2);
+      localStorage.setItem('dagbo_journal_device_key', key);
+    }
+    return key;
+  }
   async function syncServerOpenTrade(trade) {
-    if (!trade || trade.result !== 'OPEN' || trade.serverTracked) return;
-    if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
+    if (!trade || trade.result !== 'OPEN' || trade.serverTracked || trade.serverSyncInFlight) return;
+    trade.serverSyncInFlight = true;
     try {
-      var subscription = await window.DagboPWA.getSubscription();
-      if (!subscription) return;
+      var subscription = null;
+      if (window.DagboPWA && window.DagboPWA.getSubscription) {
+        try { subscription = await window.DagboPWA.getSubscription(); } catch(e) {}
+      }
       var response = await fetch('/api/trades?action=open', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({
-          subscription:subscription,
+          deviceKey:getJournalDeviceKey(),
+          subscription:subscription || undefined,
           journalTradeId:trade.id,
           pair:trade.pair,
           direction:trade.direction,
@@ -185,6 +197,9 @@
         })
       });
       var data = await response.json().catch(function(){ return {}; });
+      if (response.status === 409 && data.trade && data.trade.id) {
+        data.success = true;
+      }
       if (!response.ok || !data.success || !data.trade || !data.trade.id) {
         throw new Error(data.error || 'The server could not start monitoring this trade.');
       }
@@ -192,14 +207,16 @@
       if (saved && saved.result === 'OPEN') {
         saved.serverTracked = true;
         saved.serverTradeId = data.trade.id;
+        saved.monitoringPending = false;
         persist();
         renderList();
       }
     } catch(err) {
       console.warn('Cloud trade open sync failed; trade remains saved locally:', err);
+    } finally {
+      trade.serverSyncInFlight = false;
     }
   }
-
   function syncServerTrade(trade) {
     if (!trade) return;
     if (trade.result === 'OPEN') {
@@ -207,12 +224,11 @@
       return;
     }
     if (!trade.serverTracked || !trade.serverTradeId) return;
-    if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
-    window.DagboPWA.getSubscription().then(function(subscription) {
-      if (!subscription) return;
+    var subscriptionPromise = window.DagboPWA && window.DagboPWA.getSubscription ? window.DagboPWA.getSubscription().catch(function(){return null;}) : Promise.resolve(null);
+    subscriptionPromise.then(function(subscription) {
       return fetch('/api/trades?action=close', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({subscription:subscription,tradeId:trade.serverTradeId,result:trade.result,pnl:Number(trade.pnl)||0})
+        body:JSON.stringify({deviceKey:getJournalDeviceKey(),subscription:subscription||undefined,tradeId:trade.serverTradeId,result:trade.result,pnl:Number(trade.pnl)||0})
       }).then(function(response) {
         if (!response.ok) return response.json().then(function(data) {
           throw new Error(data.error || 'Server trade close sync failed');
@@ -428,13 +444,12 @@
   }
 
   async function syncCloudTrades() {
-    if (!window.DagboPWA || !window.DagboPWA.getSubscription) return;
     try {
-      var subscription = await window.DagboPWA.getSubscription();
-      if (!subscription) return;
+      var subscription = null;
+      if (window.DagboPWA && window.DagboPWA.getSubscription) { try { subscription = await window.DagboPWA.getSubscription(); } catch(e) {} }
       var response = await fetch('/api/trades?action=list', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({subscription:subscription})
+        body:JSON.stringify({deviceKey:getJournalDeviceKey(),subscription:subscription||undefined})
       });
       if (!response.ok) return;
       var data = await response.json();
@@ -479,6 +494,7 @@
   document.getElementById('currencyUSD').setAttribute('aria-pressed',String(journalCurrency==='USD'));
   document.getElementById('currencyNGN').setAttribute('aria-pressed',String(journalCurrency==='NGN'));
   renderStats();renderList();renderFxStatus();refreshUsdNgnRate();setInterval(refreshUsdNgnRate,5*60*1000);
+  trades.filter(function(t){ return t.result === 'OPEN' && !t.serverTracked; }).forEach(function(t){ syncServerOpenTrade(t); });
   syncCloudTrades();
   // Keep the journal current while it remains open, and refresh immediately when the user returns.
   setInterval(syncCloudTrades, 60 * 1000);
