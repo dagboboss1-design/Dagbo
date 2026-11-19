@@ -8,12 +8,18 @@ const redis = new Redis({
 });
 const SUBSCRIPTIONS = "dagbo:push:subscriptions";
 
-function deviceId(endpoint) {
+function endpointDeviceId(endpoint) {
   return crypto.createHash("sha256").update(endpoint).digest("hex");
+}
+function journalDeviceId(key) {
+  return crypto.createHash("sha256").update("dagbo-journal:" + key).digest("hex");
 }
 function validSubscription(sub) {
   return !!(sub && typeof sub.endpoint === "string" && sub.endpoint.startsWith("https://") &&
     sub.keys && typeof sub.keys.p256dh === "string" && typeof sub.keys.auth === "string");
+}
+function validDeviceKey(key) {
+  return typeof key === "string" && key.length >= 32 && key.length <= 256;
 }
 function positive(v) { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : null; }
 
@@ -23,10 +29,26 @@ module.exports = async function handler(req, res) {
   try {
     const body = req.body || {};
     const subscription = body.subscription;
-    if (!validSubscription(subscription)) return res.status(400).json({ error: "Enable push notifications on this device first." });
-    const id = deviceId(subscription.endpoint);
-    const registered = await redis.sismember(SUBSCRIPTIONS, id);
-    if (!registered) return res.status(403).json({ error: "This device is not registered for push notifications. Enable notifications again." });
+    const hasSubscription = validSubscription(subscription);
+    const hasDeviceKey = validDeviceKey(body.deviceKey);
+    if (!hasSubscription && !hasDeviceKey) {
+      return res.status(400).json({ error: "A valid DAGBO device key is required. Enable push only if you want phone alerts." });
+    }
+
+    let id;
+    if (hasDeviceKey) {
+      id = journalDeviceId(body.deviceKey);
+      if (hasSubscription) {
+        const registered = await redis.sismember(SUBSCRIPTIONS, endpointDeviceId(subscription.endpoint));
+        if (!registered) return res.status(403).json({ error: "Enable push notifications again to receive alerts." });
+        await redis.set("dagbo:push:sub:" + id, JSON.stringify(subscription), { ex: 60 * 60 * 24 * 90 });
+        await redis.sadd(SUBSCRIPTIONS, id);
+      }
+    } else {
+      id = endpointDeviceId(subscription.endpoint);
+      const registered = await redis.sismember(SUBSCRIPTIONS, id);
+      if (!registered) return res.status(403).json({ error: "This device is not registered for push notifications. Enable notifications again." });
+    }
 
     const action = req.query && req.query.action;
     const setKey = "dagbo:trades:device:" + id;
@@ -51,18 +73,22 @@ module.exports = async function handler(req, res) {
           (direction === "SELL" && !(stopLoss > entry && takeProfit < entry))) {
         return res.status(400).json({ error: "Invalid trade details or SL/TP direction." });
       }
+      const journalTradeId = String(body.journalTradeId || "");
       const ids = await redis.smembers(setKey);
       for (const tradeId of ids) {
         const raw = await redis.get("dagbo:trade:" + id + ":" + tradeId);
         if (!raw) continue;
         const old = typeof raw === "string" ? JSON.parse(raw) : raw;
+        if (journalTradeId && old.journalTradeId === journalTradeId) {
+          return res.status(200).json({ success: true, trade: old, alreadyTracked: true });
+        }
         if (old.status === "OPEN" && old.pair === pair) {
           return res.status(409).json({ error: "An open trade already exists for " + pair + ".", trade: old });
         }
       }
       const tradeId = crypto.randomUUID();
       const trade = {
-        id: tradeId, journalTradeId: String(body.journalTradeId || ""), pair, direction, entry, stopLoss, takeProfit, lotSize,
+        id: tradeId, journalTradeId, pair, direction, entry, stopLoss, takeProfit, lotSize,
         status: "OPEN", result: "OPEN", pnl: 0,
         dateOpened: new Date().toISOString(), dateClosed: null
       };
@@ -70,21 +96,17 @@ module.exports = async function handler(req, res) {
       await redis.sadd(setKey, tradeId);
       await redis.sadd("dagbo:trades:devices", id);
 
-      // Notify only the device that added this trade to the DAGBO tracker.
-      try {
-        if (process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+      if (hasSubscription && process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+        try {
           webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
           await webpush.sendNotification(subscription, JSON.stringify({
             title: "📌 TRADE ADDED TO DAGBO",
             body: pair + " " + direction + " has been added to your trade tracker. This does not place a broker order.",
-            url: "/journal.html",
-            tag: "trade-open-" + tradeId
+            url: "/journal.html", tag: "trade-open-" + tradeId
           }), { TTL: 300, urgency: "high" });
-        }
-      } catch (pushError) {
-        console.error("DAGBO trade-open push error:", pushError.message);
+        } catch (pushError) { console.error("DAGBO trade-open push error:", pushError.message); }
       }
-      return res.status(201).json({ success: true, trade });
+      return res.status(201).json({ success: true, trade, pushEnabled: hasSubscription });
     }
 
     if (action === "close") {
