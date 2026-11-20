@@ -556,6 +556,13 @@
       if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
       if (s.noMethods) { listHtml += '<section class="dg-card"><strong>'+escapeNewsText(s.pair)+' · NO ACTIVE STRATEGIES</strong><div class="dg-muted" style="margin-top:6px">Enable at least one strategy in the selected Trading Profile to run this scan.</div></section>'; return; }
       if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
+      if(s.lifecycleStatus==='EXPIRED'||s.lifecycleStatus==='NO_TRADE'){
+        var cycle=cycleFor(s.pair,currentSignalTF);
+        var statusTitle=s.lifecycleStatus==='EXPIRED'?'SIGNAL EXPIRED':'NO TRADE';
+        var nextText=cycle?'Next fresh scan: '+new Date(cycle.anchor+tfDuration(currentSignalTF)*3).toLocaleString():'Waiting for next scan';
+        listHtml+='<section class="dg-card" style="border:1px solid var(--dg-line)"><div class="dg-card__head"><h2 class="dg-card__title">'+escapeNewsText(s.pair)+'</h2><span class="dg-pill dg-pill--wait">'+statusTitle+'</span></div><div class="dg-muted" style="font-size:13px;margin-top:7px">'+(s.lifecycleStatus==='EXPIRED'?'The signal validity window has ended. Do not enter using the old levels.':'No active trade setup is available. Wait for the scheduled fresh scan.')+'</div><div class="dg-help" style="margin-top:7px">'+escapeNewsText(nextText)+'</div></section>';
+        return;
+      }
       var isBuy = s.final.includes('BUY');
       var isSell = s.final.includes('SELL');
       var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
@@ -603,6 +610,7 @@
           '<div class="dg-signal__word ' + cls + '" style="font-size:28px;text-align:left">' + s.final + '</div>' +
           '<div class="dg-muted" style="font-size:13px;margin-bottom:5px">' + (scannerProfileName()+' Setup') + ' · '+(s.quality||'LOW')+' CONFIDENCE · '+Number(s.confidence||0)+'%</div>' +
           '<div class="dg-muted" style="font-size:11px;margin-bottom:12px">Source: '+escapeNewsText(s.source||'Main confluence')+(s.momentumTrigger?' · '+escapeNewsText(s.momentumTrigger):'')+'</div>' +
+          '<div class="dg-help" style="margin:-5px 0 10px">'+(s.lifecycleStatus==='RECONFIRMED'?'Fresh scan reconfirmed this direction.':'Signal expires after '+timeframeLabel(currentSignalTF)+' unless reconfirmed.')+'</div>' +
           '<div style="font-size:12px;font-weight:800;margin:0 0 8px;color:var(--dg-text-2)">RISK : REWARD · '+escapeNewsText(s.rr||'1:1')+'</div>' +
           '<div class="dg-grid-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + fEntry + '</strong></div>' +
@@ -779,7 +787,8 @@
   };
 
   // --- INITIALIZE ---
-  async function loadAllSignals() {
+  async function loadAllSignals(options) {
+    options=options||{};
     var loading = document.getElementById('loadingText');
     if (loading) loading.innerText = 'Scanning '+scannerProfileName()+' ('+timeframeLabel(currentSignalTF)+') live candles...';
     
@@ -791,6 +800,7 @@
       if (data) signalsData[pair] = data;
     }
     
+    applyFreshScanCycles(options);
     recordSignalSnapshot();
     var now = new Date();
     document.getElementById('lastUpdated').innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -799,7 +809,8 @@
 
   renderProfileControls();
   updateScalpStats();
-  loadAllSignals();
+  loadAllSignals({resume:true});
+  startLifecycleClock();
 
   window.addEventListener('load', async function() {
     try {
