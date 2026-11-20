@@ -144,7 +144,52 @@
   try { profilePreferenceStore=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}; } catch(e) {}
   var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
   var TF_MILLISECONDS={'5':300000,'15':900000,'30':1800000,'60':3600000,'240':14400000,'1day':86400000,'1week':604800000};
-  function timeframeLabel(tf){return TF_LABELS[String(tf)]||String(tf);}
+  // Persisted signal lifecycle for the selected timeframe.
+  var SIGNAL_CYCLES_KEY='dagbo_signal_cycles_v1', signalCycles={};
+  try{signalCycles=JSON.parse(localStorage.getItem(SIGNAL_CYCLES_KEY)||'{}')||{};}catch(e){}
+  var lifecycleTimer=null,lifecycleScanBusy=false;
+  function cycleKey(pair,tf){return String(tf)+'::'+String(pair).toUpperCase();}
+  function tfDuration(tf){return TF_MILLISECONDS[String(tf)]||900000;}
+  function saveSignalCycles(){try{localStorage.setItem(SIGNAL_CYCLES_KEY,JSON.stringify(signalCycles));}catch(e){}}
+  function cycleFor(pair,tf){return signalCycles[cycleKey(pair,tf)]||null;}
+  function applyFreshScanCycles(options){
+    var now=Date.now(),duration=tfDuration(currentSignalTF),checkpoint=!!(options&&options.checkpoint),resume=!!(options&&options.resume);
+    Object.keys(signalsData).forEach(function(pair){
+      var item=signalsData[pair]||{},key=cycleKey(pair,currentSignalTF),old=signalCycles[key],direction=directionOf(item.final);
+      if(checkpoint&&old){
+        if(direction!=='WAIT'&&direction===old.direction){old.status='RECONFIRMED';old.lastConfirmedAt=now;item.lifecycleStatus='RECONFIRMED';}
+        else{old.status='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;item.lifecycleStatus='NO_TRADE';}
+        old.lastCheckedAt=now;item.lifecycleAnchor=old.anchor;item.lifecycleNextScan=old.anchor+duration*3;signalCycles[key]=old;return;
+      }
+      if(resume&&old&&now<old.anchor+duration*3){
+        var elapsed=now-old.anchor;item.lifecycleAnchor=old.anchor;item.lifecycleNextScan=old.anchor+duration*3;
+        if(elapsed>=duration*2.5){old.status='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;item.lifecycleStatus='NO_TRADE';}
+        else if(elapsed>=duration*2&&duration>=3600000){item.lifecycleStatus='EXPIRED';}
+        else if(elapsed>=duration*2){old.status='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;item.lifecycleStatus='NO_TRADE';}
+        else if(elapsed>=duration){old.status='EXPIRED';item.lifecycleStatus='EXPIRED';}
+        else{old.status=direction==='WAIT'?'NO_TRADE':'ACTIVE';item.lifecycleStatus=old.status;}
+        signalCycles[key]=old;return;
+      }
+      var cycle={anchor:now,duration:duration,direction:direction,status:direction==='WAIT'?'NO_TRADE':'ACTIVE',lastCheckedAt:now,lastConfirmedAt:direction==='WAIT'?null:now};
+      signalCycles[key]=cycle;item.lifecycleStatus=cycle.status;item.lifecycleAnchor=now;item.lifecycleNextScan=now+duration*3;
+    });
+    saveSignalCycles();
+  }
+  function renderLifecycleStatus(){
+    var now=Date.now(),duration=tfDuration(currentSignalTF),changed=false;
+    Object.keys(signalsData).forEach(function(pair){
+      var item=signalsData[pair],cycle=cycleFor(pair,currentSignalTF);if(!item||!cycle)return;
+      var elapsed=now-cycle.anchor;
+      if(elapsed>=duration*2.5&&cycle.status!=='NO_TRADE'){cycle.status='NO_TRADE';item.lifecycleStatus='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;changed=true;}
+      else if(elapsed>=duration&&cycle.status==='ACTIVE'){cycle.status='EXPIRED';item.lifecycleStatus='EXPIRED';changed=true;}
+    });
+    if(changed){saveSignalCycles();renderCards();}
+    var due=Object.keys(signalsData).some(function(pair){var x=cycleFor(pair,currentSignalTF);return x&&now>=x.anchor+duration*3;});
+    if(due&&!lifecycleScanBusy){lifecycleScanBusy=true;loadAllSignals({forceNew:true}).finally(function(){lifecycleScanBusy=false;});return;}
+    var checkpointDue=duration>=3600000&&Object.keys(signalsData).some(function(pair){var x=cycleFor(pair,currentSignalTF);return x&&x.status==='ACTIVE'&&now>=x.anchor+duration*2;});
+    if(checkpointDue&&!lifecycleScanBusy){lifecycleScanBusy=true;loadAllSignals({checkpoint:true}).finally(function(){lifecycleScanBusy=false;});}
+  }
+  function startLifecycleClock(){if(lifecycleTimer)clearInterval(lifecycleTimer);lifecycleTimer=setInterval(renderLifecycleStatus,15000);renderLifecycleStatus();}
   function scannerProfileName(){return activeProfileConfig?activeProfileConfig.name:'Day Trading';}
   function groupsForActiveProfile(){
     var categoryMap={
