@@ -332,6 +332,22 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, answer: rawAnswer.trim() });
     }
 
+    if (req.method === "POST" && action === "scan-summary") {
+      const { subscription, summary, timeframe, scannedAt } = req.body || {};
+      if (!validSubscription(subscription)) return res.status(400).json({ error: "A valid device push subscription is required" });
+      const safeSummary = typeof summary === "string" ? summary.replace(/[<>]/g, "").slice(0, 220) : "";
+      const safeTimeframe = typeof timeframe === "string" ? timeframe.slice(0, 12) : "current";
+      if (!safeSummary) return res.status(400).json({ error: "Scan summary is required" });
+      configureVapid();
+      await webpush.sendNotification(subscription, JSON.stringify({
+        title: "DAGBO SIGNAL — Scan complete",
+        body: safeSummary + " · " + safeTimeframe + (scannedAt ? " · " + String(scannedAt).slice(0, 30) : ""),
+        url: "/signals.html",
+        tag: "dagbo-scan-summary"
+      }), { TTL: 120, urgency: "normal", topic: "dagbo-scan" });
+      return res.status(200).json({ success: true, message: "Scan summary notification sent to this device" });
+    }
+
     return res.status(404).json({ error: "Unknown push action" });
   } catch (error) {
     console.error("DAGBO PUSH ERROR:", error.message);
