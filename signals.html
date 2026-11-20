@@ -830,7 +830,11 @@
     signalsData = {};
     await loadNewsSignalContext();
 
-    for (let pair of enabledPairs) {
+    for (let i = 0; i < enabledPairs.length; i++) {
+      // Twelve Data allows only a small number of calls per minute on this account.
+      // Space requests so a large enabled-pair list is queued instead of burst-rejected.
+      if (i > 0) await new Promise(function(resolve) { setTimeout(resolve, 10200); });
+      let pair = enabledPairs[i];
       let data = await fetchPairData(pair, currentSignalTF);
       if (data) signalsData[pair] = data;
     }
@@ -852,9 +856,10 @@
   // Run a fresh Signal Board scan every two minutes while this page is active.
   // The request cache and shared Twelve Data limiter protect the provider quota.
   if (window.signalAutoScanTimer) clearInterval(window.signalAutoScanTimer);
+  var signalScanIntervalMs = Math.max(120000, enabledPairs.length * 10200);
   window.signalAutoScanTimer = setInterval(function() {
     if (!document.hidden) loadAllSignals({scheduled:true});
-  }, 120000);
+  }, signalScanIntervalMs);
 
   window.addEventListener('load', async function() {
     try {
