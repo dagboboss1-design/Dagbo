@@ -147,7 +147,7 @@
   // Persisted signal lifecycle for the selected timeframe.
   var SIGNAL_CYCLES_KEY='dagbo_signal_cycles_v1', signalCycles={};
   try{signalCycles=JSON.parse(localStorage.getItem(SIGNAL_CYCLES_KEY)||'{}')||{};}catch(e){}
-  var lifecycleTimer=null,lifecycleScanBusy=false;
+  var lifecycleTimer=null,lifecycleScanBusy=false,signalLoadInProgress=false;
   function cycleKey(pair,tf){return String(tf)+'::'+String(pair).toUpperCase();}
   function tfDuration(tf){return TF_MILLISECONDS[String(tf)]||900000;}
   function scanFactor(tf){return String(tf)==='15'?4:3;}
@@ -789,6 +789,8 @@
 
   // --- INITIALIZE ---
   async function loadAllSignals(options) {
+    if(signalLoadInProgress)return;
+    signalLoadInProgress=true;
     options=options||{};
     var loading = document.getElementById('loadingText');
     if (loading) loading.innerText = 'Scanning '+scannerProfileName()+' ('+timeframeLabel(currentSignalTF)+') live candles...';
@@ -806,6 +808,7 @@
     var now = new Date();
     document.getElementById('lastUpdated').innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     renderCards();
+    signalLoadInProgress=false;
   }
 
   window.loadAllSignals=function(){loadAllSignals();};
