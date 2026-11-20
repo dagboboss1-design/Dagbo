@@ -830,22 +830,40 @@
     signalsData = {};
     await loadNewsSignalContext();
 
-    for (let i = 0; i < enabledPairs.length; i++) {
-      // Twelve Data allows only a small number of calls per minute on this account.
-      // Space requests so a large enabled-pair list is queued instead of burst-rejected.
-      if (i > 0) await new Promise(function(resolve) { setTimeout(resolve, 10200); });
-      let pair = enabledPairs[i];
-      let data = await fetchPairData(pair, currentSignalTF);
-      if (data) signalsData[pair] = data;
+    try {
+      // Fetch up to six pairs together. The API has a shared six-call/minute
+      // Twelve Data guard, so this removes the unnecessary 10-second wait per pair
+      // without exceeding the provider budget. Larger watchlists continue in the
+      // next quota window rather than returning a wall of rate-limit errors.
+      var batchSize = 6;
+      for (var start = 0; start < enabledPairs.length; start += batchSize) {
+        if (start > 0) {
+          if (loading) loading.innerText = 'Waiting for the next safe data window…';
+          await new Promise(function(resolve) { setTimeout(resolve, 62000); });
+        }
+        var batch = enabledPairs.slice(start, start + batchSize);
+        var results = await Promise.all(batch.map(function(pair) {
+          return fetchPairData(pair, currentSignalTF).then(function(data) {
+            return { pair: pair, data: data };
+          }).catch(function(error) {
+            console.error('DAGBO pair scan failed:', pair, error);
+            return { pair: pair, data: { pair: pair, error: 'Temporary scan failure. Refresh to retry.', errorStage: 'network' } };
+          });
+        }));
+        results.forEach(function(result) {
+          if (result.data) signalsData[result.pair] = result.data;
+        });
+      }
+
+      applyFreshScanCycles(options);
+      recordSignalSnapshot();
+      var now = new Date();
+      document.getElementById('lastUpdated').innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      renderCards();
+      await notifyCompletedScan();
+    } finally {
+      signalLoadInProgress = false;
     }
-    
-    applyFreshScanCycles(options);
-    recordSignalSnapshot();
-    var now = new Date();
-    document.getElementById('lastUpdated').innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    renderCards();
-    signalLoadInProgress=false;
-    await notifyCompletedScan();
   }
 
   window.loadAllSignals=function(){loadAllSignals();};
@@ -856,7 +874,7 @@
   // Run a fresh Signal Board scan every two minutes while this page is active.
   // The request cache and shared Twelve Data limiter protect the provider quota.
   if (window.signalAutoScanTimer) clearInterval(window.signalAutoScanTimer);
-  var signalScanIntervalMs = Math.max(120000, enabledPairs.length * 10200);
+  var signalScanIntervalMs = 120000;
   window.signalAutoScanTimer = setInterval(function() {
     if (!document.hidden) loadAllSignals({scheduled:true});
   }, signalScanIntervalMs);
