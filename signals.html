@@ -280,8 +280,8 @@
         var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? '' : 'Z'));
         return Number.isFinite(stamp) && stamp + barMs <= Date.now();
       }).reverse();
-      if (candles.length < 30) {
-        return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain after UTC time filtering.', errorStage: 'closed-candles' };
+      if (candles.length < 60) {
+        return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain; this strategy engine requires at least 60 closed candles.', errorStage: 'closed-candles' };
       }
 
       var analysis=analyseAllMethods(candles, activeTradingProfile);
@@ -295,11 +295,23 @@
         var high=Number(candle.high),low=Number(candle.low),previousClose=Number(previous.close);
         atrSum+=Math.max(high-low,Math.abs(high-previousClose),Math.abs(low-previousClose));
       }
-      var atr=atrSum/14,slDist=atr*1.5,tp1Dist=atr*2,tp2Dist=atr*3.5;
+      var atr=atrSum/14,slDist=atr*1.5;
+      // RR is selected from the active trading profile and independently confirmed confluence.
+      // Higher targets are reserved for stronger, multi-method setups; never force 1:7 on weak signals.
+      var rr=activeTradingProfile==='scalping'?1:
+        activeTradingProfile==='swing'?3:
+        activeTradingProfile==='position'?5:
+        activeTradingProfile==='event'?2:2;
+      var activeEvidence=Array.isArray(analysis.evidence)?analysis.evidence.length:0;
+      if(analysis.confidence>=90&&activeEvidence>=5) rr=7;
+      else if(analysis.confidence>=85&&activeEvidence>=4) rr=Math.max(rr,5);
+      else if(analysis.confidence>=80&&activeEvidence>=4) rr=Math.max(rr,4);
+      else if(analysis.confidence>=75&&activeEvidence>=3) rr=Math.max(rr,3);
+      var tp1Dist=slDist*rr,tp2Dist=slDist*Math.min(7,rr+1);
       var sl=isBuy?entry-slDist:entry+slDist,tp1=isBuy?entry+tp1Dist:entry-tp1Dist,tp2=isBuy?entry+tp2Dist:entry-tp2Dist;
       var lastC=candles[candles.length-1];
       return {
-        pair:pair,final:final,entry:entry,sl:sl,tp1:tp1,tp2:tp2,
+        pair:pair,final:final,entry:entry,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,
         s1:analysis.emaTrend,s2:analysis.candleName,s3:analysis.structure,
         strategy:analysis.evidence.length?analysis.evidence.join(' · '):'No method produced directional evidence',
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
@@ -546,6 +558,7 @@
           '<div class="dg-signal__word ' + cls + '" style="font-size:28px;text-align:left">' + s.final + '</div>' +
           '<div class="dg-muted" style="font-size:13px;margin-bottom:5px">' + (scannerProfileName()+' Setup') + ' · '+(s.quality||'LOW')+' CONFIDENCE · '+Number(s.confidence||0)+'%</div>' +
           '<div class="dg-muted" style="font-size:11px;margin-bottom:12px">Source: '+escapeNewsText(s.source||'Main confluence')+(s.momentumTrigger?' · '+escapeNewsText(s.momentumTrigger):'')+'</div>' +
+          '<div style="font-size:12px;font-weight:800;margin:0 0 8px;color:var(--dg-text-2)">RISK : REWARD · '+escapeNewsText(s.rr||'1:1')+'</div>' +
           '<div class="dg-grid-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + fEntry + '</strong></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Stop Loss</span><strong style="font-size:15px" class="dg-neg">' + fSl + '</strong></div>' +
