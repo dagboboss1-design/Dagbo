@@ -11,6 +11,51 @@ const BINANCE_SYMBOLS = {
   ETH: "ETHUSDT", ETHUSD: "ETHUSDT", ETHUSDT: "ETHUSDT"
 };
 
+const memoryCache = new Map();
+let memoryMinute = { startedAt: 0, count: 0 };
+const CACHE_SECONDS = 110;
+const MAX_TWELVE_CALLS_PER_MINUTE = 6;
+
+function redisClient() {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
+  const { Redis } = require("@upstash/redis");
+  return new Redis({ url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN });
+}
+
+async function readCache(key) {
+  try {
+    const redis = redisClient();
+    if (redis) {
+      const value = await redis.get(key);
+      if (value) return typeof value === "string" ? JSON.parse(value) : value;
+    }
+  } catch (error) { console.error("DAGBO market cache read:", error.message); }
+  return memoryCache.get(key) || null;
+}
+
+async function writeCache(key, value) {
+  memoryCache.set(key, value);
+  try {
+    const redis = redisClient();
+    if (redis) await redis.set(key, JSON.stringify(value), { ex: 600 });
+  } catch (error) { console.error("DAGBO market cache write:", error.message); }
+}
+
+async function claimTwelveDataSlot() {
+  try {
+    const redis = redisClient();
+    if (redis) {
+      const count = await redis.incr("dagbo:market:twelve:minute");
+      if (count === 1) await redis.expire("dagbo:market:twelve:minute", 60);
+      return count <= MAX_TWELVE_CALLS_PER_MINUTE;
+    }
+  } catch (error) { console.error("DAGBO market rate limiter:", error.message); }
+  const now = Date.now();
+  if (now - memoryMinute.startedAt >= 60000) memoryMinute = { startedAt: now, count: 0 };
+  memoryMinute.count += 1;
+  return memoryMinute.count <= MAX_TWELVE_CALLS_PER_MINUTE;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
@@ -71,7 +116,24 @@ module.exports = async function handler(req, res) {
   const apiKey = process.env.TWELVE_DATA_API_KEY;
   if (!apiKey) return res.status(503).json({ error: "Market data is not configured. Add TWELVE_DATA_API_KEY in Vercel." });
 
-  res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
+  const cacheKey = "dagbo:market:candles:" + pair + ":" + tf;
+  const cached = await readCache(cacheKey);
+  const cacheAge = cached ? Date.now() - Number(cached.savedAt || 0) : Infinity;
+  if (cached && cacheAge <= CACHE_SECONDS * 1000) {
+    res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
+    return res.status(200).json({ ...cached.payload, cache: "hit", cachedAt: new Date(cached.savedAt).toISOString() });
+  }
+
+  const allowed = await claimTwelveDataSlot();
+  if (!allowed) {
+    if (cached && cacheAge <= 10 * 60 * 1000) {
+      return res.status(200).json({ ...cached.payload, cache: "stale-fallback", stale: true, cacheAgeSeconds: Math.round(cacheAge / 1000) });
+    }
+    res.setHeader("Retry-After", "60");
+    return res.status(429).json({ error: "DAGBO is protecting the Twelve Data quota. The shared limit of 6 requests per minute has been reached; retry shortly.", provider: "DAGBO rate limiter", retryAfter: 60 });
+  }
+
+  res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
   try {
     const url = "https://api.twelvedata.com/time_series?symbol=" +
       encodeURIComponent(symbol) +
@@ -80,14 +142,20 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
-      return res.status(502).json({ error: data.message || "Market data provider did not return candles", provider: "Twelve Data" });
+      const message = data.message || "Market data provider did not return candles";
+      if (/credits|rate limit|api calls/i.test(message) && cached && cacheAge <= 10 * 60 * 1000) {
+        return res.status(200).json({ ...cached.payload, cache: "stale-fallback", stale: true, cacheAgeSeconds: Math.round(cacheAge / 1000) });
+      }
+      return res.status(response.status === 429 ? 429 : 502).json({ error: message, provider: "Twelve Data" });
     }
 
-    return res.status(200).json({
+    const payload = {
       pair, timeframe: tf, provider: "Twelve Data",
       providerExchange: data.meta && data.meta.exchange ? data.meta.exchange : null,
       values: data.values
-    });
+    };
+    await writeCache(cacheKey, { savedAt: Date.now(), payload });
+    return res.status(200).json({ ...payload, cache: "miss" });
   } catch (error) {
     console.error("DAGBO market data proxy error:", error.message);
     return res.status(502).json({ error: "Could not retrieve market candles" });
