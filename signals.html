@@ -180,13 +180,13 @@
     Object.keys(signalsData).forEach(function(pair){
       var item=signalsData[pair],cycle=cycleFor(pair,currentSignalTF);if(!item||!cycle)return;
       var elapsed=now-cycle.anchor;
-      if(elapsed>=duration*2.5&&cycle.status!=='NO_TRADE'){cycle.status='NO_TRADE';item.lifecycleStatus='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;changed=true;}
+      if((elapsed>=duration*2.5||(duration<3600000&&elapsed>=duration*2))&&cycle.status!=='NO_TRADE'){cycle.status='NO_TRADE';item.lifecycleStatus='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;changed=true;}
       else if(elapsed>=duration&&cycle.status==='ACTIVE'){cycle.status='EXPIRED';item.lifecycleStatus='EXPIRED';changed=true;}
     });
     if(changed){saveSignalCycles();renderCards();}
     var due=Object.keys(signalsData).some(function(pair){var x=cycleFor(pair,currentSignalTF);return x&&now>=x.anchor+duration*3;});
     if(due&&!lifecycleScanBusy){lifecycleScanBusy=true;loadAllSignals({forceNew:true}).finally(function(){lifecycleScanBusy=false;});return;}
-    var checkpointDue=duration>=3600000&&Object.keys(signalsData).some(function(pair){var x=cycleFor(pair,currentSignalTF);return x&&x.status==='ACTIVE'&&now>=x.anchor+duration*2;});
+    var checkpointDue=duration>=3600000&&Object.keys(signalsData).some(function(pair){var x=cycleFor(pair,currentSignalTF);return x&&(x.status==='ACTIVE'||x.status==='EXPIRED')&&now>=x.anchor+duration*2;});
     if(checkpointDue&&!lifecycleScanBusy){lifecycleScanBusy=true;loadAllSignals({checkpoint:true}).finally(function(){lifecycleScanBusy=false;});}
   }
   function startLifecycleClock(){if(lifecycleTimer)clearInterval(lifecycleTimer);lifecycleTimer=setInterval(renderLifecycleStatus,15000);renderLifecycleStatus();}
