@@ -150,6 +150,7 @@
   var lifecycleTimer=null,lifecycleScanBusy=false;
   function cycleKey(pair,tf){return String(tf)+'::'+String(pair).toUpperCase();}
   function tfDuration(tf){return TF_MILLISECONDS[String(tf)]||900000;}
+  function scanFactor(tf){return String(tf)==='15'?4:3;}
   function saveSignalCycles(){try{localStorage.setItem(SIGNAL_CYCLES_KEY,JSON.stringify(signalCycles));}catch(e){}}
   function cycleFor(pair,tf){return signalCycles[cycleKey(pair,tf)]||null;}
   function applyFreshScanCycles(options){
@@ -159,9 +160,9 @@
       if(checkpoint&&old){
         if(direction!=='WAIT'&&direction===old.direction){old.status='RECONFIRMED';old.lastConfirmedAt=now;item.lifecycleStatus='RECONFIRMED';}
         else{old.status='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;item.lifecycleStatus='NO_TRADE';}
-        old.lastCheckedAt=now;item.lifecycleAnchor=old.anchor;item.lifecycleNextScan=old.anchor+duration*3;signalCycles[key]=old;return;
+        old.lastCheckedAt=now;item.lifecycleAnchor=old.anchor;item.lifecycleNextScan=old.anchor+duration*scanFactor(currentSignalTF);signalCycles[key]=old;return;
       }
-      if(resume&&old&&now<old.anchor+duration*3){
+      if(resume&&old&&now<old.anchor+duration*scanFactor(currentSignalTF)){
         var elapsed=now-old.anchor;item.lifecycleAnchor=old.anchor;item.lifecycleNextScan=old.anchor+duration*3;
         if(elapsed>=duration*2.5){old.status='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;item.lifecycleStatus='NO_TRADE';}
         else if(elapsed>=duration*2&&duration>=3600000){item.lifecycleStatus='EXPIRED';}
@@ -171,7 +172,7 @@
         signalCycles[key]=old;return;
       }
       var cycle={anchor:now,duration:duration,direction:direction,status:direction==='WAIT'?'NO_TRADE':'ACTIVE',lastCheckedAt:now,lastConfirmedAt:direction==='WAIT'?null:now};
-      signalCycles[key]=cycle;item.lifecycleStatus=cycle.status;item.lifecycleAnchor=now;item.lifecycleNextScan=now+duration*3;
+      signalCycles[key]=cycle;item.lifecycleStatus=cycle.status;item.lifecycleAnchor=now;item.lifecycleNextScan=now+duration*scanFactor(currentSignalTF);
     });
     saveSignalCycles();
   }
@@ -184,7 +185,7 @@
       else if(elapsed>=duration&&cycle.status==='ACTIVE'){cycle.status='EXPIRED';item.lifecycleStatus='EXPIRED';changed=true;}
     });
     if(changed){saveSignalCycles();renderCards();}
-    var due=Object.keys(signalsData).some(function(pair){var x=cycleFor(pair,currentSignalTF);return x&&now>=x.anchor+duration*3;});
+    var due=Object.keys(signalsData).some(function(pair){var x=cycleFor(pair,currentSignalTF);return x&&now>=x.anchor+duration*scanFactor(currentSignalTF);});
     if(due&&!lifecycleScanBusy){lifecycleScanBusy=true;loadAllSignals({forceNew:true}).finally(function(){lifecycleScanBusy=false;});return;}
     var checkpointDue=duration>=3600000&&Object.keys(signalsData).some(function(pair){var x=cycleFor(pair,currentSignalTF);return x&&(x.status==='ACTIVE'||x.status==='EXPIRED')&&now>=x.anchor+duration*2;});
     if(checkpointDue&&!lifecycleScanBusy){lifecycleScanBusy=true;loadAllSignals({checkpoint:true}).finally(function(){lifecycleScanBusy=false;});}
@@ -559,7 +560,7 @@
       if(s.lifecycleStatus==='EXPIRED'||s.lifecycleStatus==='NO_TRADE'){
         var cycle=cycleFor(s.pair,currentSignalTF);
         var statusTitle=s.lifecycleStatus==='EXPIRED'?'SIGNAL EXPIRED':'NO TRADE';
-        var nextText=cycle?'Next fresh scan: '+new Date(cycle.anchor+tfDuration(currentSignalTF)*3).toLocaleString():'Waiting for next scan';
+        var nextText=cycle?'Next fresh scan: '+new Date(cycle.anchor+tfDuration(currentSignalTF)*scanFactor(currentSignalTF)).toLocaleString():'Waiting for next scan';
         listHtml+='<section class="dg-card" style="border:1px solid var(--dg-line)"><div class="dg-card__head"><h2 class="dg-card__title">'+escapeNewsText(s.pair)+'</h2><span class="dg-pill dg-pill--wait">'+statusTitle+'</span></div><div class="dg-muted" style="font-size:13px;margin-top:7px">'+(s.lifecycleStatus==='EXPIRED'?'The signal validity window has ended. Do not enter using the old levels.':'No active trade setup is available. Wait for the scheduled fresh scan.')+'</div><div class="dg-help" style="margin-top:7px">'+escapeNewsText(nextText)+'</div></section>';
         return;
       }
@@ -807,6 +808,7 @@
     renderCards();
   }
 
+  window.loadAllSignals=function(){loadAllSignals();};
   renderProfileControls();
   updateScalpStats();
   loadAllSignals({resume:true});
