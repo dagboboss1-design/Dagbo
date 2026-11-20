@@ -97,7 +97,7 @@
 
   <div class="dg-card" style="background:var(--dg-fill);box-shadow:none;margin-top:24px">
     <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:0">
-      <b>⚠️ API LIMIT NOTICE:</b> We use the free Twelve Data API. To save your 800 daily requests, this page does not auto-refresh. Tap "↻ Refresh" to get new signals.
+      <b>⚠️ API LIMIT NOTICE:</b> Automatic expiry and rescanning run while the Signal page is open. Scans use Twelve Data credits for your enabled pairs. Keep this page open for the timer; tap "↻ Refresh" for an immediate fresh scan. Background scans and phone alerts while the app is closed require the server scheduler.
     </p>
   </div>
 
@@ -163,7 +163,7 @@
         old.lastCheckedAt=now;item.lifecycleAnchor=old.anchor;item.lifecycleNextScan=old.anchor+duration*scanFactor(currentSignalTF);signalCycles[key]=old;return;
       }
       if(resume&&old&&now<old.anchor+duration*scanFactor(currentSignalTF)){
-        var elapsed=now-old.anchor;item.lifecycleAnchor=old.anchor;item.lifecycleNextScan=old.anchor+duration*3;
+        var elapsed=now-old.anchor;item.lifecycleAnchor=old.anchor;item.lifecycleNextScan=old.anchor+duration*scanFactor(currentSignalTF);
         if(elapsed>=duration*2.5){old.status='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;item.lifecycleStatus='NO_TRADE';}
         else if(elapsed>=duration*2&&duration>=3600000){item.lifecycleStatus='EXPIRED';}
         else if(elapsed>=duration*2){old.status='NO_TRADE';item.final='NO TRADE';item.entry=null;item.sl=null;item.tp1=null;item.tp2=null;item.lifecycleStatus='NO_TRADE';}
