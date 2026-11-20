@@ -612,7 +612,8 @@
       'Entry: ' + entry,
       'Stop Loss: ' + sl,
       'Take Profit 1: ' + tp1,
-      'Take Profit 2: ' + tp2
+      'Take Profit 2: ' + tp2,
+      'Risk : Reward: 1:' + (Math.abs(Number(tp1)-Number(entry))/Math.abs(Number(entry)-Number(sl))).toFixed(2)
     ].join('\n');
 
     // Try the modern clipboard API first, then a mobile-friendly selection fallback.
@@ -678,9 +679,12 @@
       return;
     }
 
+    var rrMultiple=Math.abs(tp-entry)/Math.abs(entry-sl);
     var trade={
       id:String(Date.now())+'-'+Math.random().toString(36).slice(2,7),
       pair:pair,
+      riskReward:'1:'+rrMultiple.toFixed(2),
+      rrMultiple:rrMultiple,
       direction:dir,
       entry:entry,
       stopLoss:sl,
