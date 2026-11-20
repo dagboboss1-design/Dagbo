@@ -1,0 +1,10 @@
+{
+  "name": "DAGBO SIGNAL",
+  "short_name": "DAGBO",
+  "description": "Signal Wey No Dey Lie",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#080808",
+  "icons": []
+}
