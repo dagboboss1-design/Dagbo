@@ -314,6 +314,9 @@
         console.error("Market data API Error:", apiError);
         return { pair: pair, error: String(apiError), errorStage: 'provider' };
       }
+      if (data.stale) {
+        return { pair: pair, error: 'Cached market candles are stale (' + Number(data.cacheAgeSeconds || 0) + ' seconds old). No fresh signal will be issued until live data returns.', errorStage: 'stale-data', provider: data.provider };
+      }
 
       let candles = data.values;
       if (!Array.isArray(candles) || candles.length < 30) {
