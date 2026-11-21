@@ -146,6 +146,10 @@ module.exports = async function handler(req, res) {
       if (/credits|rate limit|api calls/i.test(message) && cached && cacheAge <= 10 * 60 * 1000) {
         return res.status(200).json({ ...cached.payload, cache: "stale-fallback", stale: true, cacheAgeSeconds: Math.round(cacheAge / 1000) });
       }
+      if (cached && cacheAge <= 10 * 60 * 1000) {
+        return res.status(200).json({ ...cached.payload, cache: "stale-fallback", stale: true,
+          cacheAgeSeconds: Math.round(cacheAge / 1000), providerWarning: message });
+      }
       return res.status(response.status === 429 ? 429 : 502).json({ error: message, provider: "Twelve Data" });
     }
 
@@ -158,6 +162,10 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ...payload, cache: "miss" });
   } catch (error) {
     console.error("DAGBO market data proxy error:", error.message);
-    return res.status(502).json({ error: "Could not retrieve market candles" });
+    if (cached && cacheAge <= 10 * 60 * 1000) {
+      return res.status(200).json({ ...cached.payload, cache: "stale-fallback", stale: true,
+        cacheAgeSeconds: Math.round(cacheAge / 1000), providerWarning: "Live provider temporarily unavailable" });
+    }
+    return res.status(502).json({ error: "Could not retrieve market candles", provider: "Twelve Data" });
   }
 };
