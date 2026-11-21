@@ -27,7 +27,10 @@ function clockAt(date, timezone) {
 module.exports = function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
   const now = new Date();
-  const lagos = clockAt(now, "Africa/Lagos");
+  const requestedTimezone = req.query && typeof req.query.tz === "string" ? req.query.tz : "Africa/Lagos";
+  let userTimezone = "Africa/Lagos";
+  try { new Intl.DateTimeFormat("en-US", { timeZone: requestedTimezone }).format(now); userTimezone = requestedTimezone; } catch (_) {}
+  const userClock = clockAt(now, userTimezone);
   const sessions = WINDOWS.map(window => {
     const local = clockAt(now, window.timezone);
     const start = window.start * 60;
@@ -46,7 +49,7 @@ module.exports = function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   return res.status(200).json({
     success: true, generatedAt: now.toISOString(),
-    userReference: { timezone: "Africa/Lagos", localTime: lagos.localTime, localDate: lagos.localDate },
+    userReference: { timezone: userTimezone, localTime: userClock.localTime, localDate: userClock.localDate },
     sessions,
     methodology: "Regional FX activity windows, not exchange-open confirmation. Daylight-saving changes are handled by IANA time zones. Exchange holidays, broker-specific CFD hours and provider outages require separate live calendar/feed checks."
   });
