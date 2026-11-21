@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
       "Bollinger context: " + (last.close > upper ? "above upper band" : last.close < lower ? "below lower band" : "inside bands")
     ];
     if (side === "NONE" || !Number.isFinite(risk) || risk <= 0) return NextResponse.json({ ok: true, status: "NO TRADE", reason: "Confluence is insufficient. Wait for at least two independent evidence groups to agree.", pair, timeframe: tf, evidence: reasons, votes, checkedAt: now.toISOString() });
-    const expiryAt = new Date(candleTime(last.time) + duration).toISOString();
+    const expiryAt = new Date(candleTime(last.time) + duration * 2).toISOString();
     if (now.getTime() >= new Date(expiryAt).getTime()) return NextResponse.json({ ok: true, status: "NO TRADE", reason: "The setup candle has expired. Wait for a fresh closed-candle scan.", pair, timeframe: tf });
     return NextResponse.json({ ok: true, status: buys === 3 || sells === 3 ? "STRONG " + side : "WEAK " + side, side, pair, timeframe: tf, entry, sl, tp1, tp2, riskReward: "1:2 / 1:3.5", confidenceVotes: Math.max(buys, sells) + "/3", evidence: reasons, source: feed.source, candleTime: last.time, expiresAt: expiryAt, checkedAt: now.toISOString(), warning: "Technical confluence is not a guarantee. Confirm spread, session and position size before entry." }, { headers: { "Cache-Control": "no-store" } });
   } catch (error: any) {
