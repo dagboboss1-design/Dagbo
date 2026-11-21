@@ -1,6 +1,7 @@
 const webpush = require("web-push");
 const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
+const { reviewNews } = require("../lib/ai-specialists");
 
 const SUBSCRIPTIONS = "dagbo:push:subscriptions";
 const aiRateFallback = new Map();
@@ -309,6 +310,18 @@ module.exports = async function handler(req, res) {
         return res.status(502).json({ error: "The AI returned an empty answer" });
       }
 
+      // Optional independent second opinions for news/geopolitical questions.
+      // Reviewers add caveats only; they cannot issue signals or change risk.
+      let answerText = rawAnswer.trim();
+      try {
+        const specialistReview = await reviewNews(question, safeMarketContext);
+        if (specialistReview.note) {
+          answerText += "\\n\\nIndependent review (cross-check, not a verified news feed):\\n" + specialistReview.note;
+        }
+      } catch (reviewError) {
+        console.error("DAGBO specialist review skipped:", reviewError.message);
+      }
+
       // Notify only the device that asked the question, never every app subscriber.
       if (validSubscription(subscription)) {
         try {
@@ -337,7 +350,7 @@ module.exports = async function handler(req, res) {
       }
 
       // Return plain text; let the page render it safely rather than injecting HTML.
-      return res.status(200).json({ success: true, answer: rawAnswer.trim() });
+      return res.status(200).json({ success: true, answer: answerText });
     }
 
     if (req.method === "POST" && action === "scan-summary") {
