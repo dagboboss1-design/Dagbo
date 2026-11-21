@@ -12,7 +12,7 @@ const EASTERN_TZ = "America/New_York";
 const LOOKAHEAD_DAYS = 75;
 
 function authorized(req) {
-  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY;
+  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET;
   const supplied = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(supplied), b = Buffer.from("Bearer " + secret);
@@ -199,7 +199,7 @@ async function claim(key) {
 module.exports = async function handler(req,res) {
   if (!authorized(req)) return res.status(401).json({error:"Unauthorized"});
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({error:"Method not allowed"});
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
+  const apiKey = process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_API_KEY_2 || process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY || process.env.SPIKE_TWELVE_DATA_API_KEY;
   const lock = "dagbo:cron:news:lock";
   const acquired = await redis.set(lock,String(Date.now()),{nx:true,ex:4*60});
   if (acquired !== "OK") return res.status(200).json({skipped:true,reason:"News alert check already running"});
