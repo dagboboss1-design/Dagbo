@@ -8,7 +8,7 @@ function apiKeys() {
     process.env.TWELVE_DATA_API_KEY_3,
     process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
     process.env.SPIKE_TWELVE_DATA_API_KEY
-  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 3);
+  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 2);
 }
 function redisClient() {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
