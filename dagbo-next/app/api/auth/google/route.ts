@@ -1,0 +1,4 @@
+import {NextRequest,NextResponse} from "next/server";
+import {randomBytes} from "node:crypto";
+export const dynamic="force-dynamic";
+export async function GET(req:NextRequest){const id=process.env.DAGBO_GOOGLE_CLIENT_ID;if(!id)return NextResponse.json({ok:false,error:"Google sign-in needs DAGBO_GOOGLE_CLIENT_ID and DAGBO_GOOGLE_CLIENT_SECRET."},{status:503});const state=randomBytes(24).toString("hex");const redirect=req.nextUrl.origin+"/api/auth/google/callback";const u=new URL("https://accounts.google.com/o/oauth2/v2/auth");u.searchParams.set("client_id",id);u.searchParams.set("redirect_uri",redirect);u.searchParams.set("response_type","code");u.searchParams.set("scope","openid email profile");u.searchParams.set("state",state);u.searchParams.set("prompt","select_account");const res=NextResponse.redirect(u);res.cookies.set("dagbo_google_state",state,{httpOnly:true,secure:process.env.NODE_ENV==="production",sameSite:"lax",path:"/",maxAge:600});return res;}
