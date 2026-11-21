@@ -19,7 +19,7 @@ Foundation shell, health endpoint and a fail-closed Twelve Data candle endpoint.
 
 ## Required private environment variables
 
-Add these only to the separate Vercel project **dagbo-signal-next** (never to the live production project):
+Add any missing values only to the separate Vercel project **dagbo-signal-next** (never to the live production project). The preview already has a generated VAPID key pair and a generated `DAGBO_CRON_SECRET`; do not copy those into the production project.
 
 - `TWELVE_DATA_API_KEY` — FX and metals candles.
 - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` — shared cache, push subscriptions and alert deduplication.
