@@ -40,7 +40,7 @@ async function fetchBinanceCandles(pair, interval, limit) {
     datetime: new Date(Number(row[0])).toISOString().slice(0, 19).replace("T", " "),
     open: String(row[1]), high: String(row[2]), low: String(row[3]),
     close: String(row[4]), volume: String(row[5])
-  }));
+  })).reverse();
 }
 async function fetchProviderCandles(pair, symbol, interval, limit, apiKey) {
   if (BINANCE_SYMBOLS[pair]) return fetchBinanceCandles(pair, interval, limit);
