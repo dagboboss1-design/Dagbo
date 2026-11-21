@@ -120,7 +120,7 @@ module.exports = async function handler(req, res) {
     process.env.TWELVE_DATA_API_KEY_3,
     process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
     process.env.SPIKE_TWELVE_DATA_API_KEY
-  ].map(value => String(value || "").trim()).filter(Boolean)));
+  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 2);
   if (!apiKeys.length) return res.status(503).json({ error: "Market data is not configured. Add a Twelve Data API key in Vercel." });
 
   const cacheKey = "dagbo:market:candles:" + pair + ":" + tf;
