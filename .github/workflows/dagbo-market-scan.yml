@@ -35,7 +35,7 @@ jobs:
             --data '{}' \
             "$DAGBO_BASE_URL/api/cron-scan")
           echo "$response" | jq .
-          echo "$response" | jq -e '.success == true and (.scanned | length > 0) and (.errors | length == 0)' >/dev/null || {
-            echo "::error::Scanner returned no complete market scan. Check Twelve Data and Vercel runtime logs."
+          echo "$response" | jq -e '.success == true and (.scanned | length > 0) and (.errors | length == 0) and ((.scanNotification.failed // 0) == 0)' >/dev/null || {
+            echo "::error::Scanner or push delivery reported an error. Check Twelve Data, invalid subscriptions and Vercel runtime logs."
             exit 1
           }
