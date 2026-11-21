@@ -42,17 +42,39 @@ async function fetchBinanceCandles(pair, interval, limit) {
     close: String(row[4]), volume: String(row[5])
   })).reverse();
 }
+function twelveDataKeys(preferred) {
+  return Array.from(new Set([
+    preferred,
+    process.env.TWELVE_DATA_API_KEY,
+    process.env.TWELVE_DATA_API_KEY_2,
+    process.env.TWELVE_DATA_API_KEY_3,
+    process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
+    process.env.SPIKE_TWELVE_DATA_API_KEY
+  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 3);
+}
+async function fetchTwelveDataSeries(symbol, interval, limit, preferredKey) {
+  const keys = twelveDataKeys(preferredKey);
+  if (!keys.length) throw new Error("No Twelve Data API key is configured");
+  let lastError = "Twelve Data returned no candle data";
+  for (const key of keys) {
+    try {
+      const url = "https://api.twelvedata.com/time_series?symbol=" +
+        encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(interval) +
+        "&outputsize=" + encodeURIComponent(String(limit)) + "&timezone=UTC&apikey=" + encodeURIComponent(key);
+      const response = await fetch(url, { signal: AbortSignal.timeout(4500), headers: { Accept: "application/json" } });
+      const data = await response.json();
+      if (response.ok && data.status !== "error" && Array.isArray(data.values) && data.values.length) return data.values;
+      lastError = data.message || "Twelve Data returned invalid candle data";
+      if (response.status !== 429 && !/credits|rate limit|api calls|invalid api|api key/i.test(lastError)) break;
+    } catch (error) {
+      lastError = error && error.message ? error.message : "Twelve Data request failed";
+    }
+  }
+  throw new Error(lastError);
+}
 async function fetchProviderCandles(pair, symbol, interval, limit, apiKey) {
   if (BINANCE_SYMBOLS[pair]) return fetchBinanceCandles(pair, interval, limit);
-  const url = "https://api.twelvedata.com/time_series?symbol=" +
-    encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(interval) +
-    "&outputsize=" + encodeURIComponent(String(limit)) + "&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-  const response = await fetch(url);
-  const data = await response.json();
-  if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
-    throw new Error(data.message || "Market candle request failed");
-  }
-  return data.values;
+  return fetchTwelveDataSeries(symbol, interval, limit, apiKey);
 }
 
 function isMarketOpen(pair, now = new Date()) {
@@ -157,16 +179,10 @@ async function broadcast(title, body, tag) {
 async function fetchPreNewsCandles(pair, cutoffMs, apiKey) {
   const symbol = SYMBOLS[pair];
   if (!symbol) throw new Error("No Twelve Data symbol mapping for " + pair);
-  const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
-    "&interval=15min&outputsize=60&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-  const response = await fetch(url);
-  const data = await response.json();
-  if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
-    throw new Error(data.message || "No candle data");
-  }
+  const values = await fetchTwelveDataSeries(symbol, "15min", 60, apiKey);
   // Twelve Data timestamps mark candle starts. Only use candles that had
   // fully closed by the release-minus-15-minute cutoff.
-  const completed = data.values.map(c => {
+  const completed = values.map(c => {
     const t = Date.parse(String(c.datetime).replace(" ", "T") + (String(c.datetime).includes("Z") || /[+-]\\d\\d:\\d\\d$/.test(String(c.datetime)) ? "" : "Z"));
     return { candle: c, start: t, closeTime: t + 15 * 60 * 1000 };
   }).filter(x => Number.isFinite(x.start) && x.closeTime <= cutoffMs && x.start >= cutoffMs - 30 * 60 * 1000)
@@ -287,17 +303,10 @@ async function sendNewsAlerts(apiKey) {
 async function fetchTradeMarket(pair, apiKey) {
   const symbol = SYMBOLS[pair];
   if (!symbol) throw new Error("Unsupported trade pair " + pair);
-  const url = "https://api.twelvedata.com/time_series?symbol=" +
-    encodeURIComponent(symbol) + "&interval=15min&outputsize=3&timezone=UTC&apikey=" +
-    encodeURIComponent(apiKey);
-  const response = await fetch(url);
-  const data = await response.json();
-  if (!response.ok || data.status === "error" || !Array.isArray(data.values) || !data.values.length) {
-    throw new Error(data.message || "No trade-monitor candles");
-  }
+  const values = await fetchTwelveDataSeries(symbol, "15min", 3, apiKey);
   // Twelve Data returns newest candles first. The newest candle's high/low
   // captures an intrabar touch even if price later moves away before close.
-  const candle = data.values[0];
+  const candle = values[0];
   const high = num(candle.high), low = num(candle.low), close = num(candle.close);
   if ([high, low, close].some(v => v === null)) throw new Error("Invalid trade-monitor candle");
   return {
@@ -636,8 +645,8 @@ module.exports = async function handler(req, res) {
   }
   if (!validAuth(req)) return res.status(401).json({ error: "Unauthorized scheduled scan" });
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: "Missing TWELVE_DATA_API_KEY environment variable" });
+  const apiKey = twelveDataKeys()[0];
+  if (!apiKey) return res.status(503).json({ error: "No Twelve Data API key is configured" });
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     return res.status(503).json({ error: "Upstash Redis is not configured" });
   }
