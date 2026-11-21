@@ -1,25 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-
-const ALLOWED = new Set(["EUR/USD","GBP/USD","USD/JPY","GBP/JPY","AUD/USD","USD/CHF","XAU/USD"]);
-const INTERVALS: Record<string,string> = {"5m":"5min","15m":"15min","1h":"1h","4h":"4h","1d":"1day"};
-export async function GET(request: NextRequest) {
-  const pair = (request.nextUrl.searchParams.get("pair") || "EURUSD").toUpperCase().replace("_","/").replace("-","/");
-  const tf = request.nextUrl.searchParams.get("tf") || "15m";
-  const symbol = pair.includes("/") ? pair : pair === "XAUUSD" ? "XAU/USD" : pair.length === 6 ? `${pair.slice(0,3)}/${pair.slice(3)}` : pair;
-  const interval = INTERVALS[tf];
-  if (!ALLOWED.has(symbol) || !interval) return NextResponse.json({ok:false,error:"Unsupported pair or timeframe",source:null}, {status:400});
-  const key = process.env.TWELVE_DATA_API_KEY;
-  if (!key) return NextResponse.json({ok:false,error:"Market data provider is not configured. No simulated prices are returned.",source:null}, {status:503});
-  try {
-    const url = new URL("https://api.twelvedata.com/time_series");
-    url.searchParams.set("symbol",symbol); url.searchParams.set("interval",interval); url.searchParams.set("outputsize","120"); url.searchParams.set("timezone","UTC"); url.searchParams.set("apikey",key);
-    const response = await fetch(url,{cache:"no-store",signal:AbortSignal.timeout(12000)});
-    const payload = await response.json();
-    if (!response.ok || payload.status === "error" || !Array.isArray(payload.values)) return NextResponse.json({ok:false,error:payload.message || "Market provider returned no candle data",source:"Twelve Data"}, {status:502});
-    const candles = payload.values.slice().reverse().map((c:Record<string,string>)=>({time:c.datetime,open:Number(c.open),high:Number(c.high),low:Number(c.low),close:Number(c.close),volume:c.volume==null?null:Number(c.volume)}));
-    if (candles.some((c:{open:number;high:number;low:number;close:number})=>![c.open,c.high,c.low,c.close].every(Number.isFinite))) return NextResponse.json({ok:false,error:"Provider returned invalid candle values",source:"Twelve Data"}, {status:502});
-    return NextResponse.json({ok:true,pair:symbol,timeframe:tf,source:"Twelve Data",candles,latest:candles.at(-1)?.time,receivedAt:new Date().toISOString()},{headers:{"Cache-Control":"no-store"}});
-  } catch {
-    return NextResponse.json({ok:false,error:"Market data request failed or timed out",source:"Twelve Data"},{status:502});
-  }
-}
+import {NextRequest,NextResponse} from "next/server";
+import {redisCommand} from "@/lib/server/redis";
+export const dynamic="force-dynamic";
+const SYMBOLS:Record<string,string>={EURUSD:"EUR/USD",GBPUSD:"GBP/USD",USDJPY:"USD/JPY",GBPJPY:"GBP/JPY",AUDUSD:"AUD/USD",USDCHF:"USD/CHF",USDCAD:"USD/CAD",NZDUSD:"NZD/USD",EURJPY:"EUR/JPY",EURGBP:"EUR/GBP",XAUUSD:"XAU/USD",GOLD:"XAU/USD",XAGUSD:"XAG/USD",SILVER:"XAG/USD",US30:"DJI",US100:"NDX",NAS100:"NDX",US500:"SPX"};
+const BINANCE:Record<string,string>={BTCUSD:"BTCUSDT",BTC:"BTCUSDT",ETHUSD:"ETHUSDT",ETH:"ETHUSDT"};
+const INTERVALS:Record<string,{twelve:string;binance:string}>={"1m":{twelve:"1min",binance:"1m"},"5m":{twelve:"5min",binance:"5m"},"15m":{twelve:"15min",binance:"15m"},"30m":{twelve:"30min",binance:"30m"},"1h":{twelve:"1h",binance:"1h"},"4h":{twelve:"4h",binance:"4h"},"1d":{twelve:"1day",binance:"1d"},"1w":{twelve:"1week",binance:"1w"}};
+type Candle={time:string;open:number;high:number;low:number;close:number;volume:number|null};
+async function cacheRead(key:string){try{const raw=await redisCommand<any>("GET",key);if(!raw)return null;return typeof raw==="string"?JSON.parse(raw):raw;}catch{return null;}}
+async function cacheWrite(key:string,value:any){try{await redisCommand("SET",key,JSON.stringify(value),"EX",600);}catch{}}
+async function binanceCandles(symbol:string,interval:string):Promise<Candle[]>{const u=new URL("https://data-api.binance.vision/api/v3/klines");u.searchParams.set("symbol",symbol);u.searchParams.set("interval",interval);u.searchParams.set("limit","120");const r=await fetch(u,{cache:"no-store",signal:AbortSignal.timeout(10000)});const rows=await r.json();if(!r.ok||!Array.isArray(rows))throw new Error("Binance candle feed unavailable");return rows.map((x:any)=>({time:new Date(Number(x[0])).toISOString(),open:Number(x[1]),high:Number(x[2]),low:Number(x[3]),close:Number(x[4]),volume:Number(x[5])}));}
+export async function GET(req:NextRequest){const raw=(req.nextUrl.searchParams.get("pair")||"EURUSD").toUpperCase().replace(/[^A-Z0-9]/g,"");const tf=req.nextUrl.searchParams.get("tf")||"15m";const interval=INTERVALS[tf];const symbol=SYMBOLS[raw];const crypto=BINANCE[raw];if(!interval||(!symbol&&!crypto))return NextResponse.json({ok:false,error:"Unsupported pair or timeframe",source:null},{status:400});const cacheKey="dagbo:new:candles:"+raw+":"+tf;const cached=await cacheRead(cacheKey);const age=cached?Date.now()-Number(cached.savedAt||0):Infinity;if(cached&&age<90000)return NextResponse.json({...cached.payload,cache:"hit",stale:false});try{let candles:Candle[],source:string;if(crypto){candles=await binanceCandles(crypto,interval.binance);source="Binance public spot feed";}else{const key=process.env.TWELVE_DATA_API_KEY;if(!key)throw new Error("TWELVE_DATA_API_KEY is not configured");const u=new URL("https://api.twelvedata.com/time_series");u.searchParams.set("symbol",symbol);u.searchParams.set("interval",interval.twelve);u.searchParams.set("outputsize","120");u.searchParams.set("timezone","UTC");u.searchParams.set("apikey",key);const r=await fetch(u,{cache:"no-store",signal:AbortSignal.timeout(11000)});const d=await r.json();if(!r.ok||d.status==="error"||!Array.isArray(d.values))throw new Error(d.message||"Twelve Data returned no candles");candles=d.values.slice().reverse().map((c:any)=>({time:c.datetime,open:Number(c.open),high:Number(c.high),low:Number(c.low),close:Number(c.close),volume:c.volume==null?null:Number(c.volume)}));source="Twelve Data";}if(candles.length<30||candles.some(c=>![c.open,c.high,c.low,c.close].every(Number.isFinite)))throw new Error("Provider returned insufficient or invalid candles");const payload={ok:true,pair:raw,symbol:symbol||crypto,timeframe:tf,source,candles,latest:candles.at(-1)?.time,receivedAt:new Date().toISOString()};await cacheWrite(cacheKey,{savedAt:Date.now(),payload});return NextResponse.json({...payload,cache:"miss",stale:false},{headers:{"Cache-Control":"no-store"}});}catch(e:any){if(cached&&age<=10*60*1000)return NextResponse.json({...cached.payload,cache:"stale-fallback",stale:true,cacheAgeSeconds:Math.round(age/1000),providerWarning:e?.message||"Live provider unavailable"},{headers:{"Cache-Control":"no-store"}});return NextResponse.json({ok:false,error:e?.message||"Market data unavailable",source:crypto?"Binance":"Twelve Data"},{status:503});}}
