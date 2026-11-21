@@ -1,0 +1,5 @@
+const base=process.env.UPSTASH_REDIS_REST_URL;const token=process.env.UPSTASH_REDIS_REST_TOKEN;
+export async function redisCommand<T=unknown>(...args:(string|number)[]):Promise<T|null>{if(!base||!token)throw new Error("Push storage is not configured");const r=await fetch(base,{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(args),cache:"no-store",signal:AbortSignal.timeout(8000)});if(!r.ok)throw new Error("Redis request failed ("+r.status+")");const d=await r.json();if(d.error)throw new Error(String(d.error));return (d.result??null) as T;}
+export async function claimOnce(key:string,seconds:number){const r=await redisCommand<string>("SET",key,"1","NX","EX",seconds);return r==="OK";}
+export async function subscriptionIds(){return (await redisCommand<string[]>("SMEMBERS","dagbo:push:subscriptions"))||[];}
+export async function getSubscription(id:string){const raw=await redisCommand<string>("GET","dagbo:push:sub:"+id);return raw?JSON.parse(raw):null;}
