@@ -1,0 +1,28 @@
+name: DAGBO preview validation
+
+on:
+  push:
+    branches:
+      - fix/dagboboss-env-alias
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check server JavaScript syntax
+        run: |
+          set -e
+          find api lib public -type f -name '*.js' -print0 | while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            node --check "$file"
+          done
+      - name: Check patch whitespace
+        run: git diff --check origin/dagbo-clean-build...HEAD
