@@ -147,7 +147,7 @@ async function sendToDevice(deviceId, title, body, tag, url) {
     await webpush.sendNotification(sub, JSON.stringify({ title, body, tag, url: url || "/signals.html" }), { TTL: 900, urgency: "high" });
     return true;
   } catch (err) {
-    if ([404,410].includes(err.statusCode)) {
+    if ([400,401,403,404,410].includes(Number(err.statusCode))) {
       await redis.del("dagbo:push:sub:" + deviceId);
       await redis.srem("dagbo:push:subscriptions", deviceId);
     }
@@ -168,10 +168,12 @@ async function broadcast(title, body, tag) {
       sent++;
     } catch (err) {
       failed++;
-      if ([404,410].includes(err.statusCode)) {
+      if ([400,401,403,404,410].includes(Number(err.statusCode))) {
         await redis.del("dagbo:push:sub:" + id);
         await redis.srem("dagbo:push:subscriptions", id);
-      } else console.error("Push delivery failed:", err.message);
+      } else {
+        console.error("Push delivery failed:", JSON.stringify({ statusCode: err.statusCode || null, message: err.message }));
+      }
     }
   }
   return { sent, failed, devices: ids.length };
