@@ -50,7 +50,7 @@ function twelveDataKeys(preferred) {
     process.env.TWELVE_DATA_API_KEY_3,
     process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
     process.env.SPIKE_TWELVE_DATA_API_KEY
-  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 3);
+  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 2);
 }
 async function fetchTwelveDataSeries(symbol, interval, limit, preferredKey) {
   const keys = twelveDataKeys(preferredKey);
@@ -710,7 +710,7 @@ module.exports = async function handler(req, res) {
           const body = pair + " · " + analysis.signal + " · Entry " + analysis.entry.toFixed(5) +
             " · SL " + analysis.stopLoss.toFixed(5) + " · TP " + analysis.takeProfit.toFixed(5) +
             " · " + analysis.confidence + "% " + analysis.quality + " confluence quality (threshold " + analysis.threshold + "). Group score: " + analysis.buyScore + " BUY / " + analysis.sellScore + " SELL. Sources: " +
-            analysis.evidence.slice(0, 3).join("; ") + ". Confirm on chart.";
+            analysis.evidence.slice(0, 2).join("; ") + ". Confirm on chart.";
           await broadcast(title, body, "signal-" + pair);
         }
       } else if (previous && previous.signal !== "NO TRADE") {
