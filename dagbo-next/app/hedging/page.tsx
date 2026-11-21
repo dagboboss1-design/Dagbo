@@ -1,4 +1,5 @@
 "use client";
+import "../feature.css";
 import { useState } from "react";
 type Result = {ok:boolean; status?:string; reason?:string; pair?:string; exposure?:string; trend1h?:string; trend4h?:string; action?:string; confidence?:string; warning?:string};
 export default function HedgingPage(){
