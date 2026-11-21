@@ -662,7 +662,24 @@ module.exports = async function handler(req, res) {
       if (!isMarketOpen(pair)) return { pair, closed: true };
       const symbol = SYMBOLS[pair];
       try {
-        const values = await fetchProviderCandles(pair, symbol, "15min", 80, apiKey);
+        // Reuse the same 15m candle set across frequent scans. A 12-minute
+        // cache is shorter than the candle interval, so the next completed
+        // candle is fetched promptly without spending credits every scan.
+        const candleCacheKey = "dagbo:scan:candles:15m:" + pair;
+        const cachedRaw = await redis.get(candleCacheKey);
+        let values = null;
+        if (cachedRaw) {
+          try {
+            const cached = typeof cachedRaw === "string" ? JSON.parse(cachedRaw) : cachedRaw;
+            if (Array.isArray(cached.values) && Date.now() - Number(cached.savedAt || 0) <= 12 * 60 * 1000) {
+              values = cached.values;
+            }
+          } catch (_) {}
+        }
+        if (!values) {
+          values = await fetchProviderCandles(pair, symbol, "15min", 80, apiKey);
+          await redis.set(candleCacheKey, JSON.stringify({ savedAt: Date.now(), values }), { ex: 60 * 60 });
+        }
         if (!Array.isArray(values) || values.length < 61) throw new Error("Insufficient candle data");
         const closedCandles = values.filter(c => {
           const raw = String(c.datetime || "");
@@ -732,16 +749,36 @@ module.exports = async function handler(req, res) {
         "scanner-data-recovered");
       await redis.del(errorKey);
     }
+    const scannedPairs = Object.keys(results);
+    const buySignals = Object.entries(results).filter(([, value]) => String(value.signal || "").includes("BUY")).map(([pair, value]) => pair + " " + value.signal);
+    const sellSignals = Object.entries(results).filter(([, value]) => String(value.signal || "").includes("SELL")).map(([pair, value]) => pair + " " + value.signal);
+    const waitCount = Object.values(results).filter(value => value.signal === "NO TRADE").length;
+    const closedCount = Object.values(results).filter(value => value.marketClosed).length;
+    let scanNotification = null;
+    if (scannedPairs.length) {
+      const detail = [...buySignals, ...sellSignals].slice(0, 4).join(" · ");
+      const summaryText = scannedPairs.length + " markets checked · " + buySignals.length + " BUY · " +
+        sellSignals.length + " SELL · " + waitCount + " WAIT · " + closedCount + " closed" +
+        (errors.length ? " · " + errors.length + " data issue(s)" : " · data checks passed") +
+        ". " + (detail || "No confirmed setup this scan. WAIT is a valid result.");
+      try {
+        scanNotification = await broadcast("🔎 DAGBO SCAN COMPLETE", summaryText,
+          "scan-summary-" + Math.floor(Date.now() / 60000));
+      } catch (pushError) {
+        console.error("DAGBO scan-summary push failed:", pushError.message);
+      }
+    }
     const responseBody = {
       success: true, scannedAt: new Date().toISOString(),
-      scanned: Object.keys(results), errors, signals: results,
+      scanned: scannedPairs, errors, signals: results,
+      scanNotification,
       tradeMonitoring: tradeSummary,
       pairIntelligence: pairIntelligence ? { htfSignals: pairIntelligence.htfSignals.length, hedgeCombinations: pairIntelligence.combos.length, updatedAt: pairIntelligence.updatedAt } : null,
       newsMonitoring: newsSummary,
       note: "News alerts and spike analysis run separately for GBPUSD, GBPJPY, EURUSD and XAUUSD; pre-news bias is not a prediction or broker order."
     };
     await redis.set("dagbo:cron:scan:last", JSON.stringify({
-      scannedAt: responseBody.scannedAt, scanned: responseBody.scanned, errors
+      scannedAt: responseBody.scannedAt, scanned: responseBody.scanned, errors, scanNotification
     }), { ex: 60 * 60 * 24 * 7 });
     return res.status(200).json(responseBody);
   } catch (err) {
