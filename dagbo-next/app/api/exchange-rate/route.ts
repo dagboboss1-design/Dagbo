@@ -1,0 +1,3 @@
+import {NextResponse} from "next/server";
+export const dynamic="force-dynamic";
+export async function GET(){try{const r=await fetch("https://open.er-api.com/v6/latest/USD",{cache:"no-store",signal:AbortSignal.timeout(8000)});const d=await r.json();const rate=Number(d?.rates?.NGN);if(!r.ok||d?.result!=="success"||!Number.isFinite(rate)||rate<=0)throw new Error("Live USD/NGN rate unavailable");return NextResponse.json({ok:true,base:"USD",quote:"NGN",rate,updatedAt:d.time_last_update_utc||new Date().toISOString(),source:"ExchangeRate-API"},{headers:{"Cache-Control":"no-store"}});}catch(e:any){return NextResponse.json({ok:false,error:e?.message||"Exchange rate unavailable"},{status:503});}}
