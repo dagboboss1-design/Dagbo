@@ -26,7 +26,7 @@ module.exports = async function handler(req, res) {
     process.env.TWELVE_DATA_API_KEY, process.env.TWELVE_DATA_API_KEY_2,
     process.env.TWELVE_DATA_API_KEY_3, process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
     process.env.SPIKE_TWELVE_DATA_API_KEY
-  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 3);
+  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 2);
   if (!keys.length) return res.status(503).json({ error: "Historical data is not configured on the server" });
   try {
     let data = null, lastError = "Historical candles are unavailable";
