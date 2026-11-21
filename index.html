@@ -63,12 +63,29 @@ body{background:var(--dg-bg);color:var(--dg-text)}
 .home-more-note p{font-size:12px;line-height:1.65;color:var(--dg-text-2);margin:0}
 @media(min-width:600px){.home-more-photo img{height:285px}}
 
-</style>
+
+.global-clock{margin:0 3px 22px;padding:16px;border:1px solid var(--dg-line);border-radius:8px;background:var(--dg-card,transparent)}
+.global-clock-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.global-clock-head strong{font-size:13px;letter-spacing:.2px}.global-clock-head span{font-size:10px;color:var(--dg-text-2)}
+.global-clock-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.global-clock-item{padding:11px;border:1px solid var(--dg-line);border-radius:6px;min-width:0}
+.global-clock-item strong{display:block;font-size:12px}.global-clock-item time{display:block;font-size:20px;font-weight:750;font-variant-numeric:tabular-nums;margin:5px 0}
+.global-clock-item small{font-size:10px;color:var(--dg-text-2)}.global-clock-state{display:flex;align-items:center;gap:6px;font-size:10px;margin-top:5px}
+.global-clock-dot{width:6px;height:6px;border-radius:50%;background:var(--dg-text-3)}.global-clock-item[data-active="true"] .global-clock-dot{background:#269b68}
+.global-clock-note{font-size:10px;line-height:1.5;color:var(--dg-text-2);margin:11px 0 0}
+\n</style>
 </head>
 <body>
 <main class="dg-page home-page">
  <header class="home-head"><div class="home-logo"><img src="icons/dagbo-orbit.svg" alt="" class="dagbo-home-mark"> DAGBO <span>SIGNAL</span></div><span class="home-tag">TRADING INTELLIGENCE</span></header>
- <div id="hello" style="color:var(--dg-text-2);font-size:12px;margin:0 3px 18px">Welcome back</div>
+ <section class="global-clock" aria-label="Global market session clock">
+ <div class="global-clock-head"><strong>Global market clock</strong><span id="clock-lagos">Lagos · --:--:--</span></div>
+ <div class="global-clock-grid" id="global-clock-grid">
+  <div class="global-clock-item"><strong>Loading sessions…</strong><small>Checking regional clocks</small></div>
+ </div>
+ <p class="global-clock-note" id="global-clock-note">Regional FX activity windows are indicative, not confirmation that a specific exchange or broker market is open. Holiday calendars and live feed health must also be checked.</p>
+</section>
+<div id="hello" style="color:var(--dg-text-2);font-size:12px;margin:0 3px 18px">Welcome back</div>
  <section class="home-intro">
   <div class="eyebrow">SIGNAL WEY NO DEY LIE</div>
   <h1>Make every<br>trade a plan.</h1>
@@ -196,7 +213,22 @@ body{background:var(--dg-bg);color:var(--dg-text)}
 
  <footer class="home-footer">DAGBO SIGNAL · SIGNAL WEY NO DEY LIE<br>Market analysis is educational. Signals are not guaranteed results. Always manage risk and verify prices with your broker. DAGBO currently records journal trades; this does not mean a broker order has been placed.</footer>
 </main>
-<script src="pwa.js" defer></script>
+<script>
+(function(){
+ var grid=document.getElementById('global-clock-grid'),lagos=document.getElementById('clock-lagos');
+ if(!grid)return;
+ function render(data){
+  if(lagos)lagos.textContent='Lagos · '+data.userReference.localTime;
+  grid.innerHTML=data.sessions.map(function(s){
+   return '<div class="global-clock-item" data-active="'+s.activeWindow+'"><strong>'+s.name+'</strong><time>'+s.localTime+'</time><small>'+s.timezone+'</small><div class="global-clock-state"><i class="global-clock-dot"></i>'+(s.activeWindow?'Active FX window':'Outside FX window')+'</div></div>';
+  }).join('');
+  var note=document.getElementById('global-clock-note');if(note)note.textContent=data.methodology;
+ }
+ function load(){fetch('/api/market-clock',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('clock unavailable');return r.json()}).then(render).catch(function(){grid.innerHTML='<div class="global-clock-item"><strong>Clock unavailable</strong><small>Retrying on next refresh</small></div>'})}
+ load();setInterval(load,30000);
+})();
+</script>
+\n<script src="pwa.js" defer></script>
 <script>
 (function(){
  var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
