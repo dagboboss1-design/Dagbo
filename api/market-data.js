@@ -89,13 +89,14 @@ module.exports = async function handler(req, res) {
         return res.status(response.status >= 400 && response.status < 500 ? response.status : 502)
           .json({ error: message, provider: "Binance" });
       }
+      // Binance returns oldest-first; DAGBO's Twelve Data consumers expect newest-first.
       const values = rows.map(function(row) {
         return {
           datetime: new Date(Number(row[0])).toISOString().slice(0, 19).replace("T", " "),
           open: String(row[1]), high: String(row[2]), low: String(row[3]),
           close: String(row[4]), volume: String(row[5])
         };
-      });
+      }).reverse();
       if (values.length < 30) {
         return res.status(502).json({ error: "Binance returned fewer than 30 candles.", provider: "Binance" });
       }
@@ -113,8 +114,14 @@ module.exports = async function handler(req, res) {
   const symbol = SYMBOLS[pair];
   if (!symbol) return res.status(400).json({ error: "Unsupported market pair" });
 
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: "Market data is not configured. Add TWELVE_DATA_API_KEY in Vercel." });
+  const apiKeys = Array.from(new Set([
+    process.env.TWELVE_DATA_API_KEY,
+    process.env.TWELVE_DATA_API_KEY_2,
+    process.env.TWELVE_DATA_API_KEY_3,
+    process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
+    process.env.SPIKE_TWELVE_DATA_API_KEY
+  ].map(value => String(value || "").trim()).filter(Boolean)));
+  if (!apiKeys.length) return res.status(503).json({ error: "Market data is not configured. Add a Twelve Data API key in Vercel." });
 
   const cacheKey = "dagbo:market:candles:" + pair + ":" + tf;
   const cached = await readCache(cacheKey);
@@ -135,22 +142,34 @@ module.exports = async function handler(req, res) {
 
   res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
   try {
-    const url = "https://api.twelvedata.com/time_series?symbol=" +
-      encodeURIComponent(symbol) +
-      "&interval=" + interval.twelve + "&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
-      const message = data.message || "Market data provider did not return candles";
-      if (/credits|rate limit|api calls/i.test(message) && cached && cacheAge <= 10 * 60 * 1000) {
-        return res.status(200).json({ ...cached.payload, cache: "stale-fallback", stale: true, cacheAgeSeconds: Math.round(cacheAge / 1000) });
+    let data = null, lastProviderError = "Twelve Data did not return candles";
+    for (const apiKey of apiKeys) {
+      try {
+        const url = "https://api.twelvedata.com/time_series?symbol=" +
+          encodeURIComponent(symbol) +
+          "&interval=" + interval.twelve + "&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+        const response = await fetch(url, { signal: AbortSignal.timeout(5000), headers: { "Accept": "application/json" } });
+        const body = await response.json();
+        if (response.ok && body.status !== "error" && Array.isArray(body.values) && body.values.length >= 30) {
+          data = body;
+          break;
+        }
+        lastProviderError = body.message || "Twelve Data returned invalid candle data";
+        if (response.status !== 429 && !/credits|rate limit|api calls|invalid api|api key/i.test(lastProviderError)) {
+          // A symbol/plan/data error is unlikely to be repaired by another key.
+          break;
+        }
+      } catch (providerError) {
+        lastProviderError = providerError && providerError.message ? providerError.message : "Twelve Data request failed";
       }
+    }
+    if (!data) {
       if (cached && cacheAge <= 10 * 60 * 1000) {
         return res.status(200).json({ ...cached.payload, cache: "stale-fallback", stale: true,
-          cacheAgeSeconds: Math.round(cacheAge / 1000), providerWarning: message });
+          cacheAgeSeconds: Math.round(cacheAge / 1000), providerWarning: lastProviderError });
       }
-      return res.status(response.status === 429 ? 429 : 502).json({ error: message, provider: "Twelve Data" });
+      return res.status(/rate limit|credits|api calls/i.test(lastProviderError) ? 429 : 502)
+        .json({ error: lastProviderError, provider: "Twelve Data / configured backup keys" });
     }
 
     const payload = {
