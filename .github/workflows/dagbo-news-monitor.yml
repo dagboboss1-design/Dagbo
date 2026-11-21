@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: Run five-minute news monitor against preview
         env:
-          DAGBO_BASE_URL: https://dagboboss-k4cho66m7-goodconfort33-4342.vercel.app
+          DAGBO_BASE_URL: https://dagboboss-git-fix-dagboboss-env-alias-goodconfort33-4342.vercel.app
           DAGBO_CRON_SECRET: ${{ secrets.DAGBO_CRON_SECRET }}
         run: |
           if [ -z "$DAGBO_CRON_SECRET" ]; then
