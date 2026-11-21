@@ -79,6 +79,8 @@ module.exports = async function handler(req, res) {
     if (req.method === "GET" && action === "health") {
       const checks = {
         ai: !!process.env.GROQ_API_KEY,
+        claudeNewsReviewer: !!(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_MODEL),
+        geminiNewsReviewer: !!(process.env.GEMINI_API_KEY && process.env.GEMINI_MODEL),
         pushPublicKey: !!process.env.VAPID_PUBLIC_KEY,
         pushPrivateKey: !!process.env.VAPID_PRIVATE_KEY,
         pushSubject: !!process.env.VAPID_SUBJECT,
@@ -94,7 +96,7 @@ module.exports = async function handler(req, res) {
           push: checks.pushPublicKey && checks.pushPrivateKey && checks.pushSubject && checks.pushStorage,
           scanner: checks.marketData && checks.pushPublicKey && checks.pushPrivateKey && checks.pushSubject && checks.pushStorage && checks.cronSecret
         },
-        note: "This endpoint reports whether required environment variables exist. It does not test third-party API calls or scheduled job execution."
+        note: "This endpoint reports whether required environment variables exist. Specialist reviewer flags indicate configuration only, not successful provider calls. It does not test scheduled job execution."
       });
     }
     if (req.method === "GET" && action === "public-key") {
