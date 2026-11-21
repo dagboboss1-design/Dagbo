@@ -22,16 +22,25 @@ module.exports = async function handler(req, res) {
   if (!Number.isFinite(from) || !Number.isFinite(to) || from > to || to > Date.now() + 86400000)
     return res.status(400).json({ error: "Invalid date range" });
   if (to - from > 31 * 86400000) return res.status(400).json({ error: "Choose a range of 31 days or less" });
-  const key = process.env.TWELVE_DATA_API_KEY;
-  if (!key) return res.status(503).json({ error: "Historical data is not configured on the server" });
-  const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(SYMBOLS[pair]) +
-    "&interval=" + encodeURIComponent(INTERVALS[interval]) + "&start_date=" + encodeURIComponent(start) +
-    "&end_date=" + encodeURIComponent(end) + "&timezone=UTC&outputsize=5000&apikey=" + encodeURIComponent(key);
+  const keys = Array.from(new Set([
+    process.env.TWELVE_DATA_API_KEY, process.env.TWELVE_DATA_API_KEY_2,
+    process.env.TWELVE_DATA_API_KEY_3, process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
+    process.env.SPIKE_TWELVE_DATA_API_KEY
+  ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 3);
+  if (!keys.length) return res.status(503).json({ error: "Historical data is not configured on the server" });
   try {
-    const upstream = await fetch(url);
-    const data = await upstream.json();
-    if (!upstream.ok || data.status === "error" || !Array.isArray(data.values))
-      return res.status(502).json({ error: data.message || "Historical candles are unavailable for this market and date range" });
+    let data = null, lastError = "Historical candles are unavailable";
+    for (const key of keys) {
+      const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(SYMBOLS[pair]) +
+        "&interval=" + encodeURIComponent(INTERVALS[interval]) + "&start_date=" + encodeURIComponent(start) +
+        "&end_date=" + encodeURIComponent(end) + "&timezone=UTC&outputsize=5000&apikey=" + encodeURIComponent(key);
+      const upstream = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      const body = await upstream.json();
+      if (upstream.ok && body.status !== "error" && Array.isArray(body.values)) { data = body; break; }
+      lastError = body.message || "Historical candles are unavailable";
+      if (upstream.status !== 429 && !/credits|rate limit|api calls|invalid api|api key/i.test(lastError)) break;
+    }
+    if (!data) return res.status(502).json({ error: lastError });
     const candles = data.values.map(c => ({
       time: c.datetime, open: Number(c.open), high: Number(c.high),
       low: Number(c.low), close: Number(c.close), volume: Number(c.volume || 0)
