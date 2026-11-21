@@ -25,8 +25,12 @@ function atr(c: Candle[], period = 14) {
 }
 function marketOpen(pair: string, now: Date) {
   if (CRYPTO.has(pair)) return true;
-  const day = now.getUTCDay(), hour = now.getUTCHours();
-  return (day >= 1 && day <= 4) || (day === 0 && hour >= 21) || (day === 5 && hour < 21);
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(now);
+  const get = (type: string) => parts.find(p => p.type === type)?.value || "";
+  const day = ({ Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 } as Record<string, number>)[get("weekday")];
+  const minute = Number(get("hour")) * 60 + Number(get("minute"));
+  if (["US30", "US100", "NAS100", "US500"].includes(pair)) return day >= 1 && day <= 5 && minute >= 570 && minute < 960;
+  return (day >= 1 && day <= 4) || (day === 0 && minute >= 1020) || (day === 5 && minute < 1020);
 }
 function candleTime(s: string) {
   const normalized = s.includes("T") ? s : s.replace(" ", "T") + "Z";
