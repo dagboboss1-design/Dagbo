@@ -1,53 +1,49 @@
-# DAGBO SIGNAL — clean build
+# DAGBO SIGNAL — isolated Next.js application
 
-This folder is the isolated rebuild. The existing production application is not changed by this project.
+This directory is the clean rebuild deployed by the separate Vercel project **dagbo-signal-next**. The existing DAGBO production site is not changed.
 
-## Principles
-- Real provider data only; missing or invalid data returns an explicit error.
-- No signal generation until data freshness, closed-candle handling, instrument mapping and strategy evidence are validated.
-- Keep API keys server-side in environment variables.
-- Separate signal detection, risk calculation, journal state, notifications and UI into testable modules.
+## Included application areas
 
-## Initial environment
-- `TWELVE_DATA_API_KEY` — required for supported FX/metals candle retrieval.
+- Overview and workspace navigation
+- Live market-data endpoint and closed-candle confluence scan (EMA, RSI, MACD, Bollinger context, price action and breakout evidence)
+- Candlestick chart with local saved trendline, horizontal, rectangle and long/short position drawings
+- News calendar with a fail-closed news-spike monitoring endpoint
+- Hedging review using live 1H/4H candles
+- Local trade journal with candle-based SL/TP monitoring while the page is open
+- BOSS1 AI with voice input, speech playback and the latest five questions
+- Account settings for balance, risk, enabled pairs and live USD/NGN conversion
+- Email/username registration and login; Google OAuth flow is ready when Google client credentials are supplied
+- Browser push subscription, test notification and signed-in scan notifications
 
-## Run
-`npm install && npm run dev`
+## Required private environment
 
-## Current scope
-Foundation shell, health endpoint and a fail-closed Twelve Data candle endpoint. Additional instruments/providers are added only after provider coverage and response formats are verified.
-
-## Required private environment variables
-
-Add any missing values only to the separate Vercel project **dagbo-signal-next** (never to the live production project). The preview already has a generated VAPID key pair and a generated `DAGBO_CRON_SECRET`; do not copy those into the production project.
-
-- `TWELVE_DATA_API_KEY` — FX and metals candles.
-- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` — shared cache, push subscriptions and alert deduplication.
+- `TWELVE_DATA_API_KEY` — FX, metals and index candles supported by the account.
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` — candle cache, push subscriptions, alert deduplication and account records.
 - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` — browser push delivery.
-- `DAGBO_CRON_SECRET` — long random bearer secret protecting scheduled scans.
-- `FMP_API_KEY` — optional primary economic calendar; the news page and scanner fall back to the public Forex Factory calendar if it is absent.
-- `GROQ_API_KEY` — AI endpoint when enabled.
+- `DAGBO_CRON_SECRET` — bearer token protecting scheduled scans. It is also configured as the Vercel automation-bypass secret so Cron-job.org can reach protected preview routes.
+- `DAGBO_AUTH_SECRET` — signs account sessions.
+- `GROQ_API_KEY` — BOSS1 AI.
+- `FMP_API_KEY` — optional primary economic calendar. The news route falls back to the public Forex Factory calendar.
+- `DAGBO_GOOGLE_CLIENT_ID` and `DAGBO_GOOGLE_CLIENT_SECRET` — optional Google sign-in credentials. Set the OAuth redirect URI to `https://YOUR_PREVIEW_HOST/api/auth/google/callback` (and the eventual production host when promoted).
 
-Do not put secrets in client-side variables or source code. The app's Settings page reports whether these values are present.
+All keys remain server-side. Do not add secrets to browser code or commit them to Git.
 
 ## News alert scheduler
 
-The protected endpoint is `GET /api/cron/news`. Configure Cron-job.org to call the branch preview alias plus `/api/cron/news` every minute:
-
-`https://dagbo-signal-next-git-dagbo-clean-build-goodconfort33-4342.vercel.app/api/cron/news`
-
-Because Vercel preview SSO protection is enabled, add both HTTP headers using the same secret copied from the preview environment variable `DAGBO_CRON_SECRET`:
+The protected endpoint is `GET /api/cron/news`. Configure Cron-job.org to call the preview alias plus `/api/cron/news` every minute. Send both headers with the same `DAGBO_CRON_SECRET` value:
 
 - `x-vercel-protection-bypass: YOUR_DAGBO_CRON_SECRET`
 - `Authorization: Bearer YOUR_DAGBO_CRON_SECRET`
 
-The same value is registered as the Vercel automation-bypass secret. Keep it private and do not put it in browser code.
+The route deduplicates each event alert in Redis and sends 1-hour reminders, 15-minute pre-event context and observed post-release price movement. A successful scan response does not guarantee that a phone notification was delivered; verify a device subscription with the Settings test button.
 
-A one-minute cadence is needed so the 1-hour and 15-minute event windows are not skipped. The route deduplicates each event alert in Redis and reports the observed post-release market move only after enough completed 1-minute candles exist. A successful HTTP response confirms the scan ran, not that a phone notification was delivered; check the returned counters and device push test separately.
+## Safety and limitations
 
-## Safety
-
-- Missing or invalid provider data returns NO DECISION / NO TRADE; never substitute made-up prices.
-- Hedging page is advisory and does not place or modify broker orders.
-- Pre-news momentum is not a prediction of the event outcome.
-- Existing production deployment is not part of this project.
+- Missing, invalid or stale provider data means NO TRADE / NO DECISION; no fake prices or fabricated entries.
+- Signal scans use completed candles and return Entry, SL, TP1, TP2 and an expiry boundary only when independent evidence groups agree.
+- US index market hours use the New York regular session; exchange holidays are not yet sourced from a dedicated holiday calendar.
+- The journal's SL/TP monitor runs while its page is open; it is not a broker connection or guaranteed background monitor.
+- The account system stores password hashes and signed sessions in Redis. Email verification and password-reset email delivery require a connected mail provider.
+- Google sign-in remains unavailable until the Google OAuth client ID and secret are added.
+- News scanning still requires the external one-minute scheduler to be configured.
+- Hedging is advisory only and does not place broker orders.
