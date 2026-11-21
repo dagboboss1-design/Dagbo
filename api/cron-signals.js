@@ -70,8 +70,9 @@ async function sendPush(title, body, tag) {
 module.exports = async function handler(req, res) {
   // 1. SECURITY CHECK
   const supplied = req.headers.authorization || "";
-  const expected = `Bearer ${process.env.SIGNAL_PUSH_SECRET || ""}`;
-  if (!process.env.SIGNAL_PUSH_SECRET || supplied !== expected) {
+  const secret = process.env.SIGNAL_PUSH_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET;
+  const expected = `Bearer ${secret || ""}`;
+  if (!secret || supplied !== expected) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
