@@ -1,6 +1,8 @@
 name: DAGBO Market Scanner
 
 on:
+  push:
+    branches: [fix/dagboboss-env-alias]
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
@@ -17,9 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Run 15-minute market scanner
+      - name: Run 15-minute market scanner against preview
         env:
-          DAGBO_BASE_URL: https://dagboboss.vercel.app
+          DAGBO_BASE_URL: https://dagboboss-k4cho66m7-goodconfort33-4342.vercel.app
           DAGBO_CRON_SECRET: ${{ secrets.DAGBO_CRON_SECRET }}
         run: |
           if [ -z "$DAGBO_CRON_SECRET" ]; then
