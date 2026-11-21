@@ -1,6 +1,6 @@
 "use client";
 import "../feature.css";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useState,type MouseEvent} from "react";
 type C={time:string;open:number;high:number;low:number;close:number;volume:number|null};
 type D={ok?:boolean;error?:string;source?:string;stale?:boolean;candles?:C[]};
 type Drawing={id:string;pair:string;tool:string;x1:number;y1:number;x2:number;y2:number};
@@ -14,7 +14,7 @@ export default function ChartPage(){
  const candles=useMemo(()=>data?.candles?.slice(-90)||[],[data]);
  const low=candles.length?Math.min(...candles.map(c=>c.low)):0,high=candles.length?Math.max(...candles.map(c=>c.high)):1,span=Math.max(high-low,Number.EPSILON);
  const y=(v:number)=>330-(v-low)/span*300;
- function drawClick(e:React.MouseEvent<SVGSVGElement>){if(!candles.length)return;const rect=e.currentTarget.getBoundingClientRect();const x=Math.max(0,Math.min(900,(e.clientX-rect.left)/rect.width*900));const yy=Math.max(20,Math.min(330,(e.clientY-rect.top)/rect.height*360));const price=low+(330-yy)/300*span;if(!pending){setPending({x,y:price});return;}const item:Drawing={id:crypto.randomUUID(),pair,tool,x1:pending.x,y1:pending.y,x2:x,y2:price};persist([...drawings,item]);setPending(null);}
+ function drawClick(e:MouseEvent<SVGSVGElement>){if(!candles.length)return;const rect=e.currentTarget.getBoundingClientRect();const x=Math.max(0,Math.min(900,(e.clientX-rect.left)/rect.width*900));const yy=Math.max(20,Math.min(330,(e.clientY-rect.top)/rect.height*360));const price=low+(330-yy)/300*span;if(!pending){setPending({x,y:price});return;}const item:Drawing={id:crypto.randomUUID(),pair,tool,x1:pending.x,y1:pending.y,x2:x,y2:price};persist([...drawings,item]);setPending(null);}
  function togglePin(){const next=!pinned;setPinned(next);localStorage.setItem("dagbo_chart_pinned",next?"1":"0");}
  return <main className="feature-shell"><a className="back" href="/">← DAGBO SIGNAL</a><div className="eyebrow">MARKET STRUCTURE / CHART</div><h1>Dagbo <em>Chart</em></h1><p className="lead">Live OHLC candles with persistent drawing tools. Drawings stay on this device until you clear them.</p>
  <section className="feature-panel"><label>Instrument<select value={pair} onChange={e=>{setPair(e.target.value);setPending(null);}}>{pairs.map(p=><option key={p}>{p}</option>)}</select></label><label>Timeframe<select value={tf} onChange={e=>setTf(e.target.value)}>{["1m","5m","15m","30m","1h","4h","1d","1w"].map(t=><option key={t}>{t}</option>)}</select></label><button disabled={busy} onClick={load}>{busy?"Loading candles…":"Load live chart"}</button></section>
