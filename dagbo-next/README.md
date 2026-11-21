@@ -32,9 +32,16 @@ Do not put secrets in client-side variables or source code. The app's Settings p
 
 ## News alert scheduler
 
-The protected endpoint is `GET /api/cron/news`. Configure an external scheduler such as Cron-job.org to call the full deployment URL plus `/api/cron/news` every minute, with an HTTP header:
+The protected endpoint is `GET /api/cron/news`. Configure Cron-job.org to call the branch preview alias plus `/api/cron/news` every minute:
 
-`Authorization: Bearer YOUR_DAGBO_CRON_SECRET`
+`https://dagbo-signal-next-git-dagbo-clean-build-goodconfort33-4342.vercel.app/api/cron/news`
+
+Because Vercel preview SSO protection is enabled, add both HTTP headers using the same secret copied from the preview environment variable `DAGBO_CRON_SECRET`:
+
+- `x-vercel-protection-bypass: YOUR_DAGBO_CRON_SECRET`
+- `Authorization: Bearer YOUR_DAGBO_CRON_SECRET`
+
+The same value is registered as the Vercel automation-bypass secret. Keep it private and do not put it in browser code.
 
 A one-minute cadence is needed so the 1-hour and 15-minute event windows are not skipped. The route deduplicates each event alert in Redis and reports the observed post-release market move only after enough completed 1-minute candles exist. A successful HTTP response confirms the scan ran, not that a phone notification was delivered; check the returned counters and device push test separately.
 
