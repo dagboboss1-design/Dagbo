@@ -1,7 +1,8 @@
 import {NextRequest,NextResponse} from "next/server";
 import webpush from "web-push";
 import {createHash,timingSafeEqual} from "node:crypto";
-import {redisCommand,subscriptionIds,getSubscription} from "@/lib/server/redis";\nimport {verifySession,SESSION_COOKIE} from "@/lib/server/auth";
+import {redisCommand,subscriptionIds,getSubscription} from "@/lib/server/redis";
+import {verifySession,SESSION_COOKIE} from "@/lib/server/auth";
 export const runtime="nodejs";export const dynamic="force-dynamic";
 function vapid(){const {VAPID_SUBJECT,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY}=process.env;if(!VAPID_SUBJECT||!VAPID_PUBLIC_KEY||!VAPID_PRIVATE_KEY)throw new Error("Push delivery keys are not configured");webpush.setVapidDetails(VAPID_SUBJECT,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY);}
 function valid(s:any){return !!(s&&typeof s.endpoint==="string"&&s.endpoint.startsWith("https://")&&s.keys&&typeof s.keys.p256dh==="string"&&typeof s.keys.auth==="string");}
