@@ -4,11 +4,11 @@ import {useEffect,useMemo,useState,type MouseEvent} from "react";
 type C={time:string;open:number;high:number;low:number;close:number;volume:number|null};
 type D={ok?:boolean;error?:string;source?:string;stale?:boolean;candles?:C[]};
 type Drawing={id:string;pair:string;tool:string;x1:number;y1:number;x2:number;y2:number};
-const pairs=["XAUUSD","EURUSD","GBPUSD","GBPJPY","USDJPY","AUDUSD","USDCHF","US30","US100","US500","BTCUSD","ETHUSD"];
+const defaultPairs=["XAUUSD","EURUSD","GBPUSD","GBPJPY","USDJPY","AUDUSD","USDCHF","US30","US100","US500","BTCUSD","ETHUSD"];
 const tools=["trendline","horizontal","rectangle","long","short"];
 export default function ChartPage(){
- const [pair,setPair]=useState("XAUUSD"),[tf,setTf]=useState("15m"),[data,setData]=useState<D|null>(null),[busy,setBusy]=useState(false),[tool,setTool]=useState("trendline"),[toolbar,setToolbar]=useState(true),[pending,setPending]=useState<{x:number;y:number}|null>(null),[drawings,setDrawings]=useState<Drawing[]>([]),[pinned,setPinned]=useState(false);
- useEffect(()=>{try{const all=JSON.parse(localStorage.getItem("dagbo_chart_drawings")||"[]");setDrawings(Array.isArray(all)?all:[]);setPinned(localStorage.getItem("dagbo_chart_pinned")==="1");}catch{}},[]);
+ const [pair,setPair]=useState("XAUUSD"),[tf,setTf]=useState("15m"),[data,setData]=useState<D|null>(null),[busy,setBusy]=useState(false),[tool,setTool]=useState("trendline"),[toolbar,setToolbar]=useState(true),[pending,setPending]=useState<{x:number;y:number}|null>(null),[drawings,setDrawings]=useState<Drawing[]>([]),[pinned,setPinned]=useState(false),[pairs,setPairs]=useState(defaultPairs);
+ useEffect(()=>{try{const all=JSON.parse(localStorage.getItem("dagbo_chart_drawings")||"[]");setDrawings(Array.isArray(all)?all:[]);setPinned(localStorage.getItem("dagbo_chart_pinned")==="1");}catch{}const sync=()=>{try{const d=JSON.parse(localStorage.getItem("dagbo_settings")||"{}");const next=Array.isArray(d.pairs)&&d.pairs.length?d.pairs.filter((p:string)=>defaultPairs.includes(p)):defaultPairs;setPairs(next);setPair(p=>next.includes(p)?p:next[0]);}catch{setPairs(defaultPairs);}};sync();window.addEventListener("storage",sync);window.addEventListener("dagbo:settings-changed",sync);return()=>{window.removeEventListener("storage",sync);window.removeEventListener("dagbo:settings-changed",sync);};},[]);
  function persist(next:Drawing[]){setDrawings(next);localStorage.setItem("dagbo_chart_drawings",JSON.stringify(next));}
  async function load(){setBusy(true);setData(null);try{const r=await fetch("/api/market-data?pair="+pair+"&tf="+tf,{cache:"no-store"});setData(await r.json());}catch{setData({ok:false,error:"Chart data service unavailable."});}finally{setBusy(false);}}
  const candles=useMemo(()=>data?.candles?.slice(-90)||[],[data]);
