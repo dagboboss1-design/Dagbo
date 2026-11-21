@@ -238,7 +238,7 @@ module.exports = async function handler(req, res) {
           process.env.TWELVE_DATA_API_KEY_3,
           process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
           process.env.SPIKE_TWELVE_DATA_API_KEY
-        ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 3);
+        ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 2);
         if (quotePair && quoteKeys.length) {
           let quoteFound = false;
           for (const quoteKey of quoteKeys) {
