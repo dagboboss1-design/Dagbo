@@ -2,12 +2,12 @@
 import "../feature.css";
 import {useCallback,useEffect,useState} from "react";
 type Trade={id:string;pair:string;side:string;entry:number;sl:number;tp:number;opened:string;status:string;exitPrice?:number;closedAt?:string};
-const key="dagbo_signal_journal_v1";
+const key="dagbo_signal_journal_v1";\nconst defaultPairs=["XAUUSD","EURUSD","GBPUSD","GBPJPY","USDJPY","AUDUSD","USDCHF","US30","US100","US500","BTCUSD","ETHUSD"];
 const pairs=["XAUUSD","EURUSD","GBPUSD","GBPJPY","USDJPY","AUDUSD","USDCHF","US30","US100","US500","BTCUSD","ETHUSD"];
 export default function JournalPage(){
- const [trades,setTrades]=useState<Trade[]>([]),[pair,setPair]=useState("XAUUSD"),[side,setSide]=useState("BUY"),[entry,setEntry]=useState(""),[sl,setSl]=useState(""),[tp,setTp]=useState(""),[ready,setReady]=useState(false),[checking,setChecking]=useState(false),[notice,setNotice]=useState("Monitoring checks run while this page is open.");
+ const [trades,setTrades]=useState<Trade[]>([]),[pair,setPair]=useState("XAUUSD"),[side,setSide]=useState("BUY"),[entry,setEntry]=useState(""),[sl,setSl]=useState(""),[tp,setTp]=useState(""),[ready,setReady]=useState(false),[checking,setChecking]=useState(false),[notice,setNotice]=useState("Monitoring checks run while this page is open."),[pairs,setPairs]=useState(defaultPairs);
  const save=useCallback((next:Trade[])=>{setTrades(next);localStorage.setItem(key,JSON.stringify(next));},[]);
- useEffect(()=>{try{const raw=localStorage.getItem(key);if(raw)setTrades(JSON.parse(raw));}catch{}setReady(true);},[]);
+ useEffect(()=>{try{const raw=localStorage.getItem(key);if(raw)setTrades(JSON.parse(raw));}catch{}const sync=()=>{try{const d=JSON.parse(localStorage.getItem("dagbo_settings")||"{}");const next=Array.isArray(d.pairs)&&d.pairs.length?d.pairs.filter((p:string)=>defaultPairs.includes(p)):defaultPairs;setPairs(next);setPair(p=>next.includes(p)?p:next[0]);}catch{setPairs(defaultPairs);}};sync();window.addEventListener("storage",sync);window.addEventListener("dagbo:settings-changed",sync);setReady(true);return()=>{window.removeEventListener("storage",sync);window.removeEventListener("dagbo:settings-changed",sync);};},[]);
  const monitor=useCallback(async()=>{
   if(!ready||checking)return;
   const open=trades.filter(t=>t.status==="OPEN");if(!open.length)return;
