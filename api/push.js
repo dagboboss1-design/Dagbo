@@ -232,23 +232,31 @@ module.exports = async function handler(req, res) {
       }
       let liveQuoteContext = "";
       if (asksPrice) {
-        const quoteKey = process.env.TWELVE_DATA_API_KEY;
-        if (quotePair && quoteKey) {
-          try {
-            const quoteUrl = "https://api.twelvedata.com/quote?symbol=" +
-              encodeURIComponent(pairSymbols[quotePair]) + "&apikey=" + encodeURIComponent(quoteKey);
-            const quoteResponse = await fetch(quoteUrl);
-            const quote = await quoteResponse.json();
-            const price = Number(quote.close || quote.price);
-            if (quoteResponse.ok && Number.isFinite(price) && price > 0) {
-              liveQuoteContext = "Verified Twelve Data quote for " + quotePair +
-                ": latest price " + price + ", timestamp " + (quote.datetime || quote.timestamp || "not supplied") + ".";
-            } else {
-              liveQuoteContext = "Live quote unavailable for " + quotePair + ". Do not guess the price.";
-            }
-          } catch (_) {
-            liveQuoteContext = "Live quote service unavailable. Do not guess the price.";
+        const quoteKeys = Array.from(new Set([
+          process.env.TWELVE_DATA_API_KEY,
+          process.env.TWELVE_DATA_API_KEY_2,
+          process.env.TWELVE_DATA_API_KEY_3,
+          process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY,
+          process.env.SPIKE_TWELVE_DATA_API_KEY
+        ].map(value => String(value || "").trim()).filter(Boolean))).slice(0, 3);
+        if (quotePair && quoteKeys.length) {
+          let quoteFound = false;
+          for (const quoteKey of quoteKeys) {
+            try {
+              const quoteUrl = "https://api.twelvedata.com/quote?symbol=" +
+                encodeURIComponent(pairSymbols[quotePair]) + "&apikey=" + encodeURIComponent(quoteKey);
+              const quoteResponse = await fetch(quoteUrl, { signal: AbortSignal.timeout(4000) });
+              const quote = await quoteResponse.json();
+              const price = Number(quote.close || quote.price);
+              if (quoteResponse.ok && quote.status !== "error" && Number.isFinite(price) && price > 0) {
+                liveQuoteContext = "Verified Twelve Data quote for " + quotePair +
+                  ": latest price " + price + ", timestamp " + (quote.datetime || quote.timestamp || "not supplied") + ".";
+                quoteFound = true;
+                break;
+              }
+            } catch (_) {}
           }
+          if (!quoteFound) liveQuoteContext = "Live quote unavailable for " + quotePair + ". Do not guess the price.";
         } else {
           liveQuoteContext = quotePair
             ? "Live quote API key is not configured. Do not guess the price."
