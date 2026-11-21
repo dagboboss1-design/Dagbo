@@ -24,6 +24,37 @@ const SYMBOLS = {
 const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
 const MAX_PAIRS = 6;
 
+const BINANCE_SYMBOLS = { BTCUSD: "BTCUSDT", BTC: "BTCUSDT", ETHUSD: "ETHUSDT", ETH: "ETHUSDT" };
+const BINANCE_INTERVALS = { "15min": "15m", "4h": "4h", "1day": "1d", "1week": "1w", "1month": "1M" };
+async function fetchBinanceCandles(pair, interval, limit) {
+  const symbol = BINANCE_SYMBOLS[pair];
+  const binanceInterval = BINANCE_INTERVALS[interval];
+  if (!symbol || !binanceInterval) throw new Error("Unsupported Binance market/timeframe");
+  const url = "https://data-api.binance.vision/api/v3/klines?symbol=" +
+    encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(binanceInterval) +
+    "&limit=" + encodeURIComponent(String(limit || 80));
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const rows = await response.json();
+  if (!response.ok || !Array.isArray(rows)) throw new Error("Binance candle request failed");
+  return rows.map(row => ({
+    datetime: new Date(Number(row[0])).toISOString().slice(0, 19).replace("T", " "),
+    open: String(row[1]), high: String(row[2]), low: String(row[3]),
+    close: String(row[4]), volume: String(row[5])
+  }));
+}
+async function fetchProviderCandles(pair, symbol, interval, limit, apiKey) {
+  if (BINANCE_SYMBOLS[pair]) return fetchBinanceCandles(pair, interval, limit);
+  const url = "https://api.twelvedata.com/time_series?symbol=" +
+    encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(interval) +
+    "&outputsize=" + encodeURIComponent(String(limit)) + "&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+  const response = await fetch(url);
+  const data = await response.json();
+  if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
+    throw new Error(data.message || "Market candle request failed");
+  }
+  return data.values;
+}
+
 function isMarketOpen(pair, now = new Date()) {
   const p=String(pair||'').toUpperCase();
   if (p.includes('BTC') || p.includes('ETH')) return true;
@@ -421,15 +452,8 @@ async function getHtfCandles(pair, frame, apiKey) {
   }
   const symbol = SYMBOLS[pair];
   if (!symbol) throw new Error("Unsupported pair " + pair);
-  const url = "https://api.twelvedata.com/time_series?symbol=" +
-    encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(frame.key) +
-    "&outputsize=80&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-  const response = await fetch(url);
-  const data = await response.json();
-  if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
-    throw new Error(data.message || "No " + frame.label + " candles");
-  }
-  const candles = data.values.slice().reverse().map(c => ({
+  const values = await fetchProviderCandles(pair, symbol, frame.key, 80, apiKey);
+  const candles = values.slice().reverse().map(c => ({
     datetime: String(c.datetime || ""),
     open: num(c.open), high: num(c.high), low: num(c.low), close: num(c.close)
   })).filter(c => c.datetime && [c.open,c.high,c.low,c.close].every(v => v !== null)).slice(0, -1);
@@ -628,15 +652,10 @@ module.exports = async function handler(req, res) {
     const fetched = await Promise.all(pairsToScan.map(async pair => {
       if (!isMarketOpen(pair)) return { pair, closed: true };
       const symbol = SYMBOLS[pair];
-      const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
-        "&interval=15min&outputsize=61&apikey=" + encodeURIComponent(apiKey);
       try {
-        const response = await fetch(url);
-        const data = await response.json();
-        if (!response.ok || data.status === "error" || !Array.isArray(data.values) || data.values.length < 61) {
-          throw new Error(data.message || "Insufficient candle data");
-        }
-        const closedCandles = data.values.filter(c => {
+        const values = await fetchProviderCandles(pair, symbol, "15min", 80, apiKey);
+        if (!Array.isArray(values) || values.length < 61) throw new Error("Insufficient candle data");
+        const closedCandles = values.filter(c => {
           const raw = String(c.datetime || "");
           const stamp = Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? "" : "Z"));
           return Number.isFinite(stamp) && stamp + 15 * 60 * 1000 <= Date.now();
