@@ -70,7 +70,7 @@ async function claimTwelveDataSlot() {
 
 
 function fcsPeriod(tf) {
-  return ({ "5":"5m", "15":"15m", "30":"30m", "60":"1h", "240":"4h", "1day":"1D", "1week":"1W" })[tf] || null;
+  return ({ "1":"1m", "5":"5m", "15":"15m", "30":"30m", "60":"1h", "240":"4h", "1day":"1D", "1week":"1W" })[tf] || null;
 }
 function normalizeFcsCandles(data) {
   const source = data && data.response;
@@ -155,6 +155,7 @@ module.exports = async function handler(req, res) {
   const pair = rawPair.replace(/[^A-Z0-9]/g, "");
   const tf = String(req.query && req.query.tf || "15");
   const intervals = {
+    "1": { twelve: "1min", binance: "1m", ms: 60 * 1000 },
     "5": { twelve: "5min", binance: "5m", ms: 5 * 60 * 1000 },
     "15": { twelve: "15min", binance: "15m", ms: 15 * 60 * 1000 },
     "30": { twelve: "30min", binance: "30m", ms: 30 * 60 * 1000 },
@@ -164,7 +165,7 @@ module.exports = async function handler(req, res) {
     "1week": { twelve: "1week", binance: "1w", ms: 7 * 24 * 60 * 60 * 1000 }
   };
   const interval = intervals[tf];
-  if (!interval) return res.status(400).json({ error: "Unsupported timeframe. Use 5, 15, 30, 60, 240, 1day or 1week." });
+  if (!interval) return res.status(400).json({ error: "Unsupported timeframe. Use 1, 5, 15, 30, 60, 240, 1day or 1week." });
 
   // Crypto is served directly from Binance's free, unauthenticated public market-data API.
   // This keeps BTC/ETH requests completely outside the Twelve Data credit quota.
