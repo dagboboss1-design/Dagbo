@@ -344,7 +344,7 @@
         // both providers to oldest → newest before running indicators.
         function timeOf(c) {
           var raw = String(c.datetime || '');
-          return Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? '' : 'Z'));
+          return Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? '' : 'Z'));
         }
         return timeOf(a) - timeOf(b);
       });
