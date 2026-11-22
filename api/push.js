@@ -80,22 +80,19 @@ function getConfiguredAIProviders() {
   };
 }
 
-function chooseAIProvider(question) {
-  const q = String(question || "").toLowerCase();
-  if (/\b(code|coding|debug|developer|programming|api endpoint|review this code|refactor)\b/.test(q)) return "claude";
-  if (/\b(research|latest news|geopolitic|fundamental|economic calendar|economic data|compare providers|verify this news)\b/.test(q)) return "gemini";
-  if (/\b(analy[sz]e|analysis|trade setup|trade plan|market structure|liquidity|risk assessment|should i enter|confluence)\b/.test(q)) return "openai";
-  return "groq";
+function chooseAIProvider(task) {
+  const section = String(task || "assistant").toLowerCase();
+  if (section === "signals") return "claude";
+  if (section === "journal" || section === "assistant" || section === "boss1") return "openai";
+  if (section === "news") return "gemini";
+  if (section === "fast") return "groq";
+  return "openai";
 }
 
 function getAIProviderOrder(primary, configured) {
-  const order = [primary, "openai", "claude", "gemini", "groq"];
-  const seen = new Set();
-  return order.filter(function(name) {
-    if (seen.has(name) || !configured[name]) return false;
-    seen.add(name);
-    return true;
-  }).slice(0, 3);
+  // Groq has exactly one fallback: OpenAI. Other page owners fail visibly.
+  const order = primary === "groq" ? ["groq", "openai"] : [primary];
+  return order.filter(function(name) { return !!configured[name]; });
 }
 
 async function callAIProvider(provider, messages) {
@@ -300,7 +297,7 @@ module.exports = async function handler(req, res) {
 
     // 5. DAGBO AI — task routing with one automatic fallback provider.
     if (req.method === "POST" && action === "ask-ai") {
-      const { question, name, subscription, marketContext, history, provider: requestedProvider } = req.body || {};
+      const { question, name, subscription, marketContext, history, task } = req.body || {};
       if (typeof question !== "string" || !question.trim() || question.length > 2000) {
         return res.status(400).json({ error: "A valid question is required" });
       }
@@ -319,6 +316,8 @@ module.exports = async function handler(req, res) {
       }).map(function(item) {
         return { role: item.role, content: item.content.slice(0, 1200) };
       }) : [];
+      const validTasks = ["assistant", "boss1", "signals", "journal", "news", "fast"];
+      const selectedTask = validTasks.includes(String(task || "").toLowerCase()) ? String(task).toLowerCase() : "assistant";
 
       // For explicit live-price questions, only pass a verified Twelve Data quote.
       const pairSymbols = {
@@ -373,7 +372,14 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      const systemPrompt = "You are DAGBO AI Market Commander for " + (safeName || "Oga") +
+      const taskInstructions = {
+        signals: "You are the Claude-powered Signals analyst. Interpret only supplied, timestamped market data and technical evidence; explain confluence, invalidation and uncertainty. Never invent an entry, stop or target.",
+        journal: "You are the OpenAI-powered trading journal coach. Analyse only supplied journal records, calculate only from supplied figures, identify execution patterns and risk discipline. Never invent trades or results.",
+        news: "You are the Gemini-powered news analyst. Separate verified facts, actual values, forecasts and unknowns; explain affected assets and possible scenarios without presenting forecasts as facts.",
+        boss1: "You are the OpenAI-powered BOSS1 trading coach. Teach clearly, check reasoning and emphasise risk management.",
+        fast: "You are the Groq-powered fast assistant. Be concise and use only supplied facts."
+      };
+      const systemPrompt = (taskInstructions[selectedTask] || "You are the OpenAI-powered DAGBO assistant.") + " You are assisting " + (safeName || "Oga") +
         ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise, clear and Nigerian-friendly; use Pidgin naturally when useful. For live-price questions, use only a verified live quote supplied in the context; if unavailable, say so and never guess. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When asked for a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit only when supported by fresh market data and a valid setup. If fresh data or a valid setup is missing, return WAIT and say entry/SL/TP are unavailable. Never guarantee profits. Ordinary answers should usually be 1-4 short sentences.";
       const userContent = question.trim() +
         (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") +
@@ -383,8 +389,7 @@ module.exports = async function handler(req, res) {
         .concat([{ role: "user", content: userContent }]);
 
       const configured = getConfiguredAIProviders();
-      const validRequested = ["openai", "claude", "gemini", "groq"].includes(String(requestedProvider || "").toLowerCase());
-      const primary = validRequested ? String(requestedProvider).toLowerCase() : chooseAIProvider(question);
+      const primary = chooseAIProvider(selectedTask);
       const providerOrder = getAIProviderOrder(primary, configured);
       if (!providerOrder.length) {
         return res.status(503).json({
@@ -446,7 +451,7 @@ module.exports = async function handler(req, res) {
         provider: result.provider,
         model: result.model,
         fallbackUsed: result.provider !== primary,
-        routingReason: validRequested ? "Manually selected provider" : "Automatic task routing",
+        task: selectedTask,\n        routingReason: "Assigned page role: " + selectedTask,
         attempts: attempts
       });
     }
