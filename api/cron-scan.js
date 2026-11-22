@@ -612,8 +612,11 @@ module.exports = async function handler(req, res) {
   }
   if (!validAuth(req)) return res.status(401).json({ error: "Unauthorized scheduled scan" });
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: "Missing TWELVE_DATA_API_KEY environment variable" });
+  // The scheduled scanner must use the same provider failover manager as the Signals page.
+  // VERCEL_URL targets this deployment; production hostname is the safe fallback.
+  const marketDataHost = process.env.VERCEL_URL
+    ? "https://" + process.env.VERCEL_URL
+    : "https://dagboboss.vercel.app";
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     return res.status(503).json({ error: "Upstash Redis is not configured" });
   }
@@ -627,26 +630,38 @@ module.exports = async function handler(req, res) {
     const pairsToScan = await getConfiguredPairs();
     const fetched = await Promise.all(pairsToScan.map(async pair => {
       if (!isMarketOpen(pair)) return { pair, closed: true };
-      const symbol = SYMBOLS[pair];
-      const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
-        "&interval=15min&outputsize=61&apikey=" + encodeURIComponent(apiKey);
+      const url = marketDataHost + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
       try {
-        const response = await fetch(url);
-        const data = await response.json();
-        if (!response.ok || data.status === "error" || !Array.isArray(data.values) || data.values.length < 61) {
-          throw new Error(data.message || "Insufficient candle data");
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 12000);
+        let response, data;
+        try {
+          response = await fetch(url, { cache: "no-store", signal: controller.signal });
+          data = await response.json();
+        } finally {
+          clearTimeout(timer);
+        }
+        if (!response.ok || data.error || data.stale || !Array.isArray(data.values)) {
+          throw new Error(data.error || (data.stale ? "Provider data is stale; scheduled signal suppressed." : "Market-data failover manager returned no live candles."));
         }
         const closedCandles = data.values.filter(c => {
           const raw = String(c.datetime || "");
           const stamp = Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? "" : "Z"));
-          return Number.isFinite(stamp) && stamp + 15 * 60 * 1000 <= Date.now();
-        }).slice(0, 60).reverse();
-        if (closedCandles.length < 60) throw new Error("Waiting for 60 fully closed candles");
+          const o = Number(c.open), h = Number(c.high), l = Number(c.low), close = Number(c.close);
+          return Number.isFinite(stamp) && stamp + 15 * 60 * 1000 <= Date.now() &&
+            [o,h,l,close].every(Number.isFinite) && o>0 && h>0 && l>0 && close>0 &&
+            h>=Math.max(o,close,l) && l<=Math.min(o,close,h);
+        }).sort((a,b) => {
+          const ta = Date.parse(String(a.datetime).replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(String(a.datetime)) ? "" : "Z"));
+          const tb = Date.parse(String(b.datetime).replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(String(b.datetime)) ? "" : "Z"));
+          return ta-tb;
+        }).slice(-60);
+        if (closedCandles.length < 60) throw new Error("Only " + closedCandles.length + " valid, fully closed 15m candles; 60 are required.");
         const analysis = analyze(closedCandles, pair);
-        if (!analysis) throw new Error("Could not calculate indicators");
-        return { pair, analysis };
+        if (!analysis) throw new Error("Could not calculate indicators from provider candles.");
+        return { pair, analysis, provider: data.provider || "Market-data failover manager" };
       } catch (err) {
-        return { pair, error: err.message };
+        return { pair, error: err && err.name === "AbortError" ? "Market-data failover request timed out." : (err.message || String(err)) };
       }
     }));
 
