@@ -11,6 +11,18 @@ const BINANCE_SYMBOLS = {
   ETH: "ETHUSDT", ETHUSD: "ETHUSDT", ETHUSDT: "ETHUSDT"
 };
 
+async function fetchJsonWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 9000);
+  try {
+    const response = await fetch(url, Object.assign({}, options || {}, { signal: controller.signal }));
+    const data = await response.json();
+    return { response, data };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const memoryCache = new Map();
 let memoryMinute = { startedAt: 0, count: 0 };
 const CACHE_SECONDS = 110;
@@ -82,8 +94,9 @@ module.exports = async function handler(req, res) {
     try {
       const url = "https://data-api.binance.vision/api/v3/klines?symbol=" +
         encodeURIComponent(binanceSymbol) + "&interval=" + interval.binance + "&limit=100";
-      const response = await fetch(url, { headers: { "Accept": "application/json" } });
-      const rows = await response.json();
+      const result = await fetchJsonWithTimeout(url, { headers: { "Accept": "application/json" } }, 9000);
+      const response = result.response;
+      const rows = result.data;
       if (!response.ok || !Array.isArray(rows)) {
         const message = rows && rows.msg ? rows.msg : "Binance did not return market candles";
         return res.status(response.status >= 400 && response.status < 500 ? response.status : 502)
@@ -106,7 +119,8 @@ module.exports = async function handler(req, res) {
       });
     } catch (error) {
       console.error("DAGBO Binance market data error:", error.message);
-      return res.status(502).json({ error: "Could not retrieve Binance market candles. Please retry shortly.", provider: "Binance" });
+      const timedOut = error && error.name === "AbortError";
+      return res.status(timedOut ? 504 : 502).json({ error: timedOut ? "Binance market-data request timed out. Retry shortly." : "Could not retrieve Binance market candles. Please retry shortly.", provider: "Binance", errorCode: timedOut ? "UPSTREAM_TIMEOUT" : "UPSTREAM_ERROR" });
     }
   }
 
@@ -138,8 +152,9 @@ module.exports = async function handler(req, res) {
     const url = "https://api.twelvedata.com/time_series?symbol=" +
       encodeURIComponent(symbol) +
       "&interval=" + interval.twelve + "&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-    const response = await fetch(url);
-    const data = await response.json();
+    const result = await fetchJsonWithTimeout(url, {}, 9000);
+    const response = result.response;
+    const data = result.data;
 
     if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
       const message = data.message || "Market data provider did not return candles";
@@ -158,6 +173,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ...payload, cache: "miss" });
   } catch (error) {
     console.error("DAGBO market data proxy error:", error.message);
-    return res.status(502).json({ error: "Could not retrieve market candles" });
+    const timedOut = error && error.name === "AbortError";
+    return res.status(timedOut ? 504 : 502).json({ error: timedOut ? "Twelve Data market-data request timed out. Retry shortly." : "Could not retrieve market candles", provider: "Twelve Data", errorCode: timedOut ? "UPSTREAM_TIMEOUT" : "UPSTREAM_ERROR" });
   }
 };
