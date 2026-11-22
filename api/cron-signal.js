@@ -200,16 +200,7 @@ async function calculateNewsBias(event){
  const evidence=rows.map(r=>{const [base]=r.symbol.split("/");const dir=r.changePct>=0?"BUY":"SELL";return r.symbol+" "+dir+" ("+(r.changePct>=0?"+":"")+r.changePct.toFixed(3)+"%)";}).join("; ");
  return{action:Math.abs(strength)<.025?"WAIT":currency+" "+(strength>0?"STRONGER":"WEAKER"),confidence,score:Number(strength.toFixed(4)),evidence:"Previous 30m correlated basket: "+evidence};
 }
-async function fetchQuote(symbol, apiKey) {
-  const url = "https://api.twelvedata.com/quote?symbol=" + encodeURIComponent(symbol) + "&apikey=" + encodeURIComponent(apiKey);
-  const response = await fetch(url);
-  const data = await response.json();
-  const open = Number(data.open), current = Number(data.close);
-  if (!response.ok || data.status === "error" || !Number.isFinite(open) || !Number.isFinite(current) || open <= 0 || current <= 0) {
-    throw new Error("Quote unavailable for " + symbol + ": " + (data.message || response.status));
-  }
-  return {open,current};
-}
+
 async function claim(key) {
   return (await redis.set(key,"1",{nx:true,ex:7*24*60*60})) === "OK";
 }
@@ -217,7 +208,6 @@ async function claim(key) {
 module.exports = async function handler(req,res) {
   if (!authorized(req)) return res.status(401).json({error:"Unauthorized"});
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({error:"Method not allowed"});
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
   const lock = "dagbo:cron:news:lock";
   const acquired = await redis.set(lock,String(Date.now()),{nx:true,ex:4*60});
   if (acquired !== "OK") return res.status(200).json({skipped:true,reason:"News alert check already running"});
