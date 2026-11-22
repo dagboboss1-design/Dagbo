@@ -1,4 +1,4 @@
-const VERSION = "dagbo-v23";
+const VERSION = "dagbo-v24";
 const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "settings.html", "dagbo.css", "dagbo-confluence.js", "manifest.json", "icons/dagbo-orbit.svg", "pwa.js", "navigation.js"];
 
 self.addEventListener("install", (event) => {
@@ -39,7 +39,7 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(data.title || "DAGBO SIGNAL", {
       body: data.body || "You have a new trading alert.",
       tag: data.tag || "dagbo-alert",
-      icon: "./icons/icon-192.png",
+      icon: "./icons/dagbo-orbit.svg",
       badge: "./icons/icon-192.png",
       timestamp: Date.now(),
       data: { url: data.url || "./signals.html" },
