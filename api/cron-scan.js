@@ -124,19 +124,20 @@ async function broadcast(title, body, tag) {
   return { sent, failed, devices: ids.length };
 }
 async function fetchPreNewsCandles(pair, cutoffMs, apiKey) {
-  const symbol = SYMBOLS[pair];
-  if (!symbol) throw new Error("No Twelve Data symbol mapping for " + pair);
-  const url = "https://api.twelvedata.com/time_series?symbol=" + encodeURIComponent(symbol) +
-    "&interval=15min&outputsize=60&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-  const response = await fetch(url);
+  // Reuse the same provider manager as the live Signals page. This keeps
+  // scheduled pre-news analysis eligible for Twelve Data -> FCS -> FMP.
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\\/\\//, "");
+  const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
+  const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
-  if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
-    throw new Error(data.message || "No candle data");
+  if (!response.ok || data.stale || !Array.isArray(data.values)) {
+    throw new Error(data.error || "Live failover manager returned no fresh 15-minute candles for " + pair);
   }
-  // Twelve Data timestamps mark candle starts. Only use candles that had
-  // fully closed by the release-minus-15-minute cutoff.
+  // Provider timestamps mark candle starts. Only candles fully closed by the
+  // release-minus-15-minute cutoff are eligible for this calculation.
   const completed = data.values.map(c => {
-    const t = Date.parse(String(c.datetime).replace(" ", "T") + (String(c.datetime).includes("Z") || /[+-]\\d\\d:\\d\\d$/.test(String(c.datetime)) ? "" : "Z"));
+    const raw = String(c.datetime || "");
+    const t = Date.parse(raw.replace(" ", "T") + (raw.includes("Z") || /[+-]\\d\\d:\\d\\d$/.test(raw) ? "" : "Z"));
     return { candle: c, start: t, closeTime: t + 15 * 60 * 1000 };
   }).filter(x => Number.isFinite(x.start) && x.closeTime <= cutoffMs && x.start >= cutoffMs - 30 * 60 * 1000)
     .sort((a,b) => a.start - b.start);
@@ -421,19 +422,41 @@ async function getHtfCandles(pair, frame, apiKey) {
   }
   const symbol = SYMBOLS[pair];
   if (!symbol) throw new Error("Unsupported pair " + pair);
-  const url = "https://api.twelvedata.com/time_series?symbol=" +
-    encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(frame.key) +
-    "&outputsize=80&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-  const response = await fetch(url);
-  const data = await response.json();
-  if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
-    throw new Error(data.message || "No " + frame.label + " candles");
+  let data;
+  const sharedTf = ({ "4h":"240", "1day":"1day", "1week":"1week" })[frame.key];
+  if (sharedTf && pair !== "DXY") {
+    const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace(/^https?:\\/\\//, "");
+    const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=" + sharedTf;
+    const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+    data = await response.json();
+    if (!response.ok || data.stale || !Array.isArray(data.values)) {
+      throw new Error(data.error || "Live market-data failover unavailable for " + frame.label);
+    }
+  } else {
+    // DXY and monthly history are not currently supported by the shared
+    // pair/timeframe manager; retain the existing direct Twelve Data path.
+    const url = "https://api.twelvedata.com/time_series?symbol=" +
+      encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(frame.key) +
+      "&outputsize=80&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+    const response = await fetch(url);
+    data = await response.json();
+    if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
+      throw new Error(data.message || "No " + frame.label + " candles");
+    }
   }
-  const candles = data.values.slice().reverse().map(c => ({
+  const frameMs = ({ "4h":14400000, "1day":86400000, "1week":604800000, "1month":2592000000 })[frame.key] || 0;
+  const now = Date.now();
+  const candles = data.values.map(c => ({
     datetime: String(c.datetime || ""),
     open: num(c.open), high: num(c.high), low: num(c.low), close: num(c.close)
-  })).filter(c => c.datetime && [c.open,c.high,c.low,c.close].every(v => v !== null)).slice(0, -1);
-  if (candles.length < 55) throw new Error("Insufficient " + frame.label + " history");
+  })).filter(c => c.datetime && [c.open,c.high,c.low,c.close].every(v => v !== null))
+    .map(c => {
+      const stamp = Date.parse(c.datetime.replace(" ", "T") + (c.datetime.includes("Z") || /[+-]\\d\\d:\\d\\d$/.test(c.datetime) ? "" : "Z"));
+      return { ...c, stamp };
+    }).filter(c => Number.isFinite(c.stamp) && (!frameMs || c.stamp + frameMs <= now))
+    .sort((a,b) => a.stamp - b.stamp)
+    .map(({stamp,...c}) => c);
+  if (candles.length < 55) throw new Error("Insufficient fully closed " + frame.label + " history");
   await redis.set(cacheKey, JSON.stringify(candles), { ex: frame.ttl });
   return candles;
 }
