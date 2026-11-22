@@ -310,13 +310,13 @@
       // scanner waiting forever. A timeout is reported per pair, not as a page crash.
       var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 12000) : null;
-      var res;
+      var res, data;
       try {
         res = await fetch(url, controller ? { signal: controller.signal } : {});
+        data = await res.json();
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
       }
-      var data = await res.json();
       
       if (!res.ok || data.error || data.status === 'error') {
         var apiError = data.error || data.message || res.statusText || ('HTTP ' + res.status);
@@ -341,6 +341,13 @@
       if (candles.length < 60) {
         return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain; this strategy engine requires at least 60 closed candles.', errorStage: 'closed-candles' };
       }
+      // Reject malformed, non-positive or impossible OHLC candles before any
+      // indicator, entry, stop or target calculation can run.
+      var invalidCandle = candles.find(function(c) {
+        var o=Number(c.open),h=Number(c.high),l=Number(c.low),cl=Number(c.close);
+        return ![o,h,l,cl].every(Number.isFinite) || o<=0 || h<=0 || l<=0 || cl<=0 || h<l || h<Math.max(o,cl) || l>Math.min(o,cl);
+      });
+      if (invalidCandle) return { pair: pair, error: 'Provider returned malformed OHLC candles. No trade levels were generated.', errorStage: 'invalid-candles' };
 
       var analysis=analyseAllMethods(candles, activeTradingProfile);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
@@ -367,6 +374,12 @@
       else if(analysis.confidence>=75&&activeEvidence>=3) rr=Math.max(rr,3);
       var tp1Dist=slDist*rr,tp2Dist=slDist*Math.min(7,rr+1);
       var sl=isBuy?entry-slDist:entry+slDist,tp1=isBuy?entry+tp1Dist:entry-tp1Dist,tp2=isBuy?entry+tp2Dist:entry-tp2Dist;
+      if (!isFinite(entry) || entry<=0 || !isFinite(atr) || atr<=0 ||
+          ![sl,tp1,tp2].every(Number.isFinite) ||
+          (isBuy && !(sl<entry && tp1>entry && tp2>tp1)) ||
+          (isSell && !(sl>entry && tp1<entry && tp2<tp1))) {
+        return { pair: pair, error: 'Calculated trade levels failed price and risk validation. No executable signal issued.', errorStage: 'invalid-levels' };
+      }
       var lastC=candles[candles.length-1];
       return {
         pair:pair,final:final,entry:entry,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,
