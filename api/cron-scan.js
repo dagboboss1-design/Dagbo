@@ -293,7 +293,7 @@ async function monitorTrades(marketData, apiKey) {
   // Do not depend on the user's normal signal-watchlist: every distinct pair
   // with an OPEN tracked trade must have market data for its TP/SL check.
   const neededPairs = Array.from(new Set(openTrades.map(x => String(x.trade.pair || "").toUpperCase())))
-    .filter(pair => SYMBOLS[pair] && !marketData[pair]);
+    .filter(pair => SYMBOLS[pair] && (!marketData[pair] || num(marketData[pair].candleHigh) === null || num(marketData[pair].candleLow) === null));
   const extraMarkets = await Promise.all(neededPairs.map(async pair => {
     try {
       if (!isMarketOpen(pair)) return { pair, closed: true };
