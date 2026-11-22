@@ -10,12 +10,21 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
 #tv-full-chart .tradingview-widget-container,#tv-full-chart .tradingview-widget-container__widget{width:100%;height:100%}
 #tv-full-chart iframe{width:100%!important;height:100%!important;border:0!important}
 .dg-tabbar{position:fixed!important;left:0;right:0;bottom:0;z-index:50;background:#000!important;border-top:1px solid #252525!important}
+/* The hosted TradingView frame does not expose its internal toolbar controls.
+   This narrow cover lets the user tuck the toolbar away without reloading the chart. */
+#drawing-toolbar-cover{position:fixed;z-index:18;left:0;top:0;bottom:72px;width:112px;background:#000;display:none}
+#drawing-toolbar-cover.is-hidden{display:block}
+#drawing-toolbar-toggle{position:fixed;z-index:25;left:104px;top:50%;transform:translateY(-50%);width:30px;height:66px;border:1px solid #454545;border-left:0;border-radius:0 12px 12px 0;background:#111;color:#fff;font-size:25px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px #0009;touch-action:manipulation}
+#drawing-toolbar-toggle.is-hidden{left:0;border-left:1px solid #454545;border-radius:0 12px 12px 0}
+#drawing-toolbar-toggle:focus-visible{outline:2px solid #fff;outline-offset:2px}
 </style></head><body>
 <div id="tv-full-chart"><div class="tradingview-widget-container" style="height:100%;width:100%">
 <div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
 <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
 {"autosize":true,"symbol":"CAPITALCOM:XAUUSD","interval":"15","timezone":"Africa/Lagos","theme":"dark","style":"1","locale":"en","allow_symbol_change":true,"hide_top_toolbar":false,"hide_side_toolbar":false,"hide_legend":false,"hide_volume":false,"withdateranges":true,"save_image":true,"calendar":false,"details":false,"hotlist":false,"studies":[],"backgroundColor":"#000000","gridColor":"rgba(255,255,255,0.08)"}
 </script></div></div>
+<div id="drawing-toolbar-cover" aria-hidden="true"></div>
+<button id="drawing-toolbar-toggle" type="button" aria-label="Hide drawing toolbar" aria-pressed="false" title="Hide drawing toolbar">‹</button>
 <nav class="dg-tabbar" aria-label="Main">
 <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
 <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
@@ -24,4 +33,9 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
 <a class="dg-tab" href="boss1.html"><span class="dg-tab__icon">👑</span>BOSS1</a>
 <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
 <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a></nav>
+<script>
+(()=>{const cover=document.getElementById('drawing-toolbar-cover');const toggle=document.getElementById('drawing-toolbar-toggle');const key='dagbo_chart_drawing_toolbar_hidden';let hidden=false;try{hidden=localStorage.getItem(key)==='1'}catch(e){}
+function apply(){cover.classList.toggle('is-hidden',hidden);toggle.classList.toggle('is-hidden',hidden);toggle.textContent=hidden?'›':'‹';toggle.setAttribute('aria-pressed',String(hidden));toggle.setAttribute('aria-label',hidden?'Show drawing toolbar':'Hide drawing toolbar');toggle.title=hidden?'Show drawing toolbar':'Hide drawing toolbar'}
+toggle.addEventListener('click',()=>{hidden=!hidden;try{localStorage.setItem(key,hidden?'1':'0')}catch(e){}apply()});apply()})();
+</script>
 <script src="pwa.js" defer></script><script src="navigation.js" defer></script></body></html>
