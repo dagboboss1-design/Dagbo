@@ -550,8 +550,8 @@ function sendMessage() {
     } else if (reply && reply.type === 'groq') {
       askGroq(reply.query).then(function(result) {
         var ans = result.answer;
-        var providerName = ({ openai: 'OpenAI', claude: 'Claude', gemini: 'Gemini', groq: 'Groq' })[result.provider] || 'AI';
-        addMessage('ai', ans + '\n\n— ' + providerName + (result.fallbackUsed ? ' · backup provider' : ''));
+        // Keep the provider invisible in the chat. Users see one consistent Dagbo AI assistant.
+        addMessage('ai', ans);
         if (getAutoRead()) speak(ans);
       }).catch(function(err) {
         addMessage('ai', 'Error: ' + err.message);
