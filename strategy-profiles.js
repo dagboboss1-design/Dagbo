@@ -128,9 +128,37 @@
       ]
     }
   ];
-  var allStyles = [
-    ['Scalping','scalping'],['Day Trading','day'],['Swing Trading','swing'],['Position Trading','position'],['Momentum','scalping day swing'],['Mean Reversion','scalping day swing'],['Trend Following','day swing position'],['Contrarian','day swing position'],['Range Trading','scalping day swing'],['Breakout','scalping day swing']
-  ];
+  // Additional selectable style presets. Each preset selects its own
+  // timeframe set and detector groups; the shared confluence engine still
+  // requires closed candles and independent evidence before issuing a signal.
+  function addPreset(id,name,tag,baseId,timeframes,primaryTf,objective,priority){
+    var base=profiles.find(function(p){return p.id===baseId;});
+    var preset=Object.assign({},base,{
+      id:id,name:name,tag:tag,timeframes:timeframes,primary:timeframes[0],
+      primaryTf:primaryTf,objective:objective,priority:priority,
+      filters:(base.filters||[]).slice()
+    });
+    profiles.push(preset);
+  }
+  addPreset('momentum','Momentum','5m–30m · momentum continuation','scalping',['5m','15m','30m'],'5',
+    'Find confirmed continuation when trend, momentum and participation align.',
+    [['Momentum','RSI + MACD + Volume','Require momentum direction and participation'],['Trend','EMA + MACD','Trade with the short-term trend'],['Breakout','Donchian + ADX + ATR','Require a closed-range break'],['Structure','Break & Retest','Confirm the broken level holds'],['Pattern','Bull/Bear Flag','Require continuation confirmation'],['Candlestick','Engulfing / Pin Bar','Use candle confirmation at a level']]);
+  addPreset('mean-reversion','Mean Reversion','15m–1h · return toward value','day',['15m','30m','1h'],'15',
+    'Look for stretched price returning toward a measured value area; avoid fading strong trends.',
+    [['Value','VWAP Reversion / VWAP + RSI','Require a value-area reaction'],['Momentum','RSI + MACD','Confirm exhaustion or momentum loss'],['Reversal','Reversal Pattern','Require a confirmed reversal pattern'],['Liquidity','Liquidity Sweep Reversal','Require sweep and close back inside'],['Candlestick','Engulfing / Pin Bar','Require reversal candle confirmation'],['Trend strength','EMA + MACD + ADX','Avoid strong directional trend conditions']]);
+  addPreset('trend-following','Trend Following','4h–1w · follow established trend','swing',['4h','1d','1w'],'240',
+    'Follow established higher-timeframe direction and enter confirmed pullbacks.',
+    [['Trend following','Multi-TF EMA + RSI + MACD','Require higher-timeframe direction'],['Trend strength','EMA + MACD + ADX','Filter weak trends'],['Retracement','Fibonacci + EMA','Seek pullback confluence'],['Structure','Higher High / Higher Low','Confirm continuation structure'],['Breakout','Donchian + ADX + ATR','Confirm trend expansion'],['Candlestick','Engulfing / Pin Bar','Confirm pullback rejection']]);
+  addPreset('contrarian','Contrarian','15m–4h · confirmed countertrend','day',['15m','1h','4h'],'15',
+    'Only consider countertrend opportunities after a confirmed failure of the prior move.',
+    [['Reversal','Reversal Pattern','Require confirmed reversal structure'],['Liquidity','Equal Highs/Lows Sweep','Require failed breakout and reclaim'],['Pattern','Head & Shoulders / Double Top-Bottom','Wait for neckline confirmation'],['Candlestick','Engulfing / Pin Bar','Require reversal candle at a level'],['Key levels','Previous Day High/Low','Use major reference levels'],['Trend','EMA + MACD','Flag countertrend status clearly']]);
+  addPreset('range','Range Trading','15m–1h · bounded markets','day',['15m','30m','1h'],'15',
+    'Trade confirmed reactions at range boundaries; do not trade when the range breaks.',
+    [['Value','VWAP Reversion / VWAP + RSI','Measure return toward range value'],['Liquidity','Equal Highs/Lows Sweep','Detect failed range-edge breaks'],['Reversal','Reversal Pattern','Require rejection at range boundary'],['Candlestick','Engulfing / Pin Bar','Confirm boundary reaction'],['Key levels','Previous Day High/Low','Map range edges'],['Trend strength','EMA + MACD + ADX','Avoid strong trend conditions']]);
+  addPreset('breakout','Breakout Trading','5m–4h · confirmed range expansion','day',['15m','30m','1h'],'15',
+    'Find confirmed closes beyond defined ranges with volatility and retest confirmation.',
+    [['Breakout','Consolidation Breakout','Require a close outside the range'],['Trend strength','EMA + MACD + ADX','Require directional strength'],['Momentum','RSI + MACD + Volume','Confirm participation'],['Structure','BOS / CHoCH / MSS','Confirm structural break'],['Pattern','Bull/Bear Flag','Check continuation structure'],['Volume','Volume expansion','Use volume only when supplied by provider']]); 
+  var allStyles = profiles.map(function(p){return [p.name,p.id];});
   function getProfiles(){return profiles.slice();}
   function getProfile(id){return profiles.find(function(p){return p.id===id;})||profiles[0];}
   root.DagboStrategyProfiles={getProfiles:getProfiles,getProfile:getProfile,allStyles:allStyles};
