@@ -116,6 +116,16 @@ function setPinMode(on){pinMode=!!on;if(drawLayer)drawLayer.classList.toggle('is
 function chartPoint(e){var r=drawLayer.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,t=chart&&chart.timeScale().coordinateToTime(x),p=candleSeries&&candleSeries.coordinateToPrice(y);if(t&&typeof t==='object')t=Date.UTC(t.year,t.month-1,t.day)/1000;return {time:Number(t),price:Number(p)}}
 function pointXY(p){if(!chart||!candleSeries)return null;var x=chart.timeScale().timeToCoordinate(p.time),y=candleSeries.priceToCoordinate(p.price);return x===null||y===null||!Number.isFinite(x)||!Number.isFinite(y)?null:{x:x,y:y}}
 function makeSvg(tag,cls){var n=document.createElementNS('http://www.w3.org/2000/svg',tag);if(cls)n.setAttribute('class',cls);return n}
+function migrateLegacyDrawings(){
+ var old=readPinned();if(!old.some(function(x){return typeof x==='string'}))return;
+ var w=drawLayer.clientWidth||1,h=drawLayer.clientHeight||1,converted=old.map(function(item){
+  if(typeof item!=='string')return item;
+  var pts=item.trim().split(/\\s+/).map(function(pair){var a=pair.split(',');return {x:Number(a[0]),y:Number(a[1])}}).filter(function(p){return Number.isFinite(p.x)&&Number.isFinite(p.y)});
+  var mapped=pts.map(function(p){var t=chart.timeScale().coordinateToTime(p.x/1000*w),v=candleSeries.coordinateToPrice(p.y/1000*h);if(t&&typeof t==='object')t=Date.UTC(t.year,t.month-1,t.day)/1000;return {time:Number(t),price:Number(v)}}).filter(function(p){return Number.isFinite(p.time)&&Number.isFinite(p.price)});
+  return mapped.length?{id:'migrated'+Date.now()+(++drawCounter),type:'freehand',points:mapped}:null;
+ }).filter(Boolean);
+ savePinned(converted);
+}
 function renderPinned(){
  if(!drawLayer)return;drawLayer.textContent='';
  readPinned().forEach(function(item,index){
@@ -160,10 +170,10 @@ chart=LightweightCharts.createChart(host,{width:host.clientWidth||600,height:hos
 candleSeries=chart.addCandlestickSeries({upColor:'#18b981',downColor:'#ef5b68',borderVisible:false,wickUpColor:'#18b981',wickDownColor:'#ef5b68'});
 fetch('/api/chart?pair='+encodeURIComponent(pairIdFromSymbol(currentPair))+'&interval='+encodeURIComponent(currentTF),{cache:'no-store'}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Live candles unavailable');return d})}).then(function(d){
 if(!Array.isArray(d.candles)||!d.candles.length)throw new Error('No candles returned');
-candleData=d.candles;candleSeries.setData(candleData);chart.timeScale().fitContent();drawSavedIndicators();
+candleData=d.candles;candleSeries.setData(candleData);chart.timeScale().fitContent();migrateLegacyDrawings();renderPinned();drawSavedIndicators();
 }).catch(function(e){host.innerHTML='<div style="color:#fff;padding:18px"><strong>Live chart data unavailable</strong><p style="font-size:12px;color:#aab4c2">'+String(e.message||'Try again later')+'</p></div>'});
 resizeObserver=new ResizeObserver(function(){if(chart&&host.clientWidth&&host.clientHeight){chart.applyOptions({width:host.clientWidth,height:host.clientHeight});renderPinned()}});resizeObserver.observe(host);
-bindDrawingLayer();container.appendChild(drawLayer);setPinMode(false);setActiveTool(activeTool);setPinMode(false);updateDrawingToolsToggle();paintIndicatorButtons();
+bindDrawingLayer();container.appendChild(drawLayer);renderPinned();setPinMode(false);setActiveTool(activeTool);setPinMode(false);updateDrawingToolsToggle();paintIndicatorButtons();
 }
 function drawSavedIndicators(){
 activeSeries.forEach(function(s){try{chart.removeSeries(s)}catch(e){}});activeSeries=[];
