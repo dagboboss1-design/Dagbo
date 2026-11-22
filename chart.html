@@ -162,7 +162,7 @@ fetch('/api/chart?pair='+encodeURIComponent(pairIdFromSymbol(currentPair))+'&int
 if(!Array.isArray(d.candles)||!d.candles.length)throw new Error('No candles returned');
 candleData=d.candles;candleSeries.setData(candleData);chart.timeScale().fitContent();drawSavedIndicators();
 }).catch(function(e){host.innerHTML='<div style="color:#fff;padding:18px"><strong>Live chart data unavailable</strong><p style="font-size:12px;color:#aab4c2">'+String(e.message||'Try again later')+'</p></div>'});
-resizeObserver=new ResizeObserver(function(){if(chart&&host.clientWidth&&host.clientHeight)chart.applyOptions({width:host.clientWidth,height:host.clientHeight})});resizeObserver.observe(host);
+resizeObserver=new ResizeObserver(function(){if(chart&&host.clientWidth&&host.clientHeight){chart.applyOptions({width:host.clientWidth,height:host.clientHeight});renderPinned()}});resizeObserver.observe(host);
 bindDrawingLayer();container.appendChild(drawLayer);setPinMode(false);setActiveTool(activeTool);setPinMode(false);updateDrawingToolsToggle();paintIndicatorButtons();
 }
 function drawSavedIndicators(){
