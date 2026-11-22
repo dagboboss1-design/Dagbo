@@ -306,8 +306,17 @@
     let url = `/api/market-data?pair=${encodeURIComponent(pair)}&tf=${encodeURIComponent(tf)}`;
     
     try {
-      let res = await fetch(url);
-      let data = await res.json();
+      // Bound every market-data request so a stalled provider cannot leave the
+      // scanner waiting forever. A timeout is reported per pair, not as a page crash.
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 12000) : null;
+      var res;
+      try {
+        res = await fetch(url, controller ? { signal: controller.signal } : {});
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
+      var data = await res.json();
       
       if (!res.ok || data.error || data.status === 'error') {
         var apiError = data.error || data.message || res.statusText || ('HTTP ' + res.status);
@@ -369,8 +378,9 @@
         macdValue:analysis.macd,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg,bb:analysis.bb,volume:analysis.volume,candlePattern:analysis.candlePattern||analysis.candleName,candleDirection:analysis.candleDirection,indicatorCombo:analysis.indicatorCombo,keyLevel:analysis.keyLevel,pattern:analysis.pattern,patternDirection:analysis.patternDirection,patternConfirmed:analysis.patternConfirmed,confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,momentumTrigger:analysis.momentumTrigger,atrOk:analysis.atrOk,candleTime:analysis.candleTime
       };
     } catch(e) {
-      console.error(e);
-      return { pair: pair, error: String(e && e.message || e), errorStage: 'exception' };
+      console.error('DAGBO market-data request failed for '+pair, e);
+      var message = e && e.name === 'AbortError' ? 'Market-data request timed out. Retry this pair.' : String(e && e.message || e || 'Unknown market-data error');
+      return { pair: pair, error: message, errorStage: e && e.name === 'AbortError' ? 'timeout' : 'exception' };
     }
   }
 
@@ -821,16 +831,30 @@
 
   // --- INITIALIZE ---
   async function loadAllSignals(options) {
-    if(signalLoadInProgress)return;
+    if(signalLoadInProgress) {
+      var busyLabel = document.getElementById('loadingText');
+      if (busyLabel) busyLabel.innerText = 'A scan is already running. Please wait for it to finish.';
+      return;
+    }
     signalLoadInProgress=true;
     options=options||{};
     var loading = document.getElementById('loadingText');
+    var updatedLabel = document.getElementById('lastUpdated');
     if (loading) loading.innerText = 'Scanning '+scannerProfileName()+' ('+timeframeLabel(currentSignalTF)+') live candles...';
-    
-    signalsData = {};
-    await loadNewsSignalContext();
 
     try {
+      signalsData = {};
+      // News context is optional. A calendar/network failure must never prevent
+      // the technical scanner from running or leave the busy lock stuck.
+      try { await loadNewsSignalContext(); }
+      catch(newsError) {
+        console.warn('DAGBO news context unavailable; continuing technical scan:', newsError);
+      }
+      if (!Array.isArray(enabledPairs) || !enabledPairs.length) {
+        if (loading) loading.innerText = 'No enabled markets. Add pairs in Settings before scanning.';
+        renderCards();
+        return;
+      }
       // Fetch up to six pairs together. The API has a shared six-call/minute
       // Twelve Data guard, so this removes the unnecessary 10-second wait per pair
       // without exceeding the provider budget. Larger watchlists continue in the
@@ -858,9 +882,22 @@
       applyFreshScanCycles(options);
       recordSignalSnapshot();
       var now = new Date();
-      document.getElementById('lastUpdated').innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      if (updatedLabel) updatedLabel.innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
       renderCards();
       await notifyCompletedScan();
+    } catch(scanError) {
+      console.error('DAGBO scanner cycle failed safely:', scanError);
+      if (loading) loading.innerText = 'Scan interrupted safely. Your app is still available — tap Refresh to retry.';
+      var grid = document.getElementById('signals-grid');
+      if (grid && !Object.keys(signalsData).length) {
+        grid.textContent = '';
+        var card = document.createElement('div');
+        card.className = 'dg-card';
+        card.style.textAlign = 'center';
+        card.style.padding = '24px';
+        card.textContent = 'The scan could not complete. Check your connection and refresh to try again.';
+        grid.appendChild(card);
+      }
     } finally {
       signalLoadInProgress = false;
     }
