@@ -859,28 +859,55 @@
 
     try {
       signalsData = {};
-      // News context is optional. A calendar/network failure must never prevent
-      // the technical scanner from running or leave the busy lock stuck.
-      try { await loadNewsSignalContext(); }
-      catch(newsError) {
-        console.warn('DAGBO news context unavailable; continuing technical scan:', newsError);
-      }
       if (!Array.isArray(enabledPairs) || !enabledPairs.length) {
         if (loading) loading.innerText = 'No enabled markets. Add pairs in Settings before scanning.';
         renderCards();
         return;
       }
-      // Fetch up to six pairs together. The API has a shared six-call/minute
-      // Twelve Data guard, so this removes the unnecessary 10-second wait per pair
-      // without exceeding the provider budget. Larger watchlists continue in the
-      // next quota window rather than returning a wall of rate-limit errors.
+
+      // Classify sessions before making any network/API request. Sunday forex
+      // closure must be visible immediately instead of leaving the page on
+      // "Connecting to live market data". Crypto remains eligible 24/7.
+      var scanPairs = enabledPairs.slice();
+      var openPairs = activeTradingProfile === 'hedging'
+        ? scanPairs
+        : scanPairs.filter(function(pair) { return marketSessionOpen(pair); });
+      var closedPairs = activeTradingProfile === 'hedging'
+        ? []
+        : scanPairs.filter(function(pair) { return !marketSessionOpen(pair); });
+      closedPairs.forEach(function(pair) {
+        signalsData[pair] = {
+          pair: pair, final: 'MARKET CLOSED', marketClosed: true,
+          buyScore: 0, sellScore: 0,
+          strategy: 'This market is outside its trading session. No live entry or notification is generated.'
+        };
+      });
+
+      if (!openPairs.length) {
+        var nowClosed = new Date();
+        var closedLabel = 'MARKET CLOSED · No enabled markets are trading now.';
+        if (loading) loading.innerText = closedLabel + ' Forex reopens at Sunday 5:00 PM New York time.';
+        if (updatedLabel) updatedLabel.innerText = 'Market status checked: ' + nowClosed.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+        renderCards();
+        return;
+      }
+
+      // News context is optional. Do not delay a clear all-markets-closed
+      // state; when at least one market is open, load context independently.
+      try { await loadNewsSignalContext(); }
+      catch(newsError) {
+        console.warn('DAGBO news context unavailable; continuing technical scan:', newsError);
+      }
+
+      // Fetch up to six OPEN pairs together. Closed pairs do not consume
+      // Twelve Data credits or force the scanner to wait for another quota window.
       var batchSize = 6;
-      for (var start = 0; start < enabledPairs.length; start += batchSize) {
+      for (var start = 0; start < openPairs.length; start += batchSize) {
         if (start > 0) {
           if (loading) loading.innerText = 'Waiting for the next safe data window…';
           await new Promise(function(resolve) { setTimeout(resolve, 62000); });
         }
-        var batch = enabledPairs.slice(start, start + batchSize);
+        var batch = openPairs.slice(start, start + batchSize);
         var results = await Promise.all(batch.map(function(pair) {
           return fetchPairData(pair, currentSignalTF).then(function(data) {
             return { pair: pair, data: data };
@@ -898,6 +925,9 @@
       recordSignalSnapshot();
       var now = new Date();
       if (updatedLabel) updatedLabel.innerText = 'Updated: ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      if (loading && closedPairs.length) {
+        loading.innerText = closedPairs.length + ' market(s) closed. Open markets scanned normally.';
+      }
       renderCards();
       await notifyCompletedScan();
     } catch(scanError) {
