@@ -23,6 +23,21 @@ const SYMBOLS = {
 };
 const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
 const MAX_PAIRS = 6;
+const MAX_HTF_PAIRS = 8;
+
+async function selectRotatingBatch(redisKey, pairs, limit) {
+  const unique = Array.from(new Set(pairs));
+  if (unique.length <= limit) return unique;
+  let cursor = Number(await redis.get(redisKey));
+  if (!Number.isInteger(cursor) || cursor < 0) cursor = 0;
+  const start = cursor % unique.length;
+  const batch = [];
+  for (let i = 0; i < Math.min(limit, unique.length); i++) {
+    batch.push(unique[(start + i) % unique.length]);
+  }
+  await redis.set(redisKey, String((start + batch.length) % unique.length), { ex: 60 * 60 * 24 * 30 });
+  return batch;
+}
 
 function isMarketOpen(pair, now = new Date()) {
   const p=String(pair||'').toUpperCase();
@@ -49,7 +64,7 @@ async function getConfiguredPairs() {
       }
     }
   }
-  return (selected.size ? Array.from(selected) : DEFAULT_PAIRS).slice(0, MAX_PAIRS);
+  return selected.size ? Array.from(selected) : DEFAULT_PAIRS;
 }
 
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
@@ -522,7 +537,7 @@ async function getConfiguredForexPairs() {
       });
     } catch(e) {}
   }
-  return (selected.size ? Array.from(selected) : ["EURUSD","GBPUSD","USDCHF","AUDUSD","NZDUSD","USDJPY"]).slice(0, 8);
+  return selected.size ? Array.from(selected) : ["EURUSD","GBPUSD","USDCHF","AUDUSD","NZDUSD","USDJPY"];
 }
 
 async function runPairIntelligence(pairs, apiKey) {
@@ -647,7 +662,8 @@ module.exports = async function handler(req, res) {
 
   try {
     const results = {}, errors = [];
-    const pairsToScan = await getConfiguredPairs();
+    const configuredPairs = await getConfiguredPairs();
+    const pairsToScan = await selectRotatingBatch("dagbo:scan:cursor:main", configuredPairs, MAX_PAIRS);
     const fetched = await Promise.all(pairsToScan.map(async pair => {
       if (!isMarketOpen(pair)) return { pair, closed: true };
       const url = marketDataHost + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
@@ -711,7 +727,9 @@ module.exports = async function handler(req, res) {
 
     let pairIntelligence = null;
     try {
-      pairIntelligence = await runPairIntelligence((await getConfiguredForexPairs()).filter(pair => isMarketOpen(pair)), apiKey);
+      const configuredHtfPairs = (await getConfiguredForexPairs()).filter(pair => isMarketOpen(pair));
+      const htfBatch = await selectRotatingBatch("dagbo:scan:cursor:htf", configuredHtfPairs, MAX_HTF_PAIRS);
+      pairIntelligence = await runPairIntelligence(htfBatch, apiKey);
     } catch (pairError) {
       console.error("DAGBO pair-intelligence scan failed:", pairError.message);
     }
