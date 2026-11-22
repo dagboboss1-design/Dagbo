@@ -1,57 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F5F5F7" id="themeColor">
-<title>Chart · DAGBO SIGNAL</title>
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="stylesheet" href="dagbo.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000"><title>Chart · DAGBO SIGNAL</title>
+<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="stylesheet" href="dagbo.css">
 <style>
-.back-arrow{display:inline-flex;align-items:center;gap:6px;font-size:16px;font-weight:700;color:var(--dg-text);text-decoration:none;margin-bottom:16px;padding:8px 12px;background:var(--dg-fill);border-radius:12px}
-.back-arrow:active{opacity:.6}
-#tv-chart-container{height:calc(100vh - 360px);min-height:440px;width:100%;border-radius:16px;overflow:hidden;background:#090b10;margin-bottom:16px;position:relative}
-#tv-chart-container .tradingview-widget-container__widget{width:100%;height:100%}#tv-chart-container iframe{width:100%!important;height:100%!important;border:none!important;display:block}
-body.chart-full #tv-chart-container{position:fixed!important;top:0;left:0;right:0;bottom:0;width:100vw!important;height:100dvh!important;z-index:9999;border-radius:0;margin:0}
-body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-full #tv-chart-container .tradingview-widget-container__widget{height:100dvh!important}
-#btnFull{position:absolute;top:10px;right:10px;z-index:20;background:rgba(0,0,0,.88);color:#fff;border:1px solid #555;padding:9px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.35)}
-.chart-pair-select{appearance:none;-webkit-appearance:none;background:var(--dg-card);border:1px solid var(--dg-line);color:var(--dg-text);font-size:16px;font-weight:700;padding:14px 16px;border-radius:16px;cursor:pointer;width:100%;text-align:center;margin-bottom:12px;box-shadow:var(--dg-shadow)}
-
-#drawingToolsToggle{display:flex;align-items:center;justify-content:center;margin:0 auto 8px 0;width:34px;height:34px;padding:0;border:1px solid var(--dg-line);border-radius:10px;background:var(--dg-card);color:var(--dg-text);font-size:22px;font-weight:800;line-height:1;cursor:pointer}
-#pinDrawing{display:block;margin:10px 0 16px auto;padding:8px 16px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:800;cursor:pointer}
-#chartDrawLayer{position:absolute;inset:0;width:100%;height:100%;z-index:8;pointer-events:none;touch-action:none}
-#chartDrawLayer.is-active{pointer-events:auto;cursor:crosshair}
-#chartDrawLayer polyline{fill:none;stroke:#f5c542;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-#chartPinActions{display:flex;justify-content:flex-end;gap:8px;margin:4px 0 12px}#drawingToolbar{position:absolute;z-index:30;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:4px;padding:8px 10px;background:rgba(18,20,25,.96);border:1px solid #343943;border-radius:14px;box-shadow:0 5px 22px #0008;max-width:calc(100% - 20px)}#drawingToolbar button{width:42px;height:42px;border:0;border-radius:9px;background:transparent;color:#d8dbe1;font-size:23px}#drawingToolbar button[aria-pressed="true"]{background:#343b46;color:#fff}#chartDrawLayer .dg-draw{fill:none;stroke:#f5c542;stroke-width:2.5;vector-effect:non-scaling-stroke}#chartDrawLayer .dg-profit{fill:#18b98122;stroke:#18b981}#chartDrawLayer .dg-loss{fill:#ef5b6822;stroke:#ef5b68}
-#pinDrawing,#clearPinned{margin:0}
-#clearPinned{padding:8px 12px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:700;cursor:pointer}
-</style>
-<script>
-(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();
-</script>
-</head>
-<body>
-<main class="dg-page">
-<a href="index.html" class="back-arrow">← Back to Home</a>
-<div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">CHART</div></div>
-<h1 class="dg-title">Live Chart</h1>
-<p class="dg-subtitle">Real price. Real zones. Check before you enter.</p>
-<select id="pairSelect" class="chart-pair-select" onchange="changePair(this.value)"></select>
-<div class="dg-seg" role="radiogroup" aria-label="Timeframe" style="margin-bottom:12px" id="tfContainer">
-<input class="dg-seg__in" type="radio" name="tf" id="tf1" value="5" onchange="changeTF('5')"><label class="dg-seg__lb" for="tf1">5m</label>
-<input class="dg-seg__in" type="radio" name="tf" id="tf2" value="15" onchange="changeTF('15')" checked><label class="dg-seg__lb" for="tf2">15m</label>
-<input class="dg-seg__in" type="radio" name="tf" id="tf3" value="60" onchange="changeTF('60')"><label class="dg-seg__lb" for="tf3">1H</label>
-<input class="dg-seg__in" type="radio" name="tf" id="tf4" value="240" onchange="changeTF('240')"><label class="dg-seg__lb" for="tf4">4H</label>
-<input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
-</div>
-<section style="margin:10px 0 12px;padding:12px;border:1px solid var(--dg-line);border-radius:14px;background:var(--dg-card)"><strong style="font-size:13px">MY INDICATORS</strong><div id="indicatorButtons" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">
-<button type="button" class="indicator-chip" data-indicator="EMA 9" aria-pressed="false">EMA 9</button><button type="button" class="indicator-chip" data-indicator="EMA 20" aria-pressed="false">EMA 20</button><button type="button" class="indicator-chip" data-indicator="EMA 50" aria-pressed="false">EMA 50</button><button type="button" class="indicator-chip" data-indicator="EMA 200" aria-pressed="false">EMA 200</button><button type="button" class="indicator-chip" data-indicator="Bollinger Bands" aria-pressed="false">Bollinger Bands</button><button type="button" class="indicator-chip" data-indicator="RSI 14" aria-pressed="false">RSI 14</button><button type="button" class="indicator-chip" data-indicator="MACD" aria-pressed="false">MACD</button>
-</div><p style="font-size:11px;color:var(--dg-muted);margin:9px 0 0">Saved separately for each market. Tap again to remove.</p></section>
-<style>.indicator-chip{padding:8px 10px;border-radius:18px;border:1px solid var(--dg-line);background:transparent;color:var(--dg-text);font-size:11px;font-weight:700}.indicator-chip[aria-pressed="true"]{background:#dce8f7;color:#101820;border-color:#dce8f7}</style>
-<button id="drawingToolsToggle" type="button" aria-label="Toggle drawing tools" aria-expanded="true" title="Hide drawing tools">⌄</button><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button><div id="drawingToolbar" aria-label="Drawing tools"><button data-tool="crosshair" title="Cursor">＋</button><button data-tool="trendline" title="Trendline">／</button><button data-tool="rectangle" title="Rectangle">▢</button><button data-tool="horizontal" title="Horizontal line">━</button><button data-tool="long" title="Long position">↗</button><button data-tool="short" title="Short position">↘</button></div></div><div id="chartPinActions"><button id="clearPinned" type="button" title="Delete saved drawings">Clear saved</button></div>
-<a href="replay.html" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;margin:8px 0 18px;border-radius:14px;background:#0878e8;color:#fff;text-decoration:none;font-weight:800">⏪ OPEN HISTORICAL REPLAY</a>
-</main>
+html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hidden}body{min-height:100dvh}
+#tv-full-chart{position:fixed;inset:0 0 72px;width:100%;height:calc(100dvh - 72px);background:#000}
+#tv-full-chart .tradingview-widget-container,#tv-full-chart .tradingview-widget-container__widget{width:100%;height:100%}
+#tv-full-chart iframe{width:100%!important;height:100%!important;border:0!important}
+.dg-tabbar{position:fixed!important;left:0;right:0;bottom:0;z-index:50;background:#000!important;border-top:1px solid #252525!important}
+</style></head><body>
+<div id="tv-full-chart"><div class="tradingview-widget-container" style="height:100%;width:100%">
+<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
+<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+{"autosize":true,"symbol":"CAPITALCOM:XAUUSD","interval":"15","timezone":"Africa/Lagos","theme":"dark","style":"1","locale":"en","allow_symbol_change":true,"hide_top_toolbar":false,"hide_side_toolbar":false,"hide_legend":false,"hide_volume":false,"withdateranges":true,"save_image":true,"calendar":false,"details":false,"hotlist":false,"studies":[],"backgroundColor":"#000000","gridColor":"rgba(255,255,255,0.08)"}
+</script></div></div>
 <nav class="dg-tabbar" aria-label="Main">
 <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
 <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
@@ -59,101 +23,5 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 <a class="dg-tab" href="news.html"><span class="dg-tab__icon">📰</span>News</a>
 <a class="dg-tab" href="boss1.html"><span class="dg-tab__icon">👑</span>BOSS1</a>
 <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
-<a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
-</nav>
-<script src="https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"></script><script src="pwa.js" defer></script>
-<script>
-(function(){
-'use strict';
-var PAIRS=[
-{id:'XAUUSD',label:'GOLD (XAUUSD)',tv:'CAPITALCOM:XAUUSD'},
-{id:'EURUSD',label:'EUR/USD',tv:'FOREXCOM:EURUSD'},
-{id:'GBPUSD',label:'GBP/USD',tv:'FOREXCOM:GBPUSD'},
-{id:'USDJPY',label:'USD/JPY',tv:'FOREXCOM:USDJPY'},
-{id:'GBPJPY',label:'GBP/JPY',tv:'FOREXCOM:GBPJPY'},
-{id:'AUDUSD',label:'AUD/USD',tv:'FOREXCOM:AUDUSD'},
-{id:'USDCHF',label:'USD/CHF',tv:'FOREXCOM:USDCHF'},
-{id:'USDCAD',label:'USD/CAD',tv:'FOREXCOM:USDCAD'},
-{id:'NZDUSD',label:'NZD/USD',tv:'FOREXCOM:NZDUSD'},
-{id:'US30',label:'US30 (Dow)',tv:'CAPITALCOM:US30'},
-{id:'US100',label:'US100 (Nasdaq)',tv:'CAPITALCOM:US100'},
-{id:'US500',label:'US500 (S&P)',tv:'CAPITALCOM:US500'},
-{id:'BTCUSD',label:'Bitcoin',tv:'BINANCE:BTCUSDT'},
-{id:'ETHUSD',label:'Ethereum',tv:'BINANCE:ETHUSDT'},
-{id:'EURJPY',label:'EUR/JPY',tv:'FOREXCOM:EURJPY'},
-{id:'EURGBP',label:'EUR/GBP',tv:'FOREXCOM:EURGBP'}
-];
-var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
-var enabledIds=Array.isArray(settings.pairs)&&settings.pairs.length?settings.pairs:PAIRS.map(function(p){return p.id});
-var activePairs=PAIRS.filter(function(p){return enabledIds.indexOf(p.id)>-1||(enabledIds.indexOf('GOLD')>-1&&p.id==='XAUUSD')});
-var chartPrefs={};try{chartPrefs=JSON.parse(localStorage.getItem('dagbo_chart_preferences_v1')||'{}')}catch(e){}
-var currentPair='CAPITALCOM:XAUUSD',currentTF='15';
-var chart=null,candleSeries=null,activeSeries=[],candleData=[],resizeObserver=null;
-var indicatorStore={};try{indicatorStore=JSON.parse(localStorage.getItem('dagbo_chart_indicators_v1')||'{}')}catch(e){}
-function chosenIndicators(){var a=indicatorStore[pairIdFromSymbol(currentPair)];return Array.isArray(a)?a:[]}
-function saveIndicators(a){indicatorStore[pairIdFromSymbol(currentPair)]=a;try{localStorage.setItem('dagbo_chart_indicators_v1',JSON.stringify(indicatorStore))}catch(e){}}
-function paintIndicatorButtons(){document.querySelectorAll('.indicator-chip').forEach(function(b){b.setAttribute('aria-pressed',String(chosenIndicators().indexOf(b.dataset.indicator)>-1))})}
-function ema(values,p){var out=[],k=2/(p+1),v=null;values.forEach(function(x,i){v=v===null?x:x*k+v*(1-k);out.push({time:candleData[i].time,value:v})});return out}
-function pairIdFromSymbol(symbol){var found=PAIRS.filter(function(p){return p.tv===symbol})[0];return found?found.id:'XAUUSD'}
-function saveChartPrefs(){
-try{chartPrefs.lastPair=currentPair;chartPrefs.timeframes=chartPrefs.timeframes||{};chartPrefs.timeframes[pairIdFromSymbol(currentPair)]=currentTF;localStorage.setItem('dagbo_chart_preferences_v1',JSON.stringify(chartPrefs))}catch(e){}
-}
-function restoreTimeframe(){
-var saved=chartPrefs.timeframes&&chartPrefs.timeframes[pairIdFromSymbol(currentPair)];
-currentTF=['5','15','60','240','D'].indexOf(String(saved))>-1?String(saved):'15';
-document.querySelectorAll('input[name="tf"]').forEach(function(input){input.checked=input.value===currentTF});
-}
-var drawingToolsVisible=true;try{drawingToolsVisible=localStorage.getItem('dagbo_chart_tools_visible')!=='false'}catch(e){}
-var activeTool='crosshair';try{activeTool=localStorage.getItem('dagbo_chart_active_tool')||'crosshair'}catch(e){}
-var pinMode=false,activeShape=null,drawLayer=null;
-function drawingKey(){return 'dagbo_pinned_drawings_v1:'+currentPair+':'+currentTF}
-function readPinned(){try{var all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}');return Array.isArray(all[drawingKey()])?all[drawingKey()]:[]}catch(e){return []}}
-function savePinned(lines){try{var all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}');all[drawingKey()]=lines;localStorage.setItem('dagbo_pinned_drawings_v1',JSON.stringify(all))}catch(e){alert('Could not save drawings. Check phone storage space.');}}
-function toTime(t){return t&&typeof t==='object'?Date.UTC(t.year,t.month-1,t.day)/1000:Number(t)}
-function chartPoint(e){var r=drawLayer.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;return {time:toTime(chart.timeScale().coordinateToTime(x)),price:Number(candleSeries.coordinateToPrice(y))}}
-function xy(p){var x=chart.timeScale().timeToCoordinate(p.time),y=candleSeries.priceToCoordinate(p.price);return x===null||y===null?null:{x:x,y:y}}
-function svg(tag,attrs){var n=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.keys(attrs).forEach(function(k){n.setAttribute(k,attrs[k])});return n}
-function renderPinned(){if(!drawLayer||!chart||!candleSeries)return;drawLayer.textContent='';readPinned().forEach(function(d){if(typeof d==='string'){var pts=d.trim().split(/\\s+/).map(function(v){var q=v.split(',');return {x:Number(q[0]),y:Number(q[1])}}),w=drawLayer.clientWidth||1,h=drawLayer.clientHeight||1;d={type:'freehand',points:pts.map(function(p){return {time:toTime(chart.timeScale().coordinateToTime(p.x*w/1000)),price:Number(candleSeries.coordinateToPrice(p.y*h/1000))}}).filter(function(p){return Number.isFinite(p.time)&&Number.isFinite(p.price)})}}var p=(d.points||[]).map(xy).filter(Boolean);if(!p.length)return;if(d.type==='rectangle'&&p.length>1)drawLayer.appendChild(svg('rect',{x:Math.min(p[0].x,p[1].x),y:Math.min(p[0].y,p[1].y),width:Math.abs(p[1].x-p[0].x),height:Math.abs(p[1].y-p[0].y),class:'dg-draw'}));else if(d.type==='horizontal')drawLayer.appendChild(svg('line',{x1:0,x2:drawLayer.clientWidth,y1:p[0].y,y2:p[0].y,class:'dg-draw'}));else if((d.type==='long'||d.type==='short')&&p.length>1){var top=Math.min(p[0].y,p[1].y),bot=Math.max(p[0].y,p[1].y),mid=(top+bot)/2,x=Math.min(p[0].x,p[1].x),w=Math.max(20,Math.abs(p[1].x-p[0].x));drawLayer.appendChild(svg('rect',{x:x,y:top,width:w,height:Math.max(2,mid-top),class:'dg-profit'}));drawLayer.appendChild(svg('rect',{x:x,y:mid,width:w,height:Math.max(2,bot-mid),class:'dg-loss'}))}else drawLayer.appendChild(svg('polyline',{points:p.map(function(q){return q.x+','+q.y}).join(' '),class:'dg-draw'}))})}
-function updateDrawingToolsToggle(){var b=document.getElementById('drawingToolsToggle');b.textContent=drawingToolsVisible?'⌄':'⌃';b.setAttribute('aria-expanded',String(drawingToolsVisible));document.getElementById('drawingToolbar').style.display=drawingToolsVisible?'flex':'none'}
-document.getElementById('drawingToolsToggle').addEventListener('click',function(){drawingToolsVisible=!drawingToolsVisible;try{localStorage.setItem('dagbo_chart_tools_visible',String(drawingToolsVisible))}catch(e){}updateDrawingToolsToggle()});
-document.getElementById('drawingToolbar').addEventListener('click',function(e){var b=e.target.closest('[data-tool]');if(!b)return;activeTool=b.dataset.tool;try{localStorage.setItem('dagbo_chart_active_tool',activeTool)}catch(e){}document.querySelectorAll('#drawingToolbar [data-tool]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});pinMode=activeTool!=='crosshair';if(drawLayer)drawLayer.style.pointerEvents=pinMode?'auto':'none'});
-document.getElementById('clearPinned').addEventListener('click',function(){if(!confirm('Delete all saved drawings for this market and timeframe?'))return;var all={};try{all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}')}catch(e){}delete all[drawingKey()];try{localStorage.setItem('dagbo_pinned_drawings_v1',JSON.stringify(all))}catch(e){}renderPinned()});
-function bindDrawingLayer(){drawLayer=svg('svg',{id:'chartDrawLayer'});drawLayer.style.cssText='position:absolute;inset:0;width:100%;height:100%;z-index:8;touch-action:none;pointer-events:none';drawLayer.addEventListener('pointerdown',function(e){if(!pinMode)return;e.preventDefault();var p=chartPoint(e);if(!Number.isFinite(p.time)||!Number.isFinite(p.price))return;drawLayer.setPointerCapture(e.pointerId);activeShape={type:activeTool,points:[p]}});drawLayer.addEventListener('pointermove',function(e){if(!activeShape)return;var p=chartPoint(e);if(Number.isFinite(p.time)&&Number.isFinite(p.price)){activeShape.points[1]=p;renderPinned();var q=activeShape.points.map(xy).filter(Boolean);if(q.length>1)drawLayer.appendChild(svg('line',{x1:q[0].x,y1:q[0].y,x2:q[1].x,y2:q[1].y,class:'dg-draw'}))}});function finish(){if(!activeShape)return;var d=activeShape;activeShape=null;if(d.type==='horizontal')d.points=[d.points[0]];if(d.points.length>1||d.type==='horizontal'){var list=readPinned();list.push(d);savePinned(list)}renderPinned()}drawLayer.addEventListener('pointerup',finish);drawLayer.addEventListener('pointercancel',finish)}
-document.querySelectorAll('#drawingToolbar [data-tool]').forEach(function(x){x.setAttribute('aria-pressed',String(x.dataset.tool===activeTool))});
-function loadChart(){
-var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull');
-container.innerHTML='';container.appendChild(btn);
-if(resizeObserver){try{resizeObserver.disconnect()}catch(e){}resizeObserver=null}
-if(chart){try{chart.remove()}catch(e){}chart=null}
-var host=document.createElement('div');host.style.cssText='width:100%;height:100%';container.insertBefore(host,btn);
-if(!window.LightweightCharts){host.innerHTML='<p style="color:white;padding:18px">Chart library unavailable. Check your connection.</p>';return}
-chart=LightweightCharts.createChart(host,{width:host.clientWidth||600,height:host.clientHeight||480,layout:{background:{color:'#090b10'},textColor:'#c8d0da'},grid:{vertLines:{color:'#1c2430'},horzLines:{color:'#1c2430'}},rightPriceScale:{borderColor:'#303846'},timeScale:{borderColor:'#303846',timeVisible:true},crosshair:{mode:1}});
-candleSeries=chart.addCandlestickSeries({upColor:'#18b981',downColor:'#ef5b68',borderVisible:false,wickUpColor:'#18b981',wickDownColor:'#ef5b68'});
-fetch('/api/chart?pair='+encodeURIComponent(pairIdFromSymbol(currentPair))+'&interval='+encodeURIComponent(currentTF),{cache:'no-store'}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Live candles unavailable');return d})}).then(function(d){
-if(!Array.isArray(d.candles)||!d.candles.length)throw new Error('No candles returned');
-candleData=d.candles;candleSeries.setData(candleData);chart.timeScale().fitContent();renderPinned();drawSavedIndicators();
-}).catch(function(e){host.innerHTML='<div style="color:#fff;padding:18px"><strong>Live chart data unavailable</strong><p style="font-size:12px;color:#aab4c2">'+String(e.message||'Try again later')+'</p></div>'});
-resizeObserver=new ResizeObserver(function(){if(chart&&host.clientWidth&&host.clientHeight){chart.applyOptions({width:host.clientWidth,height:host.clientHeight});renderPinned()}});resizeObserver.observe(host);
-bindDrawingLayer();container.appendChild(drawLayer);pinMode=activeTool!=="crosshair";drawLayer.style.pointerEvents=pinMode?"auto":"none";renderPinned();paintIndicatorButtons();
-}
-function drawSavedIndicators(){
-activeSeries.forEach(function(s){try{chart.removeSeries(s)}catch(e){}});activeSeries=[];
-var close=candleData.map(function(x){return x.close});
-function line(data,color,scale){var s=chart.addLineSeries({color:color,lineWidth:2,priceLineVisible:false,lastValueVisible:false,priceScaleId:scale||'right'});s.setData(data);activeSeries.push(s)}
-chosenIndicators().forEach(function(n){
-if(n.indexOf('EMA ')===0){var p=Number(n.split(' ')[1]);line(ema(close,p),({'9':'#f5c542','20':'#4da3ff','50':'#b48cff','200':'#ff8a65'})[p]||'#aaa')}
-if(n==='Bollinger Bands'){var mid=[],up=[],lo=[];for(var i=19;i<close.length;i++){var a=close.slice(i-19,i+1),m=a.reduce(function(x,y){return x+y},0)/20,v=a.reduce(function(x,y){return x+Math.pow(y-m,2)},0)/20,sd=Math.sqrt(v),t=candleData[i].time;mid.push({time:t,value:m});up.push({time:t,value:m+2*sd});lo.push({time:t,value:m-2*sd})}line(up,'#7f9db9');line(mid,'#a9b6c5');line(lo,'#7f9db9')}
-if(n==='RSI 14'){var g=0,l=0,out=[];for(var i=1;i<close.length;i++){var d=close[i]-close[i-1];g+=Math.max(d,0);l+=Math.max(-d,0);if(i>=14){out.push({time:candleData[i].time,value:100-100/(1+(l===0?100:g/l))});var old=close[i-13]-close[i-14];g-=Math.max(old,0);l-=Math.max(-old,0)}}line(out,'#d7a8ff','rsi')}
-if(n==='MACD'){var a=ema(close,12),b=ema(close,26),m={};b.forEach(function(x){m[x.time]=x.value});line(a.filter(function(x){return m[x.time]!==undefined}).map(function(x){return {time:x.time,value:x.value-m[x.time]}}),'#5ad0bd','macd')}
-});
-}
-window.changePair=function(tvSymbol){currentPair=tvSymbol;restoreTimeframe();saveChartPrefs();paintIndicatorButtons();loadChart()};
-window.changeTF=function(tf){currentTF=tf;saveChartPrefs();loadChart()};
-window.toggleFull=function(){document.body.classList.toggle('chart-full');var btn=document.getElementById('btnFull');btn.textContent=document.body.classList.contains('chart-full')?'✕ CLOSE':'⛶ FULLSCREEN';setTimeout(loadChart,100)};
-document.querySelectorAll('.indicator-chip').forEach(function(b){b.addEventListener('click',function(){var a=chosenIndicators(),i=a.indexOf(b.dataset.indicator);if(i>-1)a.splice(i,1);else a.push(b.dataset.indicator);saveIndicators(a);paintIndicatorButtons();if(chart&&candleData.length)drawSavedIndicators()})});
-buildDropdown();updateDrawingToolsToggle();paintIndicatorButtons();loadChart();
-})();
-</script>
-<script src="navigation.js" defer></script>
-</body>
-</html>
+<a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a></nav>
+<script src="pwa.js" defer></script><script src="navigation.js" defer></script></body></html>
