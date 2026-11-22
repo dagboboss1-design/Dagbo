@@ -337,6 +337,7 @@ body{background:#050b14!important;color:#edf4ff!important}
           ask.textContent = '🤖 Ask AI';
           ask.addEventListener('click', function() {
             localStorage.setItem('dagbo_news_prefill', item.title || 'Explain this market news headline.');
+            localStorage.setItem('dagbo_ai_task', 'news');
             window.location.href = 'ai.html';
           });
 
@@ -355,7 +356,7 @@ body{background:#050b14!important;color:#edf4ff!important}
 
 
   document.getElementById('refreshCalendar').addEventListener('click', loadCalendar);
-  document.getElementById('openNewsAI').addEventListener('click', function(){ localStorage.setItem('dagbo_news_prefill','Explain the latest market-moving news and identify potentially affected forex pairs, metals, indices and crypto markets. Separate confirmed facts from possible market reactions.'); window.location.href='ai.html'; });
+  document.getElementById('openNewsAI').addEventListener('click', function(){ localStorage.setItem('dagbo_news_prefill','Explain the latest market-moving news and identify potentially affected forex pairs, metals, indices and crypto markets. Separate confirmed facts from possible market reactions.'); localStorage.setItem('dagbo_ai_task','news'); window.location.href='ai.html'; });
   loadCalendar();
   setInterval(updateNewsCountdown,1000);
   setInterval(loadCalendar,5*60*1000);
