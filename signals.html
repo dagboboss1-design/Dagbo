@@ -339,7 +339,15 @@
         var raw = String(c.datetime || '');
         var stamp = Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? '' : 'Z'));
         return Number.isFinite(stamp) && stamp + barMs <= Date.now();
-      }).reverse();
+      }).sort(function(a,b) {
+        // Twelve Data and Binance return opposite candle orders. Normalize
+        // both providers to oldest → newest before running indicators.
+        function timeOf(c) {
+          var raw = String(c.datetime || '');
+          return Date.parse(raw.replace(' ', 'T') + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? '' : 'Z'));
+        }
+        return timeOf(a) - timeOf(b);
+      });
       if (candles.length < 60) {
         return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain; this strategy engine requires at least 60 closed candles.', errorStage: 'closed-candles' };
       }
