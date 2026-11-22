@@ -395,7 +395,12 @@ function askGroq(userQ){
         if (!res.ok || !data.success || typeof data.answer !== 'string') {
           throw new Error(data.error || 'Dagbo AI could not answer right now');
         }
-        resolve(data.answer);
+        resolve({
+          answer: data.answer,
+          provider: data.provider || 'AI',
+          model: data.model || '',
+          fallbackUsed: data.fallbackUsed === true
+        });
       });
     }).catch(function(err){
       reject(err);
@@ -537,8 +542,10 @@ function sendMessage() {
       addLessonMessage(reply);
       if (getAutoRead()) speak(reply.text);
     } else if (reply && reply.type === 'groq') {
-      askGroq(reply.query).then(function(ans) {
-        addMessage('ai', ans);
+      askGroq(reply.query).then(function(result) {
+        var ans = result.answer;
+        var providerName = ({ openai: 'OpenAI', claude: 'Claude', gemini: 'Gemini', groq: 'Groq' })[result.provider] || 'AI';
+        addMessage('ai', ans + '\n\n— ' + providerName + (result.fallbackUsed ? ' · backup provider' : ''));
         if (getAutoRead()) speak(ans);
       }).catch(function(err) {
         addMessage('ai', 'Error: ' + err.message);
