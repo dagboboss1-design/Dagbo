@@ -84,7 +84,8 @@ function normalizeFcsCandles(data) {
     if (!Number.isFinite(date.getTime())) return null;
     const open = Number(row.o ?? row.open), high = Number(row.h ?? row.high);
     const low = Number(row.l ?? row.low), close = Number(row.c ?? row.close);
-    if (![open,high,low,close].every(Number.isFinite) || open<=0 || high<=0 || low<=0 || close<=0 || high<low) return null;
+    if (![open,high,low,close].every(Number.isFinite) || open<=0 || high<=0 || low<=0 || close<=0 ||
+        high<low || high<Math.max(open,close) || low>Math.min(open,close)) return null;
     return { datetime: date.toISOString().slice(0,19).replace("T"," "), open:String(open), high:String(high), low:String(low), close:String(close), volume:String(row.v ?? row.volume ?? 0) };
   }).filter(Boolean).sort((a,b)=>Date.parse(a.datetime)-Date.parse(b.datetime));
 }
@@ -101,7 +102,8 @@ async function fetchFcsFallback(pair, tf) {
     "&period=" + encodeURIComponent(period) + "&length=100&is_chart=0" + type +
     "&access_key=" + encodeURIComponent(key);
   const result = await fetchJsonWithTimeout(url, { headers: { "Accept":"application/json" } }, 9000);
-  if (!result.response.ok || result.data.status === false || Number(result.data.code) !== 200) {
+  if (!result.response.ok || result.data.status === false || result.data.status === "error" ||
+      (result.data.code !== undefined && Number(result.data.code) !== 200)) {
     throw new Error("FCS rejected the candle request: " + String(result.data.msg || result.response.status));
   }
   const values = normalizeFcsCandles(result.data);
