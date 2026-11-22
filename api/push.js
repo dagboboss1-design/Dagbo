@@ -451,7 +451,8 @@ module.exports = async function handler(req, res) {
         provider: result.provider,
         model: result.model,
         fallbackUsed: result.provider !== primary,
-        task: selectedTask,\n        routingReason: "Assigned page role: " + selectedTask,
+        task: selectedTask,
+        routingReason: "Assigned page role: " + selectedTask,
         attempts: attempts
       });
     }
