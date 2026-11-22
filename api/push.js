@@ -56,7 +56,7 @@ function getId(endpoint) {
 }
 
 function authorized(req) {
-  const secret = process.env.SIGNAL_PUSH_SECURITY || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET;
+  const secret = process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET;
   const supplied = req.headers.authorization || "";
   if (!secret) return false;
   const a = Buffer.from(supplied);
@@ -73,9 +73,9 @@ function validSubscription(sub) {
 
 function getConfiguredAIProviders() {
   return {
-    openai: !!process.env.OPENAI_API_KEY,
+    openai: !!(process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY),
     claude: !!process.env.ANTHROPIC_API_KEY,
-    gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+    gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.Gemini_API_Key),
     groq: !!process.env.GROQ_API_KEY
   };
 }
@@ -95,7 +95,7 @@ function getAIProviderOrder(primary, configured) {
     if (seen.has(name) || !configured[name]) return false;
     seen.add(name);
     return true;
-  }).slice(0, 2);
+  }).slice(0, 3);
 }
 
 async function callAIProvider(provider, messages) {
@@ -104,7 +104,7 @@ async function callAIProvider(provider, messages) {
   let url, headers = { "Content-Type": "application/json" }, body, model;
 
   if (provider === "openai") {
-    const key = process.env.OPENAI_API_KEY;
+    const key = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY;
     if (!key) throw new Error("OpenAI is not configured");
     model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
     url = "https://api.openai.com/v1/chat/completions";
@@ -126,7 +126,7 @@ async function callAIProvider(provider, messages) {
       })
     };
   } else if (provider === "gemini") {
-    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.Gemini_API_Key;
     if (!key) throw new Error("Gemini is not configured");
     model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
     url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
@@ -150,7 +150,7 @@ async function callAIProvider(provider, messages) {
     method: "POST",
     headers: headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(3200)
+    signal: AbortSignal.timeout(2500)
   });
   let data = {};
   try { data = await response.json(); } catch (_) {}
@@ -189,7 +189,7 @@ module.exports = async function handler(req, res) {
         pushSubject: !!process.env.VAPID_SUBJECT,
         pushStorage: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
         marketData: !!process.env.TWELVE_DATA_API_KEY,
-        cronSecret: !!(process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY)
+        cronSecret: !!(process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security)
       };
       return res.status(200).json({
         success: true,
