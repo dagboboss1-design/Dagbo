@@ -200,7 +200,7 @@
       'Breakout':['Market structure','Volatility'],'Session range':['Market structure'],'Key levels':['Market structure'],'Structure':['Market structure'],
       'Liquidity':['Market structure'],'SMC':['Market structure'],'Session':['Market structure'],'Levels':['Market structure'],
       'Pattern':['Chart pattern'],'Candlestick':['Chart pattern'],'Reversal':['Chart pattern','Market structure'],
-      'Volatility':['Volatility'],'Price action':['Chart pattern','Market structure'],'Cross-market':['Trend','Momentum'],
+      'Volatility':['Volatility'],'Volume':['Volume'],'Price action':['Chart pattern','Market structure'],'Cross-market':['Trend','Momentum'],
       'Economic release':['Volatility'],'Central bank':['Volatility','Trend'],'Risk':[]
     };
     var profile=activeProfileConfig,disabled=profilePreferenceStore.disabled||{},groups={};
@@ -277,7 +277,9 @@
   }
   function candleNumber(c, key){return Number(c[key]);}
   function analyseAllMethods(candles, profile) {
-    var engineProfile = profile === 'scalping' ? 'scalp' : (profile === 'h4' ? 'swing' : profile);
+    var engineProfile = profile === 'scalping' || profile === 'momentum' ? 'scalp' :
+      (profile === 'h4' || profile === 'trend-following' ? 'swing' :
+      (['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0 ? 'day' : profile));
     var result = window.DagboConfluence.analyze(candles, '', engineProfile, {enabledGroups:groupsForActiveProfile()});
     if (!result) return null;
     return {
