@@ -11,7 +11,7 @@
 <style>
 .back-arrow{display:inline-flex;align-items:center;gap:6px;font-size:16px;font-weight:700;color:var(--dg-text);text-decoration:none;margin-bottom:16px;padding:8px 12px;background:var(--dg-fill);border-radius:12px}
 .back-arrow:active{opacity:.6}
-#tv-chart-container{height:calc(100vh - 280px);min-height:550px;width:100%;border-radius:16px;overflow:hidden;background:#000;margin-bottom:16px;position:relative}
+#tv-chart-container{height:calc(100vh - 360px);min-height:440px;width:100%;border-radius:16px;overflow:hidden;background:#090b10;margin-bottom:16px;position:relative}
 #tv-chart-container .tradingview-widget-container__widget{width:100%;height:100%}#tv-chart-container iframe{width:100%!important;height:100%!important;border:none!important;display:block}
 body.chart-full #tv-chart-container{position:fixed!important;top:0;left:0;right:0;bottom:0;width:100vw!important;height:100dvh!important;z-index:9999;border-radius:0;margin:0}
 body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-full #tv-chart-container .tradingview-widget-container__widget{height:100dvh!important}
@@ -45,6 +45,10 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 <input class="dg-seg__in" type="radio" name="tf" id="tf4" value="240" onchange="changeTF('240')"><label class="dg-seg__lb" for="tf4">4H</label>
 <input class="dg-seg__in" type="radio" name="tf" id="tf5" value="D" onchange="changeTF('D')"><label class="dg-seg__lb" for="tf5">1D</label>
 </div>
+<section style="margin:10px 0 12px;padding:12px;border:1px solid var(--dg-line);border-radius:14px;background:var(--dg-card)"><strong style="font-size:13px">MY INDICATORS</strong><div id="indicatorButtons" style="display:flex;flex-wrap:wrap;gap:7px;margin-top:9px">
+<button type="button" class="indicator-chip" data-indicator="EMA 9" aria-pressed="false">EMA 9</button><button type="button" class="indicator-chip" data-indicator="EMA 20" aria-pressed="false">EMA 20</button><button type="button" class="indicator-chip" data-indicator="EMA 50" aria-pressed="false">EMA 50</button><button type="button" class="indicator-chip" data-indicator="EMA 200" aria-pressed="false">EMA 200</button><button type="button" class="indicator-chip" data-indicator="Bollinger Bands" aria-pressed="false">Bollinger Bands</button><button type="button" class="indicator-chip" data-indicator="RSI 14" aria-pressed="false">RSI 14</button><button type="button" class="indicator-chip" data-indicator="MACD" aria-pressed="false">MACD</button>
+</div><p style="font-size:11px;color:var(--dg-muted);margin:9px 0 0">Saved separately for each market. Tap again to remove.</p></section>
+<style>.indicator-chip{padding:8px 10px;border-radius:18px;border:1px solid var(--dg-line);background:transparent;color:var(--dg-text);font-size:11px;font-weight:700}.indicator-chip[aria-pressed="true"]{background:#dce8f7;color:#101820;border-color:#dce8f7}</style>
 <button id="drawingToolsToggle" type="button" aria-label="Hide drawing tools" aria-expanded="true" title="Hide drawing tools">‹</button><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div><div id="chartPinActions"><button id="pinDrawing" type="button" title="Draw and pin saved marks">📌 Pin drawings</button><button id="clearPinned" type="button" title="Delete saved drawings">Clear saved</button></div>
 <a href="replay.html" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;margin:8px 0 18px;border-radius:14px;background:#0878e8;color:#fff;text-decoration:none;font-weight:800">⏪ OPEN HISTORICAL REPLAY</a>
 </main>
@@ -57,7 +61,7 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
 <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a>
 </nav>
-<script src="pwa.js" defer></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"></script><script src="pwa.js" defer></script>
 <script>
 (function(){
 'use strict';
@@ -84,6 +88,12 @@ var enabledIds=Array.isArray(settings.pairs)&&settings.pairs.length?settings.pai
 var activePairs=PAIRS.filter(function(p){return enabledIds.indexOf(p.id)>-1||(enabledIds.indexOf('GOLD')>-1&&p.id==='XAUUSD')});
 var chartPrefs={};try{chartPrefs=JSON.parse(localStorage.getItem('dagbo_chart_preferences_v1')||'{}')}catch(e){}
 var currentPair='CAPITALCOM:XAUUSD',currentTF='15';
+var chart=null,candleSeries=null,activeSeries=[],candleData=[],resizeObserver=null;
+var indicatorStore={};try{indicatorStore=JSON.parse(localStorage.getItem('dagbo_chart_indicators_v1')||'{}')}catch(e){}
+function chosenIndicators(){var a=indicatorStore[pairIdFromSymbol(currentPair)];return Array.isArray(a)?a:[]}
+function saveIndicators(a){indicatorStore[pairIdFromSymbol(currentPair)]=a;try{localStorage.setItem('dagbo_chart_indicators_v1',JSON.stringify(indicatorStore))}catch(e){}}
+function paintIndicatorButtons(){document.querySelectorAll('.indicator-chip').forEach(function(b){b.setAttribute('aria-pressed',String(chosenIndicators().indexOf(b.dataset.indicator)>-1))})}
+function ema(values,p){var out=[],k=2/(p+1),v=null;values.forEach(function(x,i){v=v===null?x:x*k+v*(1-k);out.push({time:candleData[i].time,value:v})});return out}
 function pairIdFromSymbol(symbol){var found=PAIRS.filter(function(p){return p.tv===symbol})[0];return found?found.id:'XAUUSD'}
 function saveChartPrefs(){
 try{chartPrefs.lastPair=currentPair;chartPrefs.timeframes=chartPrefs.timeframes||{};chartPrefs.timeframes[pairIdFromSymbol(currentPair)]=currentTF;localStorage.setItem('dagbo_chart_preferences_v1',JSON.stringify(chartPrefs))}catch(e){}
@@ -152,22 +162,36 @@ renderPinned();
 }
 function loadChart(){
 var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull');
-container.innerHTML='';
-var theme=document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light';
-var frame=document.createElement('iframe');
-frame.title='TradingView live chart';
-frame.src='https://s.tradingview.com/widgetembed/?symbol='+encodeURIComponent(currentPair)+'&interval='+encodeURIComponent(currentTF)+'&theme='+theme+'&style=1&locale=en&timezone=Africa%2FLagos&hide_side_toolbar='+(drawingToolsVisible?'0':'1')+'&symboledit=0&saveimage=0&toolbarbg=%23000000&hide_volume=true';
-frame.setAttribute('allowfullscreen','');
-frame.style.cssText='width:100%;height:100%;border:0;display:block';
-container.appendChild(frame);
-bindDrawingLayer();container.appendChild(drawLayer);
-container.appendChild(btn);
-setPinMode(false);
+container.innerHTML='';container.appendChild(btn);
+if(resizeObserver){try{resizeObserver.disconnect()}catch(e){}resizeObserver=null}
+if(chart){try{chart.remove()}catch(e){}chart=null}
+var host=document.createElement('div');host.style.cssText='width:100%;height:100%';container.insertBefore(host,btn);
+if(!window.LightweightCharts){host.innerHTML='<p style="color:white;padding:18px">Chart library unavailable. Check your connection.</p>';return}
+chart=LightweightCharts.createChart(host,{width:host.clientWidth||600,height:host.clientHeight||480,layout:{background:{color:'#090b10'},textColor:'#c8d0da'},grid:{vertLines:{color:'#1c2430'},horzLines:{color:'#1c2430'}},rightPriceScale:{borderColor:'#303846'},timeScale:{borderColor:'#303846',timeVisible:true},crosshair:{mode:1}});
+candleSeries=chart.addCandlestickSeries({upColor:'#18b981',downColor:'#ef5b68',borderVisible:false,wickUpColor:'#18b981',wickDownColor:'#ef5b68'});
+fetch('/api/chart?pair='+encodeURIComponent(pairIdFromSymbol(currentPair))+'&interval='+encodeURIComponent(currentTF),{cache:'no-store'}).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Live candles unavailable');return d})}).then(function(d){
+if(!Array.isArray(d.candles)||!d.candles.length)throw new Error('No candles returned');
+candleData=d.candles;candleSeries.setData(candleData);chart.timeScale().fitContent();drawSavedIndicators();
+}).catch(function(e){host.innerHTML='<div style="color:#fff;padding:18px"><strong>Live chart data unavailable</strong><p style="font-size:12px;color:#aab4c2">'+String(e.message||'Try again later')+'</p></div>'});
+resizeObserver=new ResizeObserver(function(){if(chart&&host.clientWidth&&host.clientHeight)chart.applyOptions({width:host.clientWidth,height:host.clientHeight})});resizeObserver.observe(host);
+bindDrawingLayer();container.appendChild(drawLayer);setPinMode(false);paintIndicatorButtons();
 }
-window.changePair=function(tvSymbol){currentPair=tvSymbol;restoreTimeframe();saveChartPrefs();loadChart()};
+function drawSavedIndicators(){
+activeSeries.forEach(function(s){try{chart.removeSeries(s)}catch(e){}});activeSeries=[];
+var close=candleData.map(function(x){return x.close});
+function line(data,color,scale){var s=chart.addLineSeries({color:color,lineWidth:2,priceLineVisible:false,lastValueVisible:false,priceScaleId:scale||'right'});s.setData(data);activeSeries.push(s)}
+chosenIndicators().forEach(function(n){
+if(n.indexOf('EMA ')===0){var p=Number(n.split(' ')[1]);line(ema(close,p),({'9':'#f5c542','20':'#4da3ff','50':'#b48cff','200':'#ff8a65'})[p]||'#aaa')}
+if(n==='Bollinger Bands'){var mid=[],up=[],lo=[];for(var i=19;i<close.length;i++){var a=close.slice(i-19,i+1),m=a.reduce(function(x,y){return x+y},0)/20,v=a.reduce(function(x,y){return x+Math.pow(y-m,2)},0)/20,sd=Math.sqrt(v),t=candleData[i].time;mid.push({time:t,value:m});up.push({time:t,value:m+2*sd});lo.push({time:t,value:m-2*sd})}line(up,'#7f9db9');line(mid,'#a9b6c5');line(lo,'#7f9db9')}
+if(n==='RSI 14'){var g=0,l=0,out=[];for(var i=1;i<close.length;i++){var d=close[i]-close[i-1];g+=Math.max(d,0);l+=Math.max(-d,0);if(i>=14){out.push({time:candleData[i].time,value:100-100/(1+(l===0?100:g/l))});var old=close[i-13]-close[i-14];g-=Math.max(old,0);l-=Math.max(-old,0)}}line(out,'#d7a8ff','rsi')}
+if(n==='MACD'){var a=ema(close,12),b=ema(close,26),m={};b.forEach(function(x){m[x.time]=x.value});line(a.filter(function(x){return m[x.time]!==undefined}).map(function(x){return {time:x.time,value:x.value-m[x.time]}}),'#5ad0bd','macd')}
+});
+}
+window.changePair=function(tvSymbol){currentPair=tvSymbol;restoreTimeframe();saveChartPrefs();paintIndicatorButtons();loadChart()};
 window.changeTF=function(tf){currentTF=tf;saveChartPrefs();loadChart()};
 window.toggleFull=function(){document.body.classList.toggle('chart-full');var btn=document.getElementById('btnFull');btn.textContent=document.body.classList.contains('chart-full')?'✕ CLOSE':'⛶ FULLSCREEN';setTimeout(loadChart,100)};
-buildDropdown();updateDrawingToolsToggle();loadChart();
+document.querySelectorAll('.indicator-chip').forEach(function(b){b.addEventListener('click',function(){var a=chosenIndicators(),i=a.indexOf(b.dataset.indicator);if(i>-1)a.splice(i,1);else a.push(b.dataset.indicator);saveIndicators(a);paintIndicatorButtons();if(chart&&candleData.length)drawSavedIndicators()})});
+buildDropdown();updateDrawingToolsToggle();paintIndicatorButtons();loadChart();
 })();
 </script>
 <script src="navigation.js" defer></script>
