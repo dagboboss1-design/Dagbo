@@ -23,7 +23,7 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 #chartDrawLayer{position:absolute;inset:0;width:100%;height:100%;z-index:8;pointer-events:none;touch-action:none}
 #chartDrawLayer.is-active{pointer-events:auto;cursor:crosshair}
 #chartDrawLayer polyline{fill:none;stroke:#f5c542;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
-#chartPinActions{display:flex;justify-content:flex-end;gap:8px;margin:10px 0 16px}
+#chartPinActions{display:flex;justify-content:flex-end;gap:8px;margin:10px 0 16px}.draw-tool{padding:8px 10px;border:1px solid var(--dg-line);border-radius:12px;background:var(--dg-card);color:var(--dg-text);font-size:11px;font-weight:700}.draw-tool[aria-pressed="true"]{background:#dce8f7;color:#101820;border-color:#dce8f7}#chartDrawLayer{overflow:visible}#chartDrawLayer .saved-drawing{fill:none;stroke:#f5c542;stroke-width:2.5;vector-effect:non-scaling-stroke;pointer-events:stroke}#chartDrawLayer .risk-zone{fill:#18b981;fill-opacity:.13;stroke:#18b981;stroke-width:1.5;vector-effect:non-scaling-stroke}#chartDrawLayer .risk-zone.loss{fill:#ef5b68;stroke:#ef5b68}#chartDrawLayer .selected-drawing{stroke:#fff;stroke-dasharray:5 4}
 #pinDrawing,#clearPinned{margin:0}
 #clearPinned{padding:8px 12px;border:1px solid var(--dg-line);border-radius:20px;background:var(--dg-card);color:var(--dg-text);font-size:12px;font-weight:700;cursor:pointer}
 </style>
@@ -49,7 +49,7 @@ body.chart-full #tv-chart-container iframe{height:100dvh!important}body.chart-fu
 <button type="button" class="indicator-chip" data-indicator="EMA 9" aria-pressed="false">EMA 9</button><button type="button" class="indicator-chip" data-indicator="EMA 20" aria-pressed="false">EMA 20</button><button type="button" class="indicator-chip" data-indicator="EMA 50" aria-pressed="false">EMA 50</button><button type="button" class="indicator-chip" data-indicator="EMA 200" aria-pressed="false">EMA 200</button><button type="button" class="indicator-chip" data-indicator="Bollinger Bands" aria-pressed="false">Bollinger Bands</button><button type="button" class="indicator-chip" data-indicator="RSI 14" aria-pressed="false">RSI 14</button><button type="button" class="indicator-chip" data-indicator="MACD" aria-pressed="false">MACD</button>
 </div><p style="font-size:11px;color:var(--dg-muted);margin:9px 0 0">Saved separately for each market. Tap again to remove.</p></section>
 <style>.indicator-chip{padding:8px 10px;border-radius:18px;border:1px solid var(--dg-line);background:transparent;color:var(--dg-text);font-size:11px;font-weight:700}.indicator-chip[aria-pressed="true"]{background:#dce8f7;color:#101820;border-color:#dce8f7}</style>
-<button id="drawingToolsToggle" type="button" aria-label="Hide drawing tools" aria-expanded="true" title="Hide drawing tools">‹</button><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div><div id="chartPinActions"><button id="pinDrawing" type="button" title="Draw and pin saved marks">📌 Pin drawings</button><button id="clearPinned" type="button" title="Delete saved drawings">Clear saved</button></div>
+<button id="drawingToolsToggle" type="button" aria-label="Hide drawing tools" aria-expanded="true" title="Hide drawing tools">‹</button><section id="drawingToolbar" aria-label="Chart drawing tools" style="display:flex;flex-wrap:wrap;gap:7px;margin:0 0 10px"><button type="button" class="draw-tool" data-tool="freehand">✎ Freehand</button><button type="button" class="draw-tool" data-tool="trendline">／ Trendline</button><button type="button" class="draw-tool" data-tool="hline">— Horizontal</button><button type="button" class="draw-tool" data-tool="rectangle">▱ Rectangle</button><button type="button" class="draw-tool" data-tool="long">↗ Long</button><button type="button" class="draw-tool" data-tool="short">↘ Short</button><button type="button" id="deleteDrawing" class="draw-tool">Delete selected</button></section><div id="tv-chart-container"><button id="btnFull" onclick="toggleFull()">⛶ FULLSCREEN</button></div><div id="chartPinActions"><button id="pinDrawing" type="button" title="Draw and pin saved marks">📌 Pin drawings</button><button id="clearPinned" type="button" title="Delete saved drawings">Clear saved</button></div>
 <a href="replay.html" style="display:flex;justify-content:center;align-items:center;gap:8px;padding:14px;margin:8px 0 18px;border-radius:14px;background:#0878e8;color:#fff;text-decoration:none;font-weight:800">⏪ OPEN HISTORICAL REPLAY</a>
 </main>
 <nav class="dg-tabbar" aria-label="Main">
@@ -104,62 +104,51 @@ currentTF=['5','15','60','240','D'].indexOf(String(saved))>-1?String(saved):'15'
 document.querySelectorAll('input[name="tf"]').forEach(function(input){input.checked=input.value===currentTF});
 }
 var drawingToolsVisible=true;try{drawingToolsVisible=localStorage.getItem('dagbo_chart_tools_visible')!=='false'}catch(e){}
-function buildDropdown(){
-var sel=document.getElementById('pairSelect');sel.innerHTML='';
-activePairs.forEach(function(p){var opt=document.createElement('option');opt.value=p.tv;opt.textContent=p.label;sel.appendChild(opt)});
-var urlParams=new URLSearchParams(window.location.search),urlPair=urlParams.get('pair');
-if(urlPair){var matched=PAIRS.filter(function(p){return p.id===urlPair||(urlPair==='GOLD'&&p.id==='XAUUSD')})[0];if(matched&&activePairs.indexOf(matched)>-1){currentPair=matched.tv;window.history.replaceState({},'',window.location.pathname)}}
-else if(chartPrefs.lastPair&&activePairs.some(function(p){return p.tv===chartPrefs.lastPair})){currentPair=chartPrefs.lastPair}
-else if(activePairs.length>0){currentPair=activePairs[0].tv}
-sel.value=currentPair;
-restoreTimeframe();
-}
-function updateDrawingToolsToggle(){var b=document.getElementById('drawingToolsToggle');if(!b)return;b.textContent=drawingToolsVisible?'‹':'›';b.setAttribute('aria-expanded',drawingToolsVisible?'true':'false');b.setAttribute('aria-label',drawingToolsVisible?'Hide drawing tools':'Show drawing tools');b.title=drawingToolsVisible?'Hide drawing tools':'Show drawing tools'}
-document.getElementById('drawingToolsToggle').addEventListener('click',function(){drawingToolsVisible=!drawingToolsVisible;try{localStorage.setItem('dagbo_chart_tools_visible',drawingToolsVisible?'true':'false')}catch(e){}updateDrawingToolsToggle();loadChart()});
-document.getElementById('pinDrawing').addEventListener('click',function(){setPinMode(!pinMode)});
-document.getElementById('clearPinned').addEventListener('click',function(){
-if(!confirm('Delete all saved drawings for this market and timeframe?'))return;
-var all={};try{all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}')}catch(e){}
-delete all[drawingKey()];try{localStorage.setItem('dagbo_pinned_drawings_v1',JSON.stringify(all))}catch(e){}
-renderPinned();
-});
-var pinMode=false,activeLine=null,drawLayer=null;
+var drawingToolbar=document.getElementById('drawingToolbar');
+var activeTool='freehand';try{activeTool=localStorage.getItem('dagbo_chart_active_tool')||'freehand'}catch(e){}
+var selectedDrawing=null,pinMode=false,activeShape=null,drawLayer=null,drawCounter=0;
 function drawingKey(){return 'dagbo_pinned_drawings_v1:'+currentPair+':'+currentTF}
 function readPinned(){try{var all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}');return Array.isArray(all[drawingKey()])?all[drawingKey()]:[]}catch(e){return []}}
 function savePinned(lines){try{var all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}');all[drawingKey()]=lines;localStorage.setItem('dagbo_pinned_drawings_v1',JSON.stringify(all))}catch(e){alert('Could not save drawings. Check phone storage space.');}}
+function updateDrawingToolsToggle(){var b=document.getElementById('drawingToolsToggle');if(!b)return;b.textContent=drawingToolsVisible?'‹':'›';b.setAttribute('aria-expanded',drawingToolsVisible?'true':'false');b.setAttribute('aria-label',drawingToolsVisible?'Hide drawing tools':'Show drawing tools');b.title=drawingToolsVisible?'Hide drawing tools':'Show drawing tools';if(drawingToolbar)drawingToolbar.style.display=drawingToolsVisible?'flex':'none'}
+function setActiveTool(tool){activeTool=tool;try{localStorage.setItem('dagbo_chart_active_tool',tool)}catch(e){}document.querySelectorAll('.draw-tool[data-tool]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.tool===tool))});setPinMode(true)}
+function setPinMode(on){pinMode=!!on;if(drawLayer)drawLayer.classList.toggle('is-active',pinMode);var b=document.getElementById('pinDrawing');if(b){b.textContent=pinMode?'✓ Drawing mode ON':'📌 Pin drawings';b.setAttribute('aria-pressed',String(pinMode))}}
+function chartPoint(e){var r=drawLayer.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top,t=chart&&chart.timeScale().coordinateToTime(x),p=candleSeries&&candleSeries.coordinateToPrice(y);if(t&&typeof t==='object')t=Date.UTC(t.year,t.month-1,t.day)/1000;return {time:Number(t),price:Number(p)}}
+function pointXY(p){if(!chart||!candleSeries)return null;var x=chart.timeScale().timeToCoordinate(p.time),y=candleSeries.priceToCoordinate(p.price);return x===null||y===null||!Number.isFinite(x)||!Number.isFinite(y)?null:{x:x,y:y}}
+function makeSvg(tag,cls){var n=document.createElementNS('http://www.w3.org/2000/svg',tag);if(cls)n.setAttribute('class',cls);return n}
 function renderPinned(){
-if(!drawLayer)return;
-drawLayer.textContent='';
-readPinned().forEach(function(points){var line=document.createElementNS('http://www.w3.org/2000/svg','polyline');line.setAttribute('points',points);drawLayer.appendChild(line)});
-}
-function setPinMode(on){
-pinMode=!!on;
-if(drawLayer)drawLayer.classList.toggle('is-active',pinMode);
-var b=document.getElementById('pinDrawing');if(b){b.textContent=pinMode?'✓ Finish drawing':'📌 Pin drawings';b.setAttribute('aria-pressed',String(pinMode))}
+ if(!drawLayer)return;drawLayer.textContent='';
+ readPinned().forEach(function(item,index){
+  if(typeof item==='string'){var legacy=makeSvg('polyline','saved-drawing');legacy.setAttribute('points',item);drawLayer.appendChild(legacy);return}
+  if(!item||!Array.isArray(item.points)||!item.points.length)return;
+  var pts=item.points.map(pointXY);if(pts.some(function(p){return !p}))return;
+  var group=makeSvg('g',item.id===selectedDrawing?'selected-drawing':'');group.setAttribute('data-drawing-id',item.id||String(index));
+  if(item.type==='hline'){var ln=makeSvg('line','saved-drawing');ln.setAttribute('x1',0);ln.setAttribute('x2',drawLayer.clientWidth||1000);ln.setAttribute('y1',pts[0].y);ln.setAttribute('y2',pts[0].y);group.appendChild(ln)}
+  else if(item.type==='rectangle'||item.type==='long'||item.type==='short'){var a=pts[0],b=pts[1]||pts[0],left=Math.min(a.x,b.x),top=Math.min(a.y,b.y),w=Math.max(2,Math.abs(b.x-a.x)),h=Math.max(2,Math.abs(b.y-a.y));var rect=makeSvg('rect',item.type==='short'?'risk-zone loss':'risk-zone');rect.setAttribute('x',left);rect.setAttribute('y',top);rect.setAttribute('width',w);rect.setAttribute('height',h);group.appendChild(rect);if(item.type!=='rectangle'){var mid=makeSvg('line','saved-drawing');mid.setAttribute('x1',left);mid.setAttribute('x2',left+w);mid.setAttribute('y1',top+h/2);mid.setAttribute('y2',top+h/2);group.appendChild(mid)}}
+  else {var shape=makeSvg(item.type==='trendline'?'line':'polyline','saved-drawing');if(item.type==='trendline'){shape.setAttribute('x1',pts[0].x);shape.setAttribute('y1',pts[0].y);shape.setAttribute('x2',pts[pts.length-1].x);shape.setAttribute('y2',pts[pts.length-1].y)}else shape.setAttribute('points',pts.map(function(p){return p.x+','+p.y}).join(' '));group.appendChild(shape)}
+  drawLayer.appendChild(group);
+ });
 }
 function bindDrawingLayer(){
-drawLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
-drawLayer.setAttribute('id','chartDrawLayer');drawLayer.setAttribute('viewBox','0 0 1000 1000');drawLayer.setAttribute('preserveAspectRatio','none');
-drawLayer.addEventListener('pointerdown',function(e){
-if(!pinMode)return;
-e.preventDefault();drawLayer.setPointerCapture(e.pointerId);
-var r=drawLayer.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*1000,y=(e.clientY-r.top)/r.height*1000;
-activeLine=document.createElementNS('http://www.w3.org/2000/svg','polyline');
-activeLine.setAttribute('points',x.toFixed(1)+','+y.toFixed(1));drawLayer.appendChild(activeLine);
-});
-drawLayer.addEventListener('pointermove',function(e){
-if(!pinMode||!activeLine)return;
-var r=drawLayer.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*1000,y=(e.clientY-r.top)/r.height*1000;
-var p=activeLine.getAttribute('points');activeLine.setAttribute('points',p+' '+x.toFixed(1)+','+y.toFixed(1));
-});
-function finishLine(){
-if(!activeLine)return;
-var pts=activeLine.getAttribute('points').trim();activeLine=null;
-if(pts.split(' ').length>1){var saved=readPinned();saved.push(pts);savePinned(saved)}
+ drawLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');drawLayer.setAttribute('id','chartDrawLayer');drawLayer.setAttribute('preserveAspectRatio','none');
+ drawLayer.addEventListener('pointerdown',function(e){
+  if(!pinMode)return;e.preventDefault();var p=chartPoint(e);if(!Number.isFinite(p.time)||!Number.isFinite(p.price))return;
+  drawLayer.setPointerCapture(e.pointerId);
+  if(e.target.closest&&e.target.closest('[data-drawing-id]')){selectedDrawing=e.target.closest('[data-drawing-id]').getAttribute('data-drawing-id');renderPinned();return}
+  activeShape={id:'d'+Date.now()+(++drawCounter),type:activeTool,points:[p]};renderPreview();
+ });
+ function renderPreview(){if(!activeShape)return;var p=activeShape.points[activeShape.points.length-1],xy=pointXY(p);if(!xy)return;var prev=drawLayer.querySelector('#drawingPreview');if(prev)prev.remove();var el=makeSvg('circle','saved-drawing');el.setAttribute('id','drawingPreview');el.setAttribute('cx',xy.x);el.setAttribute('cy',xy.y);el.setAttribute('r',5);drawLayer.appendChild(el)}
+ drawLayer.addEventListener('pointermove',function(e){if(!pinMode||!activeShape)return;var p=chartPoint(e);if(!Number.isFinite(p.time)||!Number.isFinite(p.price))return;if(activeShape.type==='freehand')activeShape.points.push(p);else if(activeShape.points.length===1)activeShape.points.push(p);else activeShape.points[1]=p;renderPreview()});
+ function finish(){if(!activeShape)return;var s=activeShape;activeShape=null;var needed=s.type==='hline'?1:2;if(s.points.length>=needed){var saved=readPinned();saved.push(s);savePinned(saved)}renderPinned()}
+ drawLayer.addEventListener('pointerup',finish);drawLayer.addEventListener('pointercancel',finish);
+ renderPinned();
+ if(chart){chart.timeScale().subscribeVisibleTimeRangeChange(renderPinned);chart.timeScale().subscribeVisibleLogicalRangeChange(renderPinned);chart.subscribeCrosshairMove(function(){if(!activeShape)renderPinned()})}
 }
-drawLayer.addEventListener('pointerup',finishLine);drawLayer.addEventListener('pointercancel',finishLine);
-renderPinned();
-}
+document.getElementById('drawingToolsToggle').addEventListener('click',function(){drawingToolsVisible=!drawingToolsVisible;try{localStorage.setItem('dagbo_chart_tools_visible',drawingToolsVisible?'true':'false')}catch(e){}updateDrawingToolsToggle()});
+document.querySelectorAll('.draw-tool[data-tool]').forEach(function(b){b.addEventListener('click',function(){setActiveTool(b.dataset.tool)})});
+document.getElementById('deleteDrawing').addEventListener('click',function(){if(!selectedDrawing)return;savePinned(readPinned().filter(function(x){return typeof x==='string'||x.id!==selectedDrawing}));selectedDrawing=null;renderPinned()});
+document.getElementById('pinDrawing').addEventListener('click',function(){setPinMode(!pinMode)});
+document.getElementById('clearPinned').addEventListener('click',function(){if(!confirm('Delete all saved drawings for this market and timeframe?'))return;var all={};try{all=JSON.parse(localStorage.getItem('dagbo_pinned_drawings_v1')||'{}')}catch(e){}delete all[drawingKey()];try{localStorage.setItem('dagbo_pinned_drawings_v1',JSON.stringify(all))}catch(e){}selectedDrawing=null;renderPinned()});
 function loadChart(){
 var container=document.getElementById('tv-chart-container'),btn=document.getElementById('btnFull');
 container.innerHTML='';container.appendChild(btn);
@@ -174,7 +163,7 @@ if(!Array.isArray(d.candles)||!d.candles.length)throw new Error('No candles retu
 candleData=d.candles;candleSeries.setData(candleData);chart.timeScale().fitContent();drawSavedIndicators();
 }).catch(function(e){host.innerHTML='<div style="color:#fff;padding:18px"><strong>Live chart data unavailable</strong><p style="font-size:12px;color:#aab4c2">'+String(e.message||'Try again later')+'</p></div>'});
 resizeObserver=new ResizeObserver(function(){if(chart&&host.clientWidth&&host.clientHeight)chart.applyOptions({width:host.clientWidth,height:host.clientHeight})});resizeObserver.observe(host);
-bindDrawingLayer();container.appendChild(drawLayer);setPinMode(false);paintIndicatorButtons();
+bindDrawingLayer();container.appendChild(drawLayer);setPinMode(false);setActiveTool(activeTool);setPinMode(false);updateDrawingToolsToggle();paintIndicatorButtons();
 }
 function drawSavedIndicators(){
 activeSeries.forEach(function(s){try{chart.removeSeries(s)}catch(e){}});activeSeries=[];
