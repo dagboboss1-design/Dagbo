@@ -70,14 +70,120 @@ function validSubscription(sub) {
     typeof sub.keys.p256dh === "string" && typeof sub.keys.auth === "string");
 }
 
+
+function getConfiguredAIProviders() {
+  return {
+    openai: !!process.env.OPENAI_API_KEY,
+    claude: !!process.env.ANTHROPIC_API_KEY,
+    gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+    groq: !!process.env.GROQ_API_KEY
+  };
+}
+
+function chooseAIProvider(question) {
+  const q = String(question || "").toLowerCase();
+  if (/\b(code|coding|debug|developer|programming|api endpoint|review this code|refactor)\b/.test(q)) return "claude";
+  if (/\b(research|latest news|geopolitic|fundamental|economic calendar|economic data|compare providers|verify this news)\b/.test(q)) return "gemini";
+  if (/\b(analy[sz]e|analysis|trade setup|trade plan|market structure|liquidity|risk assessment|should i enter|confluence)\b/.test(q)) return "openai";
+  return "groq";
+}
+
+function getAIProviderOrder(primary, configured) {
+  const order = [primary, "openai", "claude", "gemini", "groq"];
+  const seen = new Set();
+  return order.filter(function(name) {
+    if (seen.has(name) || !configured[name]) return false;
+    seen.add(name);
+    return true;
+  }).slice(0, 2);
+}
+
+async function callAIProvider(provider, messages) {
+  const systemMessage = messages.find(function(m) { return m.role === "system"; });
+  const conversation = messages.filter(function(m) { return m.role !== "system"; });
+  let url, headers = { "Content-Type": "application/json" }, body, model;
+
+  if (provider === "openai") {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error("OpenAI is not configured");
+    model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+    url = "https://api.openai.com/v1/chat/completions";
+    headers.Authorization = "Bearer " + key;
+    body = { model: model, messages: messages, temperature: 0.3, max_tokens: 500 };
+  } else if (provider === "claude") {
+    const key = process.env.ANTHROPIC_API_KEY;
+    if (!key) throw new Error("Claude is not configured");
+    model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
+    url = "https://api.anthropic.com/v1/messages";
+    headers["x-api-key"] = key;
+    headers["anthropic-version"] = "2023-06-01";
+    body = {
+      model: model,
+      max_tokens: 500,
+      system: systemMessage ? systemMessage.content : "",
+      messages: conversation.map(function(m) {
+        return { role: m.role === "assistant" ? "assistant" : "user", content: m.content };
+      })
+    };
+  } else if (provider === "gemini") {
+    const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+    if (!key) throw new Error("Gemini is not configured");
+    model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
+    body = {
+      systemInstruction: systemMessage ? { parts: [{ text: systemMessage.content }] } : undefined,
+      contents: conversation.map(function(m) {
+        return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] };
+      }),
+      generationConfig: { temperature: 0.3, maxOutputTokens: 500 }
+    };
+  } else {
+    const key = process.env.GROQ_API_KEY;
+    if (!key) throw new Error("Groq is not configured");
+    model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+    url = "https://api.groq.com/openai/v1/chat/completions";
+    headers.Authorization = "Bearer " + key;
+    body = { model: model, messages: messages, temperature: 0.3, max_tokens: 500 };
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(3200)
+  });
+  let data = {};
+  try { data = await response.json(); } catch (_) {}
+  if (!response.ok) {
+    const status = response.status;
+    const message = data && data.error && data.error.message;
+    throw new Error(provider + " request failed (" + status + ")" + (message ? ": " + String(message).slice(0, 180) : ""));
+  }
+
+  let answer = "";
+  if (provider === "claude") {
+    answer = (data.content || []).filter(function(part) { return part && part.type === "text"; })
+      .map(function(part) { return part.text || ""; }).join("\n");
+  } else if (provider === "gemini") {
+    answer = data.candidates && data.candidates[0] && data.candidates[0].content &&
+      data.candidates[0].content.parts ? data.candidates[0].content.parts.map(function(part) { return part.text || ""; }).join("\n") : "";
+  } else {
+    answer = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || "";
+  }
+  if (typeof answer !== "string" || !answer.trim()) throw new Error(provider + " returned an empty answer");
+  return { answer: answer.trim(), provider: provider, model: model };
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   const action = req.query && req.query.action;
 
   try {
     if (req.method === "GET" && action === "health") {
+      const aiProviders = getConfiguredAIProviders();
       const checks = {
-        ai: !!process.env.GROQ_API_KEY,
+        ai: Object.keys(aiProviders).some(function(name) { return aiProviders[name]; }),
+        aiProviders: aiProviders,
         pushPublicKey: !!process.env.VAPID_PUBLIC_KEY,
         pushPrivateKey: !!process.env.VAPID_PRIVATE_KEY,
         pushSubject: !!process.env.VAPID_SUBJECT,
@@ -192,9 +298,19 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, total: ids.length, sent, failed, removed });
     }
 
-    // 5. AI BACKGROUND NOTIFICATION
+    // 5. DAGBO AI — task routing with one automatic fallback provider.
     if (req.method === "POST" && action === "ask-ai") {
-      const { question, name, subscription, marketContext, history } = req.body || {};
+      const { question, name, subscription, marketContext, history, provider: requestedProvider } = req.body || {};
+      if (typeof question !== "string" || !question.trim() || question.length > 2000) {
+        return res.status(400).json({ error: "A valid question is required" });
+      }
+
+      const rate = await checkAiRateLimit(req);
+      if (!rate.allowed) {
+        res.setHeader("Retry-After", String(AI_RATE_WINDOW_SECONDS));
+        return res.status(429).json({ error: "Dagbo AI is receiving too many requests. Please wait a few minutes and try again." });
+      }
+
       const safeMarketContext = typeof marketContext === "string" ? marketContext.slice(0, 2500) : "";
       const safeName = typeof name === "string" ? name.replace(/[^a-zA-Z0-9 _-]/g, "").trim().slice(0, 32) : "Oga";
       const safeHistory = Array.isArray(history) ? history.slice(-10).filter(function(item) {
@@ -203,9 +319,8 @@ module.exports = async function handler(req, res) {
       }).map(function(item) {
         return { role: item.role, content: item.content.slice(0, 1200) };
       }) : [];
-      const groqKey = process.env.GROQ_API_KEY;
-      // Fetch a real Twelve Data quote for explicit pair questions or the pair
-      // selected in the user's saved chart snapshots. Never ask the model to guess.
+
+      // For explicit live-price questions, only pass a verified Twelve Data quote.
       const pairSymbols = {
         XAUUSD:"XAU/USD", GOLD:"XAU/USD", EURUSD:"EUR/USD", GBPUSD:"GBP/USD",
         USDJPY:"USD/JPY", GBPJPY:"GBP/JPY", AUDUSD:"AUD/USD", USDCHF:"USD/CHF",
@@ -213,11 +328,13 @@ module.exports = async function handler(req, res) {
         BTCUSD:"BTC/USD", ETHUSD:"ETH/USD", US30:"DJI", US100:"NDX", NAS100:"NDX", US500:"SPX"
       };
       const asksPrice = /\b(price|quote|trading at|how much is|current value)\b/i.test(question);
-      let quotePair = Object.keys(pairSymbols).find(pair => new RegExp("\\b" + pair + "\\b", "i").test(question));
+      let quotePair = Object.keys(pairSymbols).find(function(pair) {
+        return new RegExp("\\b" + pair + "\\b", "i").test(question);
+      });
       if (!quotePair && asksPrice && /\b(this pair|current pair|selected pair)\b/i.test(question) && safeMarketContext) {
         try {
           const snapshot = JSON.parse(safeMarketContext);
-          const walk = (value) => {
+          const walk = function(value) {
             if (!value || typeof value !== "object") return null;
             for (const key of Object.keys(value)) {
               const normalized = key.toUpperCase().replace("/", "").replace("_", "");
@@ -237,7 +354,7 @@ module.exports = async function handler(req, res) {
           try {
             const quoteUrl = "https://api.twelvedata.com/quote?symbol=" +
               encodeURIComponent(pairSymbols[quotePair]) + "&apikey=" + encodeURIComponent(quoteKey);
-            const quoteResponse = await fetch(quoteUrl);
+            const quoteResponse = await fetch(quoteUrl, { signal: AbortSignal.timeout(1800) });
             const quote = await quoteResponse.json();
             const price = Number(quote.close || quote.price);
             if (quoteResponse.ok && Number.isFinite(price) && price > 0) {
@@ -255,60 +372,55 @@ module.exports = async function handler(req, res) {
             : "No pair could be identified from the question or saved chart context. Ask which pair the user means.";
         }
       }
-      if (typeof question !== "string" || !question.trim() || question.length > 2000 || !groqKey) {
-        return res.status(!groqKey ? 503 : 400).json({
-          error: !groqKey ? "AI service is not configured on the server" : "A valid question is required"
+
+      const systemPrompt = "You are DAGBO AI Market Commander for " + (safeName || "Oga") +
+        ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise, clear and Nigerian-friendly; use Pidgin naturally when useful. For live-price questions, use only a verified live quote supplied in the context; if unavailable, say so and never guess. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When asked for a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit only when supported by fresh market data and a valid setup. If fresh data or a valid setup is missing, return WAIT and say entry/SL/TP are unavailable. Never guarantee profits. Ordinary answers should usually be 1-4 short sentences.";
+      const userContent = question.trim() +
+        (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") +
+        (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "");
+      const messages = [{ role: "system", content: systemPrompt }]
+        .concat(safeHistory)
+        .concat([{ role: "user", content: userContent }]);
+
+      const configured = getConfiguredAIProviders();
+      const validRequested = ["openai", "claude", "gemini", "groq"].includes(String(requestedProvider || "").toLowerCase());
+      const primary = validRequested ? String(requestedProvider).toLowerCase() : chooseAIProvider(question);
+      const providerOrder = getAIProviderOrder(primary, configured);
+      if (!providerOrder.length) {
+        return res.status(503).json({
+          error: "No AI provider is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GROQ_API_KEY in Vercel."
         });
       }
 
-      const rate = await checkAiRateLimit(req);
-      if (!rate.allowed) {
-        res.setHeader("Retry-After", String(AI_RATE_WINDOW_SECONDS));
-        return res.status(429).json({ error: "Dagbo AI is receiving too many requests. Please wait a few minutes and try again." });
+      let result = null;
+      let lastError = null;
+      const attempts = [];
+      for (const providerName of providerOrder) {
+        const startedAt = Date.now();
+        try {
+          result = await callAIProvider(providerName, messages);
+          attempts.push({ provider: providerName, ok: true, latencyMs: Date.now() - startedAt });
+          break;
+        } catch (error) {
+          lastError = error;
+          attempts.push({ provider: providerName, ok: false, latencyMs: Date.now() - startedAt });
+          console.warn("DAGBO AI provider unavailable:", providerName, error.message);
+        }
+      }
+      if (!result) {
+        return res.status(502).json({
+          error: "DAGBO AI providers could not answer. Check provider keys, model access and API billing.",
+          attempts: attempts
+        });
       }
 
-      // Keep the Groq API key on the server; never accept it from the browser.
-      const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${groqKey}`
-        },
-        body: JSON.stringify({
-          model: "openai/gpt-oss-120b",
-          messages: [
-            {
-              role: "system",
-              content: "You are DAGBO AI Market Commander for " + (safeName || "Oga") + ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise: greetings get one short greeting, simple questions get one direct answer, and use bullets only when useful. Speak in clear Nigerian-friendly English or Pidgin when natural. For live-price questions, use only a verified live quote supplied in the context below; if unavailable, say so and ask which pair is meant. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When the user requests a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit, plus one brief reason. Entry, SL and TP must be derived from fresh market data and a clearly defined setup, with correct price ordering for the direction. If fresh data or a valid setup is missing, return WAIT and explicitly say entry/SL/TP are not available; never fabricate levels. Never guarantee profits. Keep ordinary answers to 1-3 short sentences."
-            },
-            ...safeHistory,
-            { role: "user", content: question.trim() + (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") + (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "") }
-          ],
-          temperature: 0.3,
-          max_tokens: 220
-        })
-      });
-
-      const groqData = await groqRes.json();
-      if (!groqRes.ok) {
-        console.error("DAGBO GROQ ERROR:", groqData.error && groqData.error.message);
-        return res.status(502).json({ error: "The AI service could not answer right now" });
-      }
-
-      const rawAnswer = groqData.choices && groqData.choices[0] &&
-        groqData.choices[0].message && groqData.choices[0].message.content;
-      if (typeof rawAnswer !== "string" || !rawAnswer.trim()) {
-        return res.status(502).json({ error: "The AI returned an empty answer" });
-      }
-
-      // Notify only the device that asked the question, never every app subscriber.
+      // Notify only the device that asked the question. Notification failure never blocks the answer.
       if (validSubscription(subscription)) {
         try {
-          // Push is optional: a missing VAPID setup must not block the AI answer.
           configureVapid();
           await webpush.sendNotification(subscription, JSON.stringify({
             title: "🤖 Dagbo AI Answer",
-            body: (rawAnswer.trim().replace(/\s+/g, " ").slice(0, 190) + (rawAnswer.trim().length > 190 ? "…" : "")),
+            body: result.answer.replace(/\s+/g, " ").slice(0, 190) + (result.answer.length > 190 ? "…" : ""),
             url: "/ai.html",
             tag: "dagbo-ai-" + Date.now()
           }), { TTL: 60, urgency: "normal" });
@@ -328,8 +440,15 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // Return plain text; let the page render it safely rather than injecting HTML.
-      return res.status(200).json({ success: true, answer: rawAnswer.trim() });
+      return res.status(200).json({
+        success: true,
+        answer: result.answer,
+        provider: result.provider,
+        model: result.model,
+        fallbackUsed: result.provider !== primary,
+        routingReason: validRequested ? "Manually selected provider" : "Automatic task routing",
+        attempts: attempts
+      });
     }
 
     if (req.method === "POST" && action === "scan-summary") {
