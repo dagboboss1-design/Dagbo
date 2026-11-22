@@ -255,27 +255,24 @@ async function sendNewsAlerts(apiKey) {
   return { eventsChecked, newsAlerts, preNewsSignals };
 }
 async function fetchTradeMarket(pair, apiKey) {
-  const symbol = SYMBOLS[pair];
-  if (!symbol) throw new Error("Unsupported trade pair " + pair);
-  const url = "https://api.twelvedata.com/time_series?symbol=" +
-    encodeURIComponent(symbol) + "&interval=15min&outputsize=3&timezone=UTC&apikey=" +
-    encodeURIComponent(apiKey);
-  const response = await fetch(url);
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
+  const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
+  const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
-  if (!response.ok || data.status === "error" || !Array.isArray(data.values) || !data.values.length) {
-    throw new Error(data.message || "No trade-monitor candles");
+  if (!response.ok || data.stale || !Array.isArray(data.values) || !data.values.length) {
+    throw new Error(data.error || "No fresh trade-monitor candles for " + pair);
   }
-  // Twelve Data returns newest candles first. The newest candle's high/low
-  // captures an intrabar touch even if price later moves away before close.
-  const candle = data.values[0];
-  const high = num(candle.high), low = num(candle.low), close = num(candle.close);
-  if ([high, low, close].some(v => v === null)) throw new Error("Invalid trade-monitor candle");
-  return {
-    pair, entry: close, candleHigh: high, candleLow: low,
-    candleTime: candle.datetime || null, signal: null
-  };
+  const candles = data.values.map(c => {
+    const raw = String(c.datetime || "");
+    const time = Date.parse(raw.replace(" ", "T") + (raw.includes("Z") || /[+-]\d\d:\d\d$/.test(raw) ? "" : "Z"));
+    return { time, datetime:raw, high:num(c.high), low:num(c.low), close:num(c.close) };
+  }).filter(c => Number.isFinite(c.time) && [c.high,c.low,c.close].every(v => v !== null))
+    .sort((a,b)=>a.time-b.time);
+  if (!candles.length) throw new Error("Invalid trade-monitor candle for " + pair);
+  const candle = candles[candles.length-1];
+  return { pair, entry:candle.close, candleHigh:candle.high, candleLow:candle.low,
+    candleTime:candle.datetime || null, signal:null };
 }
-
 async function monitorTrades(marketData, apiKey) {
   const devices = await redis.smembers("dagbo:trades:devices");
   let closed = 0, warnings = 0, checked = 0, dataErrors = [];
