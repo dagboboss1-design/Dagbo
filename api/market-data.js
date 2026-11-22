@@ -2,7 +2,7 @@ const SYMBOLS = {
   XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY", GBPJPY: "GBP/JPY",
   AUDUSD: "AUD/USD", USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
-  EURJPY: "EUR/JPY", EURGBP: "EUR/GBP",
+  EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK",
   US30: "DJI", US100: "NDX", NAS100: "NDX", US500: "SPX"
 };
 
@@ -93,7 +93,7 @@ async function fetchFcsFallback(pair, tf) {
   const key = process.env.FCS_API_KEY;
   const period = fcsPeriod(tf);
   if (!key || !period) return null;
-  const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP"];
+  const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","USDSEK"];
   const commodities = ["XAUUSD","GOLD","XAGUSD","SILVER"];
   if (!fxPairs.includes(pair) && !commodities.includes(pair)) return null;
   const symbol = pair === "GOLD" ? "XAUUSD" : (pair === "XAGUSD" ? "SILVER" : pair);
