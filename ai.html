@@ -379,6 +379,7 @@ function askGroq(userQ){
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: String(userQ),
+          task: (function(){ try { return localStorage.getItem('dagbo_ai_task') || 'assistant'; } catch(e) { return 'assistant'; } })(),
           name: name,
           history: _hist.slice(-11, -1).map(function(item){ return { role: item.role === 'me' ? 'user' : 'assistant', content: item.text }; }),
           subscription: subscription,
