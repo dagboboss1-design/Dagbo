@@ -152,23 +152,41 @@ async function getHighImpactEvents(now) {
   return Array.from(unique.values()).sort((a,b) => a.date - b.date);
 }
 
-async function fetch30mMove(symbol,apiKey){
- const url="https://api.twelvedata.com/time_series?symbol="+encodeURIComponent(symbol)+"&interval=1min&outputsize=35&apikey="+encodeURIComponent(apiKey);
- const response=await fetch(url),data=await response.json();
- if(!response.ok||data.status==="error"||!Array.isArray(data.values))throw new Error("30m candles unavailable for "+symbol+": "+(data.message||response.status));
- const rows=data.values.map(v=>({time:Date.parse(v.datetime),close:Number(v.close)})).filter(v=>Number.isFinite(v.time)&&Number.isFinite(v.close)&&v.close>0).sort((a,b)=>a.time-b.time);
- if(rows.length<2)throw new Error("Not enough candles for "+symbol);
- const latest=rows[rows.length-1],target=latest.time-1800000;let oldest=rows[0];
- for(const row of rows)if(Math.abs(row.time-target)<Math.abs(oldest.time-target))oldest=row;
- const span=(latest.time-oldest.time)/60000;if(span<25||span>36)throw new Error("Insufficient 30m history for "+symbol);
- return {symbol,changePct:(latest.close-oldest.close)/oldest.close*100};
+function pairCodeFromSymbol(symbol) {
+  return String(symbol || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+}
+async function fetchSharedCandles(symbol, timeframe) {
+  const pair = pairCodeFromSymbol(symbol);
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
+  const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=" + encodeURIComponent(timeframe);
+  const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+  const data = await response.json();
+  if (!response.ok || data.stale || !Array.isArray(data.values)) throw new Error("Fresh candles unavailable for " + pair + ": " + String(data.error || response.status));
+  const rows = data.values.map(v => {
+    const raw = String(v.datetime || "");
+    const time = Date.parse(raw.replace(" ", "T") + (raw.includes("Z") || /[+-]\d\d:\d\d$/.test(raw) ? "" : "Z"));
+    return { time, open:Number(v.open), high:Number(v.high), low:Number(v.low), close:Number(v.close) };
+  }).filter(v => Number.isFinite(v.time) && [v.open,v.high,v.low,v.close].every(Number.isFinite) &&
+    v.open>0 && v.high>=Math.max(v.open,v.close) && v.low<=Math.min(v.open,v.close) && v.low>0)
+    .sort((a,b)=>a.time-b.time);
+  if (rows.length < 2) throw new Error("Insufficient valid candles for " + pair);
+  return rows;
+}
+async function fetch30mMove(symbol) {
+  const rows = await fetchSharedCandles(symbol, "1");
+  const latest = rows[rows.length-1], target = latest.time - 1800000;
+  let oldest = rows[0];
+  for (const row of rows) if (Math.abs(row.time-target) < Math.abs(oldest.time-target)) oldest = row;
+  const span = (latest.time-oldest.time)/60000;
+  if (span < 25 || span > 36) throw new Error("Insufficient 30m history for " + symbol);
+  return { symbol, changePct:(latest.close-oldest.close)/oldest.close*100 };
 }
 const NEWS_PAIR_MAP={EUR:["EUR/USD","EUR/JPY","EUR/GBP"],GBP:["GBP/USD","GBP/JPY","EUR/GBP"],JPY:["USD/JPY","EUR/JPY","GBP/JPY"],AUD:["AUD/USD","AUD/JPY","AUD/NZD"],NZD:["NZD/USD","NZD/JPY","AUD/NZD"],CAD:["USD/CAD","CAD/JPY","AUD/CAD"],CHF:["USD/CHF","CHF/JPY","EUR/CHF"]};
-async function calculateNewsBias(event,apiKey){
- const currency=String(event.currency||"").toUpperCase();if(!apiKey)return{action:"WAIT",confidence:"LOW",reason:"TWELVE_DATA_API_KEY is not configured."};
+async function calculateNewsBias(event){
+ const currency=String(event.currency||"").toUpperCase();
  if(currency==="USD"){
   const symbols=["EUR/USD","USD/JPY","GBP/USD","USD/CAD","USD/SEK","USD/CHF","XAU/USD"];
-  const rows=await Promise.all(symbols.map(s=>fetch30mMove(s,apiKey))),m=Object.fromEntries(rows.map(r=>[r.symbol,r]));
+  const rows=await Promise.all(symbols.map(s=>fetch30mMove(s))),m=Object.fromEntries(rows.map(r=>[r.symbol,r]));
   const weights={"EUR/USD":-0.576,"USD/JPY":0.136,"GBP/USD":-0.119,"USD/CAD":0.091,"USD/SEK":0.042,"USD/CHF":0.036};
   const dxy=Object.entries(weights).reduce((sum,[s,w])=>sum+w*Math.log(1+m[s].changePct/100)*100,0),gold=m["XAU/USD"].changePct,score=-dxy*.65+gold*.35;
   const action=score>.035?"BUY GOLD":score<-.035?"SELL GOLD":"WAIT",confidence=Math.abs(score)>=.12?"HIGH":Math.abs(score)>=.06?"MEDIUM":"LOW";
@@ -176,7 +194,7 @@ async function calculateNewsBias(event,apiKey){
   return{action,confidence,score:Number(score.toFixed(4)),evidence:"Previous 30m: synthetic DXY "+(dxy>=0?"+":"")+dxy.toFixed(3)+"%; Gold "+(gold>=0?"+":"")+gold.toFixed(3)+"%. Correlated pairs: "+fx};
  }
  const symbols=NEWS_PAIR_MAP[currency];if(!symbols)return{action:"WAIT",confidence:"LOW",reason:"No correlation basket configured for "+currency+"."};
- const rows=await Promise.all(symbols.map(s=>fetch30mMove(s,apiKey)));
+ const rows=await Promise.all(symbols.map(s=>fetch30mMove(s)));
  const strength=rows.reduce((sum,r)=>{const [base,quote]=r.symbol.split("/");return sum+r.changePct*(base===currency?1:quote===currency?-1:0);},0)/rows.length;
  const confidence=Math.abs(strength)>=.12?"HIGH":Math.abs(strength)>=.06?"MEDIUM":"LOW";
  const evidence=rows.map(r=>{const [base]=r.symbol.split("/");const dir=r.changePct>=0?"BUY":"SELL";return r.symbol+" "+dir+" ("+(r.changePct>=0?"+":"")+r.changePct.toFixed(3)+"%)";}).join("; ");
@@ -222,12 +240,10 @@ module.exports = async function handler(req,res) {
       let title = "🚨 " + released.currency + " NEWS RELEASED";
       if (released.currency === "USD") {
         try {
-          const candleUrl = "https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=1min&outputsize=2&apikey=" + encodeURIComponent(apiKey);
-          const response = await fetch(candleUrl);
-          const data = await response.json();
-          if (response.ok && data.status !== "error" && Array.isArray(data.values) && data.values.length) {
-            const candle = data.values[0];
-            const open = Number(candle.open), close = Number(candle.close);
+          const candles = await fetchSharedCandles("XAU/USD", "1");
+          if (candles.length) {
+            const candle = candles[candles.length-1];
+            const open = candle.open, close = candle.close;
             const pct = open > 0 ? (close-open)/open*100 : 0;
             if (Math.abs(pct) >= 0.30) {
               title = pct > 0 ? "🚀 POST-NEWS GOLD SPIKE UP" : "🔻 POST-NEWS GOLD SPIKE DOWN";
