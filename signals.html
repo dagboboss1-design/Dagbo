@@ -105,12 +105,40 @@
 
 
 
+<script>
+(function(){
+  var timer=setTimeout(function(){
+    var status=document.getElementById('loadingText');
+    if(status && /Connecting|Starting/i.test(status.textContent||'')){
+      status.textContent='Scanner could not start. A page script failed to initialize. Reload this page; if it continues, report this message.';
+      var grid=document.getElementById('signals-grid');
+      if(grid){
+        var detail=document.createElement('div');
+        detail.className='dg-card';
+        detail.style.cssText='margin-top:10px;border:1px solid #b7791f;padding:14px';
+        detail.textContent='DAGBO checked the page startup and did not detect the scanner starting. This is not an API-limit message.';
+        grid.appendChild(detail);
+      }
+    }
+  },8000);
+  window.addEventListener('dagbo:scanner-started',function(){clearTimeout(timer);},{once:true});
+  window.addEventListener('error',function(event){
+    var status=document.getElementById('loadingText');
+    if(status && /Connecting|Starting|Scanning/i.test(status.textContent||'')){
+      status.textContent='Scanner startup error: '+String(event.message||'A page script failed')+'. Reload to retry.';
+    }
+  });
+})();
+</script>
 <script src="pwa.js" defer></script>
 <script src="strategy-profiles.js"></script>
 <script src="dagbo-confluence.js"></script>
 <script>
 (function(){
   'use strict';
+
+  var initialStatus = document.getElementById('loadingText');
+  if (initialStatus) initialStatus.textContent = 'Starting DAGBO scanner...';
 
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
@@ -326,7 +354,13 @@
       var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 35000) : null;
       var res, data;
       try {
-        res = await fetch(url, controller ? { signal: controller.signal } : {});
+        res = await fetch(url, controller
+          ? { signal: controller.signal, cache: 'no-store', headers: { 'Accept': 'application/json' } }
+          : { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+        var contentType = res.headers && res.headers.get ? (res.headers.get('content-type') || '') : '';
+        if (contentType && contentType.indexOf('application/json') === -1) {
+          throw new Error('Market-data endpoint returned a non-JSON response (HTTP ' + res.status + ').');
+        }
         data = await res.json();
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
@@ -1008,6 +1042,7 @@
   try { updateScalpStats(); }
   catch (error) { console.warn('DAGBO scalp statistics unavailable:', error); }
   loadAllSignals({resume:true});
+  window.dispatchEvent(new Event('dagbo:scanner-started'));
   try { startLifecycleClock(); }
   catch (error) { console.warn('DAGBO signal lifecycle clock unavailable:', error); }
   // Scan once per selected candle timeframe while the page is active.
