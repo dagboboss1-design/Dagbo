@@ -1,6 +1,7 @@
 const webpush = require("web-push");
 const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
+const confluence = require("../public/dagbo-confluence.js");
 
 const SUBSCRIPTIONS = "dagbo:push:subscriptions";
 const aiRateFallback = new Map();
@@ -342,8 +343,9 @@ module.exports = async function handler(req, res) {
       const asksPrice = /\b(price|quote|trading at|how much is|current value)\b/i.test(question);
       const asksAnalysis = /\b(analy[sz]e|analysis|chart|signal|setup|buy|sell|long|short|trend|direction|entry|technical|market structure|support|resistance|bias)\b/i.test(question);
       const normalizedQuestion = question.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      const tokenQuestion = " " + question.toUpperCase().replace(/[^A-Z0-9]+/g, " ") + " ";
       let quotePair = Object.keys(pairSymbols).find(function(pair) {
-        return new RegExp("\b" + pair + "\b", "i").test(question) ||
+        return tokenQuestion.indexOf(" " + pair + " ") >= 0 ||
           normalizedQuestion.indexOf(pair.replace(/[^A-Z0-9]/g, "")) >= 0;
       });
       if (!quotePair && (asksPrice || asksAnalysis) && /\b(this pair|current pair|selected pair|my chart|the chart)\b/i.test(question) && safeMarketContext) {
@@ -365,46 +367,83 @@ module.exports = async function handler(req, res) {
       let liveQuoteContext = "";
       let liveCandleContext = "";
       if (asksAnalysis && quotePair) {
-        const tf = /\b(5m|5 min|5-minute|5 minute)\b/i.test(question) ? "5" :
-          /\b(30m|30 min|30-minute|30 minute)\b/i.test(question) ? "30" :
-          /\b(1h|1 hour|hourly)\b/i.test(question) ? "60" :
-          /\b(4h|4 hour|4-hour)\b/i.test(question) ? "240" : "15";
+        const tf = /\\b(5m|5 min|5-minute|5 minute)\\b/i.test(question) ? "5" :
+          /\\b(30m|30 min|30-minute|30 minute)\\b/i.test(question) ? "30" :
+          /\\b(1h|1 hour|hourly)\\b/i.test(question) ? "60" :
+          /\\b(4h|4 hour|4-hour)\\b/i.test(question) ? "240" : "15";
+        const timeframeMs = { "5":300000, "15":900000, "30":1800000, "60":3600000, "240":14400000 };
+        const minCandles = tf === "5" ? 30 : 60;
         try {
-          const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
+          const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\\/\\//, "");
           const candleUrl = "https://" + host + "/api/market-data?pair=" +
             encodeURIComponent(quotePair) + "&tf=" + encodeURIComponent(tf);
           const candleResponse = await fetch(candleUrl, {
             headers: { "Cache-Control": "no-cache" },
-            signal: AbortSignal.timeout(2200)
+            signal: AbortSignal.timeout(3200)
           });
           const candleData = await candleResponse.json();
           if (candleResponse.ok && !candleData.stale &&
-              Array.isArray(candleData.values) && candleData.values.length >= 5) {
-            const bars = candleData.values.slice(-20).map(function(bar) {
+              Array.isArray(candleData.values) && candleData.values.length >= minCandles) {
+            const ordered = candleData.values.slice().sort(function(a,b) {
+              function stamp(x) {
+                const raw = String(x.datetime || "");
+                return Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? "" : "Z"));
+              }
+              return stamp(a) - stamp(b);
+            });
+            const bars = ordered.filter(function(bar) {
+              const raw = String(bar.datetime || "");
+              const stamp = Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? "" : "Z"));
+              return Number.isFinite(stamp) && stamp + timeframeMs[tf] <= Date.now() &&
+                [bar.open,bar.high,bar.low,bar.close].every(function(v){return Number.isFinite(Number(v));});
+            }).map(function(bar) {
               return {
-                time: bar.datetime,
+                datetime: bar.datetime,
                 open: Number(bar.open), high: Number(bar.high),
                 low: Number(bar.low), close: Number(bar.close),
                 volume: Number(bar.volume || 0)
               };
-            }).filter(function(bar) {
-              return [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite);
-            });
-            if (bars.length >= 5) {
-              liveCandleContext = "FRESH MARKET-DATA OHLC candles for " + quotePair +
-                " on " + tf + " timeframe. Source: " + String(candleData.provider || "market-data service") +
-                ". Newest candle timestamp " + bars[bars.length - 1].time +
-                ". Candles oldest-to-newest: " + JSON.stringify(bars) +
-                ". " + String(candleData.proxyNotice || "") + " Use these candles for structure and setup analysis; do not claim indicators that were not calculated.";
+            }).slice(-100);
+            if (bars.length >= minCandles) {
+              const profile = tf === "5" ? "scalp" : tf === "240" ? "swing" : "intraday";
+              const edge = confluence.analyze(bars, quotePair, profile, {
+                enabledGroups: ["Trend","Momentum","Volatility","Volume","Chart pattern","Market structure"]
+              });
+              const proxyText = String(candleData.proxyNotice || "");
+              const recentBars = bars.slice(-12);
+              if (edge) {
+                const hasTrade = edge.direction === "BUY" || edge.direction === "SELL";
+                liveCandleContext =
+                  "DAGBO EDGE ENGINE RESULT (calculated from the newest fully closed candles; follow this result exactly). " +
+                  "Market: " + quotePair + (candleData.sourceSymbol ? " · data instrument " + candleData.sourceSymbol : "") +
+                  ". Timeframe: " + tf + "m. Provider: " + String(candleData.provider || "market-data service") +
+                  ". Result: " + edge.signal + ". Direction: " + edge.direction +
+                  ". Confluence quality score: " + edge.confidence + "% (" + edge.quality + "); this is not a win probability." +
+                  ". Threshold: " + edge.threshold + ". BUY group score: " + edge.buyScore +
+                  ". SELL group score: " + edge.sellScore + ". ATR active: " + edge.atrOk +
+                  ". Evidence: " + (edge.evidence || []).join("; ") +
+                  (hasTrade ? ". Entry: " + edge.entry + ". Stop loss: " + edge.stopLoss +
+                    ". Take profit 1: " + edge.takeProfit + ". Take profit 2: " + edge.tp2 : ". No entry, stop loss or take profit: the engine says NO TRADE.") +
+                  ". Latest closed candle: " + edge.candleTime +
+                  ". Recent fully closed OHLC candles: " + JSON.stringify(recentBars) +
+                  (proxyText ? ". DATA SOURCE NOTICE: " + proxyText : "") +
+                  ". Do not reverse the engine direction, do not create levels for NO TRADE, and explain the evidence briefly.";
+              } else {
+                liveCandleContext = "DAGBO EDGE ENGINE could not calculate a valid setup for " + quotePair +
+                  " on " + tf + "m. Return WAIT and do not invent entry, SL or TP.";
+              }
+            } else {
+              liveCandleContext = "Only " + bars.length + " fully closed candles are available for " + quotePair +
+                ". At least " + minCandles + " are required by the DAGBO confluence engine. Return WAIT and do not invent entry, SL or TP.";
             }
           } else {
             liveCandleContext = "Fresh candles are unavailable for " + quotePair +
               ". Provider response: " + String(candleData.error || "No current candles returned") +
-              ". Do not issue a directional trade call or invent entry/SL/TP.";
+              ". Return WAIT and do not invent entry, SL or TP.";
           }
         } catch (candleError) {
           liveCandleContext = "Live candle request failed for " + quotePair +
-            ". Do not issue a directional trade call or invent entry/SL/TP.";
+            ". Return WAIT and do not invent entry, SL or TP.";
           console.warn("AI Commander candle context unavailable:", candleError.message);
         }
       } else if (asksAnalysis && !quotePair) {
@@ -446,7 +485,7 @@ module.exports = async function handler(req, res) {
         !/\b(analy[sz]e|analysis|chart|signal|setup|buy|sell|long|short|trend|direction|entry|technical|market structure|support|resistance|bias|compare|difference|explain|teach|steps|how to|how do i|why|calculate|review|journal|news|strategy|plan)\b/i.test(question);
       const answerTokenLimit = isSimpleQuestion ? 100 : 500;
       const systemPrompt = (taskInstructions[selectedTask] || "You are DAGBO's AI Market Commander.") + " You are assisting " + (safeName || "Oga") +
-        ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise, clear and Nigerian-friendly; use Pidgin naturally when useful. For simple factual questions, answer in ONE short sentence, ideally under 20 words. Do not add greetings, headings, bullet points, repeated explanations or unsolicited follow-up. For detailed requests, give only the details needed. For live-price questions, use only a verified live quote supplied in the context; if unavailable, say so and never guess. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When asked for a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit only when supported by fresh market data and a valid setup. If fresh data or a valid setup is missing, return WAIT and say entry/SL/TP are unavailable. Never guarantee profits. Ordinary answers should usually be 1-4 short sentences.";
+        ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise, clear and Nigerian-friendly; use Pidgin naturally when useful. For simple factual questions, answer in ONE short sentence, ideally under 20 words. Do not add greetings, headings, bullet points, repeated explanations or unsolicited follow-up. For detailed requests, give only the details needed. For live-price questions, use only a verified live quote supplied in the context; if unavailable, say so and never guess. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When asked for a trade signal or setup, follow the supplied DAGBO EDGE ENGINE RESULT exactly. Never change its direction or price levels. If it says NO TRADE or the fresh candles are insufficient, return WAIT and say entry/SL/TP are unavailable. Never guarantee profits. Ordinary answers should usually be 1-4 short sentences.";
       const userContent = question.trim() +
         (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") +
         (liveCandleContext ? "\n\nLIVE CHART CONTEXT: " + liveCandleContext : "") +
@@ -467,7 +506,7 @@ module.exports = async function handler(req, res) {
       let result = null;
       let lastError = null;
       const attempts = [];
-      const aiDeadline = Date.now() + 7000;
+      const aiDeadline = Date.now() + 8200;
       for (const providerName of providerOrder) {
         const remainingMs = aiDeadline - Date.now();
         if (remainingMs < 900) break;
