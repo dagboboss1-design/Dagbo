@@ -45,7 +45,7 @@
   <div class="ai-header-card" style="margin-top:16px">
     <div class="ai-avatar" aria-hidden="true">◈</div>
     <div style="flex:1">
-      <div style="font-size:18px;font-weight:700;display:flex;align-items:center">Dagbo AI <span class="ai-status">AI assistant</span></div>
+      <div style="font-size:18px;font-weight:700;display:flex;align-items:center">AI Commander <span class="ai-status">AI assistant</span></div>
       <div class="dg-muted" style="font-size:13px;margin-top:2px">AI Market Commander · Trading teacher · Signal explainer</div>
     </div>
   </div>
@@ -95,8 +95,8 @@ function getName(){ var s = readSettings(); return (s.name || 'Oga').replace(/^O
 function getAutoRead(){ return readSettings().autoRead === true; }
 function getRiskPct(){ return Number(readSettings().risk) || 1; }
 function getAccount(){ return Number(readSettings().accountSize) || 100; }
-function getGroqKey(){ return ''; }
-function hasGroqKey(){ return true; }
+function getAIKey(){ return ''; }
+function hasAIKey(){ return true; }
 
 var NFP_EXCEPTIONS = { '2013-10':'2013-10-22', '2025-01':'2025-01-10', '2026-01':'2026-01-09' };
 function firstFriday(year, mIdx){ var d = new Date(year, mIdx, 1); var offset = (5 - d.getDay() + 7) % 7; return new Date(year, mIdx, 1 + offset); }
@@ -343,7 +343,7 @@ function compose(userQ){
   var raw = String(userQ).trim(), low = raw.toLowerCase();
   
   if (/\b(hi|hello|hey|good morning|good afternoon|good evening)\b[!.? ]*$/i.test(low)) return "Hi! Which pair are we checking?";
-  if (/\b(current|live|price|quote)\b/i.test(low)) return { type: "groq", query: raw };
+  if (/\b(current|live|price|quote)\b/i.test(low)) return { type: "ai", query: raw };
   if (/\b(should|can|make)\b i (buy|sell)\b/i.test(low)) return "I no dey give trade calls, I only teach. Check the Chart page.";
   
   var e = { numbers: raw.match(/\d+(?:\.\d+)?/g) || [], amount: null, percent: null, year: null };
@@ -357,10 +357,10 @@ function compose(userQ){
   var results = matchKB(raw);
   if (results.length > 0 && results[0].score >= 30) return { type: 'lesson', text: KB[results[0].idx].a, title: KB[results[0].idx].k[0] };
 
-  return { type: 'groq', query: raw };
+  return { type: 'ai', query: raw };
 }
 
-function askGroq(userQ){
+function askAI(userQ){
   return new Promise(function(resolve, reject){
     var name = getName();
 
@@ -399,7 +399,7 @@ function askGroq(userQ){
     }).then(function(res){
       return res.json().then(function(data){
         if (!res.ok || !data.success || typeof data.answer !== 'string') {
-          throw new Error(data.error || 'Dagbo AI could not answer right now');
+          throw new Error(data.error || 'AI Commander could not answer right now');
         }
         resolve({
           answer: data.answer,
@@ -427,7 +427,7 @@ function saveChatHistory() {
     _hist = _hist.slice(-200);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(_hist));
   } catch(e) {
-    console.warn('Could not save Dagbo AI history:', e);
+    console.warn('Could not save AI Commander history:', e);
   }
 }
 
@@ -475,7 +475,7 @@ function loadChatHistory() {
 
     return true;
   } catch(e) {
-    console.warn('Could not load Dagbo AI history:', e);
+    console.warn('Could not load AI Commander history:', e);
     _hist = [];
     return false;
   }
@@ -547,10 +547,10 @@ function sendMessage() {
     if (reply && reply.type === 'lesson') {
       addLessonMessage(reply);
       if (getAutoRead()) speak(reply.text);
-    } else if (reply && reply.type === 'groq') {
-      askGroq(reply.query).then(function(result) {
+    } else if (reply && reply.type === 'ai') {
+      askAI(reply.query).then(function(result) {
         var ans = result.answer;
-        // Keep the provider invisible in the chat. Users see one consistent Dagbo AI assistant.
+        // Keep the provider invisible in the chat. Users see one consistent AI Commander assistant.
         addMessage('ai', ans);
         if (getAutoRead()) speak(ans);
       }).catch(function(err) {
@@ -602,7 +602,7 @@ function toggleAutoRead(el) {
 
   if (!restored) {
     var name = getName();
-    addMessage('ai', "Hello " + name + "! I'm Dagbo AI. How can I help you today?\n\n- Explain any signal\n- Teach trading concepts\n- Analyse a named market\n- Answer your trading questions");
+    addMessage('ai', "Hello " + name + "! I'm AI Commander. How can I help you today?\n\n- Explain any signal\n- Teach trading concepts\n- Analyse a named market\n- Answer your trading questions");
   }
 
   // Accept a headline passed from the Market News page.
@@ -614,7 +614,7 @@ function toggleAutoRead(el) {
       sendMessage();
     }
   } catch(e) {
-    console.warn('Could not load news headline for Dagbo AI:', e);
+    console.warn('Could not load news headline for AI Commander:', e);
   }
 })();
 </script>
