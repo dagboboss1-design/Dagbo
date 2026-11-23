@@ -10,17 +10,13 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
 #tv-full-chart .tradingview-widget-container,#tv-full-chart .tradingview-widget-container__widget{width:100%;height:100%}
 #tv-full-chart iframe{width:100%!important;height:100%!important;border:0!important}
 .dg-tabbar{position:fixed!important;left:0;right:0;bottom:0;z-index:50;background:#000!important;border-top:1px solid #252525!important}
-/* Keep the embedded chart unchanged; this cover tucks away its built-in left drawing rail. */
-#chart-controls{position:fixed;z-index:22;top:calc(9px + env(safe-area-inset-top,0px));left:58px;right:12px;display:flex;justify-content:flex-end;gap:7px;pointer-events:none}
-#chart-controls select{pointer-events:auto;min-width:0;height:38px;border:1px solid #343434;border-radius:10px;background:#151515;color:#fff;padding:0 10px;font-size:12px;font-weight:650;outline:none;box-shadow:0 3px 14px #0008}
+#chart-controls{position:fixed;z-index:22;top:calc(8px + env(safe-area-inset-top,0px));left:58px;right:10px;display:flex;justify-content:flex-end;gap:7px;pointer-events:none}
+#chart-controls select{pointer-events:auto;min-width:0;height:38px;border:1px solid #3a3a3a;border-radius:11px;background:rgba(18,18,18,.96);color:#fff;padding:0 11px;font-size:12px;font-weight:650;outline:none;box-shadow:0 4px 18px #0009;backdrop-filter:blur(12px)}
 #chart-pair{flex:1;max-width:190px}
 #chart-timeframe{width:76px}
-#drawing-toolbar-cover{position:fixed;z-index:18;left:0;top:52px;bottom:72px;width:112px;background:#000;display:none}
-#drawing-toolbar-cover.is-hidden{display:block}
-#drawing-toolbar-toggle{position:fixed;z-index:25;right:16px;bottom:88px;width:44px;height:44px;border:1px solid #343434;border-radius:12px;background:#151515;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 14px #0009;touch-action:manipulation;padding:0}
-#drawing-toolbar-toggle svg{width:21px;height:21px;display:block}
-#drawing-toolbar-toggle:active{background:#242424}
-#drawing-toolbar-toggle:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#tv-full-chart{background:radial-gradient(ellipse at 50% 0%,#171717 0%,#080808 52%,#000 100%)}
+#tv-full-chart iframe{background:#000}
+@media(max-width:380px){#chart-controls{left:52px;right:7px;gap:5px}#chart-controls select{height:35px;padding:0 8px;font-size:11px}#chart-timeframe{width:68px}}
 </style></head><body>
 <div id="tv-full-chart"><div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div></div>
 <div id="chart-controls" aria-label="Chart controls">
@@ -28,9 +24,6 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
 <select id="chart-timeframe" aria-label="Select timeframe">
 <option value="5">5m</option><option value="15" selected>15m</option><option value="30">30m</option><option value="60">1H</option><option value="240">4H</option><option value="1D">1D</option><option value="1W">1W</option>
 </select></div>
-<div id="drawing-toolbar-cover" aria-hidden="true"></div>
-<button id="drawing-toolbar-toggle" type="button" aria-label="Hide drawing toolbar" aria-pressed="false" title="Hide drawing toolbar">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 5 5 5"/><path d="M4 20l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.2 16.1 4 20Z"/><path d="M13 6l5 5"/></svg></button>
 <nav class="dg-tabbar" aria-label="Main">
 <a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
 <a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
@@ -41,22 +34,8 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
 <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a></nav>
 <script>
 (()=> {
-  const cover=document.getElementById('drawing-toolbar-cover');
-  const toggle=document.getElementById('drawing-toolbar-toggle');
   const pairSelect=document.getElementById('chart-pair');
   const tfSelect=document.getElementById('chart-timeframe');
-  const key='dagbo_chart_drawing_toolbar_hidden';
-  let hidden=false;
-  try{hidden=localStorage.getItem(key)==='1'}catch(e){}
-  function applyToolbar(){
-    cover.classList.toggle('is-hidden',hidden);
-    toggle.classList.toggle('is-hidden',hidden);
-    toggle.textContent=hidden?'›':'‹';
-    toggle.setAttribute('aria-pressed',String(hidden));
-    toggle.setAttribute('aria-label',hidden?'Show drawing toolbar':'Hide drawing toolbar');
-    toggle.title=hidden?'Show drawing toolbar':'Hide drawing toolbar';
-  }
-  toggle.addEventListener('click',()=>{hidden=!hidden;try{localStorage.setItem(key,hidden?'1':'0')}catch(e){}applyToolbar()});
   const symbols={
     XAUUSD:'OANDA:XAUUSD',GOLD:'OANDA:XAUUSD',XAGUSD:'OANDA:XAGUSD',
     EURUSD:'OANDA:EURUSD',GBPUSD:'OANDA:GBPUSD',USDJPY:'OANDA:USDJPY',GBPJPY:'OANDA:GBPJPY',
@@ -90,8 +69,21 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
       autosize:true,symbol:symbols[pairSelect.value],interval:tfSelect.value,timezone:'Africa/Lagos',
       theme:'dark',style:'1',locale:'en',allow_symbol_change:true,hide_top_toolbar:false,
       hide_side_toolbar:false,hide_legend:false,hide_volume:false,withdateranges:true,save_image:true,
-      calendar:false,details:false,hotlist:false,studies:[],save_chart_properties_to_local_storage:true,
-      backgroundColor:'#000000',gridColor:'rgba(255,255,255,0.08)'
+      calendar:false,details:false,hotlist:false,
+      studies:['STD;EMA','STD;RSI','STD;MACD'],
+      save_chart_properties_to_local_storage:true,
+      backgroundColor:'#080808',gridColor:'rgba(255,255,255,0.075)',
+      overrides:{
+        'mainSeriesProperties.candleStyle.upColor':'#16a34a',
+        'mainSeriesProperties.candleStyle.downColor':'#dc2626',
+        'mainSeriesProperties.candleStyle.borderUpColor':'#16a34a',
+        'mainSeriesProperties.candleStyle.borderDownColor':'#dc2626',
+        'mainSeriesProperties.candleStyle.wickUpColor':'#16a34a',
+        'mainSeriesProperties.candleStyle.wickDownColor':'#dc2626',
+        'paneProperties.background':'#080808',
+        'paneProperties.vertGridProperties.color':'rgba(255,255,255,0.045)',
+        'paneProperties.horzGridProperties.color':'rgba(255,255,255,0.045)'
+      }
     });
     widget.appendChild(script);
     const params=new URLSearchParams(location.search);params.set('pair',pairSelect.value);params.set('tf',tfSelect.value);
@@ -99,7 +91,7 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
   }
   pairSelect.addEventListener('change',renderChart);
   tfSelect.addEventListener('change',renderChart);
-  applyToolbar();renderChart();
+  renderChart();
 })();
 </script>
 <script src="pwa.js" defer></script><script src="navigation.js" defer></script></body></html>
