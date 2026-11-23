@@ -4,7 +4,7 @@ const SYMBOLS = {
   USDJPY: "USD/JPY", GBPJPY: "GBP/JPY", AUDUSD: "AUD/USD",
   USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
   EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", BTCUSD: "BTC/USD",
-  ETHUSD: "ETH/USD", US30: "DJI", US100: "NDX", US500: "SPX"
+  ETHUSD: "ETH/USD", US30: "DIA", US100: "QQQ", NAS100: "QQQ", US500: "SPY"
 };
 const INTERVALS = { "5":"5min", "15":"15min", "60":"1h", "240":"4h", "D":"1day" };
 module.exports = async function handler(req, res) {
@@ -37,7 +37,8 @@ module.exports = async function handler(req, res) {
       low: Number(c.low), close: Number(c.close), volume: Number(c.volume || 0)
     })).filter(c => [c.open,c.high,c.low,c.close].every(Number.isFinite))
       .sort((a,b) => a.time.localeCompare(b.time));
-    return res.status(200).json({ pair, interval, candles, source: "Twelve Data", timezone: "UTC" });
+    const proxy = ["US30","US100","NAS100","US500"].includes(pair);
+    return res.status(200).json({ pair, interval, candles, source: proxy ? "Twelve Data · ETF proxy" : "Twelve Data", sourceSymbol: SYMBOLS[pair], marketDataType: proxy ? "ETF_PROXY" : "DIRECT", proxyNotice: proxy ? "Historical prices are in the DIA / QQQ / SPY ETF proxy, not the exact index CFD." : null, timezone: "UTC" });
   } catch (e) {
     return res.status(502).json({ error: "Could not retrieve historical candles" });
   }
