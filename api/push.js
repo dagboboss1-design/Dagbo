@@ -410,13 +410,14 @@ module.exports = async function handler(req, res) {
                 enabledGroups: ["Trend","Momentum","Volatility","Volume","Chart pattern","Market structure"]
               });
               const proxyText = String(candleData.proxyNotice || "");
+              const timeframeLabel = ({ "5":"5m", "15":"15m", "30":"30m", "60":"1h", "240":"4h" })[tf] || tf;
               const recentBars = bars.slice(-12);
               if (edge) {
                 const hasTrade = edge.direction === "BUY" || edge.direction === "SELL";
                 liveCandleContext =
                   "DAGBO EDGE ENGINE RESULT (calculated from the newest fully closed candles; follow this result exactly). " +
                   "Market: " + quotePair + (candleData.sourceSymbol ? " · data instrument " + candleData.sourceSymbol : "") +
-                  ". Timeframe: " + tf + "m. Provider: " + String(candleData.provider || "market-data service") +
+                  ". Timeframe: " + timeframeLabel + ". Provider: " + String(candleData.provider || "market-data service") +
                   ". Result: " + edge.signal + ". Direction: " + edge.direction +
                   ". Confluence quality score: " + edge.confidence + "% (" + edge.quality + "); this is not a win probability." +
                   ". Threshold: " + edge.threshold + ". BUY group score: " + edge.buyScore +
