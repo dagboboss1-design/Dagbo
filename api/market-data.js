@@ -36,7 +36,7 @@ async function fetchJsonWithTimeout(url, options, timeoutMs) {
 const memoryCache = new Map();
 let memoryMinute = { startedAt: 0, count: 0 };
 const CACHE_SECONDS = 110;
-const MAX_TWELVE_CALLS_PER_MINUTE = 6;
+const MAX_TWELVE_CALLS_PER_MINUTE = 7;
 
 function redisClient() {
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
@@ -125,7 +125,7 @@ async function fetchFcsFallback(pair, tf) {
   const url = "https://api-v4.fcsapi.com/forex/history?symbol=" + encodeURIComponent(symbol) +
     "&period=" + encodeURIComponent(period) + "&length=100&is_chart=0" + type +
     "&access_key=" + encodeURIComponent(key);
-  const result = await fetchJsonWithTimeout(url, { headers: { "Accept":"application/json" } }, 9000);
+  const result = await fetchJsonWithTimeout(url, { headers: { "Accept":"application/json" } }, 3500);
   if (!result.response.ok || result.data.status === false || result.data.status === "error" ||
       (result.data.code !== undefined && Number(result.data.code) !== 200)) {
     throw new Error("FCS rejected the candle request: " + String(result.data.msg || result.response.status));
@@ -136,13 +136,21 @@ async function fetchFcsFallback(pair, tf) {
 }
 async function fetchBackupCandles(pair, tf) {
   const failures = [];
+  const authBlock = await readCache("dagbo:market:fcs-auth-blocked");
+  if (authBlock && Number(authBlock.until) > Date.now()) {
+    return { payload:null, failures:["FCS_API_KEY was rejected recently; replace the key in Vercel before FCS failover can resume."] };
+  }
   for (const provider of [fetchFcsFallback]) {
     try {
       const payload = await provider(pair, tf);
       if (payload) return { payload, failures };
     } catch (error) {
-      failures.push(error.message || String(error));
-      console.error("DAGBO market backup error:", error.message);
+      const message = error.message || String(error);
+      failures.push(message);
+      if (/valid API Access Key|invalid api access key/i.test(message)) {
+        await writeCache("dagbo:market:fcs-auth-blocked", { until: Date.now() + 10 * 60 * 1000 });
+      }
+      console.error("DAGBO market backup error:", message);
     }
   }
   return { payload:null, failures };
@@ -258,6 +266,7 @@ module.exports = async function handler(req, res) {
     primaryFailure = "TWELVE_DATA_API_KEY is not configured";
   }
 
+  console.warn("DAGBO Twelve Data primary failed for " + pair + " (" + tf + "): " + String(primaryFailure || "unknown provider failure").slice(0, 180));
   // Provider failover: Twelve Data -> FCS only. No third-party candle fallback is permitted.
   const backup = isIndexProxy
     ? { payload:null, failures:["The ETF proxy is not price-compatible with FCS index instruments; no mismatched fallback is used."] }
