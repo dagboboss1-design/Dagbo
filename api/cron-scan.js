@@ -751,7 +751,15 @@ module.exports = async function handler(req, res) {
     }));
 
     for (const item of fetched) {
-      if (item.closed) { results[item.pair] = { signal:'MARKET CLOSED', marketClosed:true }; continue; }
+      if (item.closed) {
+        results[item.pair] = {
+          signal: "MARKET CLOSED", marketClosed: true,
+          marketDataType: ["US30","US100","NAS100","US500"].includes(item.pair) ? "ETF_PROXY" : "DIRECT",
+          marketLabel: ["US30","US100","NAS100","US500"].includes(item.pair)
+            ? "US cash-session ETF proxy (DIA / QQQ / SPY)" : "Instrument trading session"
+        };
+        continue;
+      }
       if (item.error) {
         errors.push({ pair: item.pair, error: item.error });
         results[item.pair] = { signal: "DATA UNAVAILABLE", marketDataUnavailable: true, error: item.error };
