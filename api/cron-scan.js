@@ -2,6 +2,7 @@ const webpush = require("web-push");
 const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
 const confluence = require("../public/dagbo-confluence.js");
+const { fetchFcsCalendarEvents } = require("../lib/fcs-calendar");
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
@@ -188,16 +189,11 @@ async function sendNewsAlerts(apiKey) {
   const now = Date.now();
   let eventsChecked = 0, newsAlerts = 0, preNewsSignals = 0;
   try {
-    const response = await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.json", {
-      headers: { "User-Agent": "DAGBO-SIGNAL-Economic-Calendar/1.0" }
-    });
-    if (!response.ok) throw new Error("Economic calendar HTTP " + response.status);
-    const rows = await response.json();
-    if (!Array.isArray(rows)) throw new Error("Invalid economic calendar response");
+    const rows = await fetchFcsCalendarEvents({ now: new Date(now) });
 
     const upcoming = rows.map(row => ({
       name: String(row.title || "Economic event").slice(0, 120),
-      currency: String(row.country || "GLOBAL").toUpperCase(),
+      currency: String(row.currency || row.country || "GLOBAL").toUpperCase(),
       impact: String(row.impact || ""),
       date: new Date(row.date)
     })).filter(event => event.impact.toLowerCase() === "high" &&
