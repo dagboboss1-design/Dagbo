@@ -459,7 +459,7 @@ module.exports = async function handler(req, res) {
       const providerOrder = getAIProviderOrder(primary, configured);
       if (!providerOrder.length) {
         return res.status(503).json({
-          error: "No AI provider is configured. Add OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY or GROQ_API_KEY in Vercel."
+          error: "AI service is not configured. Please contact support."
         });
       }
 
@@ -480,8 +480,7 @@ module.exports = async function handler(req, res) {
       }
       if (!result) {
         return res.status(502).json({
-          error: "DAGBO AI providers could not answer. Check provider keys, model access and API billing.",
-          attempts: attempts
+          error: "AI service is temporarily unavailable. Please try again shortly.",
         });
       }
 
