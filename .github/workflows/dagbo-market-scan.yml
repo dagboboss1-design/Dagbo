@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Run 15-minute market scanner
         env:
-          DAGBO_BASE_URL: https://dagboboss.vercel.app
+          DAGBO_BASE_URL: https://dagbo-v9g7.vercel.app
           DAGBO_CRON_SECRET: ${{ secrets.DAGBO_CRON_SECRET }}
         run: |
           if [ -z "$DAGBO_CRON_SECRET" ]; then
