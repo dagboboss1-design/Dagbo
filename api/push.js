@@ -83,16 +83,20 @@ function getConfiguredAIProviders() {
 function chooseAIProvider(task) {
   const section = String(task || "assistant").toLowerCase();
   if (section === "signals") return "claude";
-  if (section === "journal" || section === "assistant" || section === "boss1") return "openai";
+  if (section === "journal") return "openai";
+  if (section === "assistant" || section === "boss1") return "groq";
   if (section === "news") return "gemini";
   if (section === "fast") return "groq";
   return "openai";
 }
 
 function getAIProviderOrder(primary, configured) {
-  // Groq has exactly one fallback: OpenAI. Other page owners fail visibly.
-  const order = primary === "groq" ? ["groq", "openai"] : [primary];
-  return order.filter(function(name) { return !!configured[name]; });
+  // Keep each page's preferred model first, then use Groq as a dependable
+  // general-purpose fallback. Groq itself falls back to OpenAI.
+  const order = primary === "groq" ? ["groq", "openai"] : [primary, "groq"];
+  return order.filter(function(name, index, all) {
+    return !!configured[name] && all.indexOf(name) === index;
+  });
 }
 
 async function callAIProvider(provider, messages) {
@@ -147,7 +151,7 @@ async function callAIProvider(provider, messages) {
     method: "POST",
     headers: headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(2500)
+    signal: AbortSignal.timeout(3500)
   });
   let data = {};
   try { data = await response.json(); } catch (_) {}
@@ -327,10 +331,13 @@ module.exports = async function handler(req, res) {
         BTCUSD:"BTC/USD", ETHUSD:"ETH/USD", US30:"DJI", US100:"NDX", NAS100:"NDX", US500:"SPX"
       };
       const asksPrice = /\b(price|quote|trading at|how much is|current value)\b/i.test(question);
+      const asksAnalysis = /\b(analy[sz]e|analysis|chart|signal|setup|buy|sell|long|short|trend|direction|entry|technical|market structure|support|resistance|bias)\b/i.test(question);
+      const normalizedQuestion = question.toUpperCase().replace(/[^A-Z0-9]/g, "");
       let quotePair = Object.keys(pairSymbols).find(function(pair) {
-        return new RegExp("\\b" + pair + "\\b", "i").test(question);
+        return new RegExp("\\b" + pair + "\\b", "i").test(question) ||
+          normalizedQuestion.indexOf(pair.replace(/[^A-Z0-9]/g, "")) >= 0;
       });
-      if (!quotePair && asksPrice && /\b(this pair|current pair|selected pair)\b/i.test(question) && safeMarketContext) {
+      if (!quotePair && (asksPrice || asksAnalysis) && /\b(this pair|current pair|selected pair|my chart|the chart)\b/i.test(question) && safeMarketContext) {
         try {
           const snapshot = JSON.parse(safeMarketContext);
           const walk = function(value) {
@@ -347,7 +354,61 @@ module.exports = async function handler(req, res) {
         } catch (_) {}
       }
       let liveQuoteContext = "";
-      if (asksPrice) {
+      let liveCandleContext = "";
+      if (asksAnalysis && quotePair && process.env.TWELVE_DATA_API_KEY) {
+        const candleSymbols = {
+          XAUUSD:"XAU/USD", GOLD:"XAU/USD", EURUSD:"EUR/USD", GBPUSD:"GBP/USD",
+          USDJPY:"USD/JPY", GBPJPY:"GBP/JPY", AUDUSD:"AUD/USD", USDCHF:"USD/CHF",
+          USDCAD:"USD/CAD", NZDUSD:"NZD/USD", EURJPY:"EUR/JPY", EURGBP:"EUR/GBP",
+          BTCUSD:"BTC/USD", ETHUSD:"ETH/USD"
+        };
+        const candleSymbol = candleSymbols[quotePair];
+        if (candleSymbol) {
+          const tf = /\b(5m|5 min|5-minute|5 minute)\b/i.test(question) ? "5min" :
+            /\b(30m|30 min|30-minute|30 minute)\b/i.test(question) ? "30min" :
+            /\b(1h|1 hour|hourly)\b/i.test(question) ? "1h" :
+            /\b(4h|4 hour|4-hour)\b/i.test(question) ? "4h" : "15min";
+          try {
+            const candleUrl = "https://api.twelvedata.com/time_series?symbol=" +
+              encodeURIComponent(candleSymbol) + "&interval=" + encodeURIComponent(tf) +
+              "&timezone=UTC&outputsize=24&apikey=" + encodeURIComponent(process.env.TWELVE_DATA_API_KEY);
+            const candleResponse = await fetch(candleUrl, { signal: AbortSignal.timeout(2200) });
+            const candleData = await candleResponse.json();
+            if (candleResponse.ok && Array.isArray(candleData.values) && candleData.values.length >= 5) {
+              const bars = candleData.values.slice(0, 20).reverse().map(function(bar) {
+                return {
+                  time: bar.datetime,
+                  open: Number(bar.open), high: Number(bar.high),
+                  low: Number(bar.low), close: Number(bar.close),
+                  volume: Number(bar.volume || 0)
+                };
+              }).filter(function(bar) {
+                return [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite);
+              });
+              if (bars.length >= 5) {
+                liveCandleContext = "FRESH TWELVE DATA OHLC CANDLES for " + quotePair +
+                  " on " + tf + " timeframe, UTC, newest candle timestamp " +
+                  bars[bars.length - 1].time + ". Candles oldest-to-newest: " +
+                  JSON.stringify(bars) +
+                  ". Use these candles for structure and setup analysis; do not claim indicators that were not calculated.";
+              }
+            } else {
+              liveCandleContext = "Fresh candles are unavailable for " + quotePair +
+                ". Do not issue a directional trade call or invent entry/SL/TP.";
+            }
+          } catch (candleError) {
+            liveCandleContext = "Live candle request failed for " + quotePair +
+              ". Do not issue a directional trade call or invent entry/SL/TP.";
+            console.warn("DAGBO AI candle context unavailable:", candleError.message);
+          }
+        } else {
+          liveCandleContext = "No supported live candle mapping is available for " + quotePair +
+            ". Ask the user to select a supported FX, GOLD or crypto pair; do not invent chart analysis.";
+        }
+      } else if (asksAnalysis && !quotePair) {
+        liveCandleContext = "No instrument was identified. Ask the user which pair or market and timeframe to analyse.";
+      }
+      if (asksPrice && !asksAnalysis) {
         const quoteKey = process.env.TWELVE_DATA_API_KEY;
         if (quotePair && quoteKey) {
           try {
@@ -373,16 +434,17 @@ module.exports = async function handler(req, res) {
       }
 
       const taskInstructions = {
-        signals: "You are the Claude-powered Signals analyst. Interpret only supplied, timestamped market data and technical evidence; explain confluence, invalidation and uncertainty. Never invent an entry, stop or target.",
-        journal: "You are the OpenAI-powered trading journal coach. Analyse only supplied journal records, calculate only from supplied figures, identify execution patterns and risk discipline. Never invent trades or results.",
-        news: "You are the Gemini-powered news analyst. Separate verified facts, actual values, forecasts and unknowns; explain affected assets and possible scenarios without presenting forecasts as facts.",
-        boss1: "You are the OpenAI-powered BOSS1 trading coach. Teach clearly, check reasoning and emphasise risk management.",
-        fast: "You are the Groq-powered fast assistant. Be concise and use only supplied facts."
+        signals: "You are DAGBO's Signals analyst. Interpret only supplied, timestamped market data and technical evidence; explain confluence, invalidation and uncertainty. Never invent an entry, stop or target.",
+        journal: "You are DAGBO's trading journal coach. Analyse only supplied journal records, calculate only from supplied figures, identify execution patterns and risk discipline. Never invent trades or results.",
+        news: "You are DAGBO's news analyst. Separate verified facts, actual values, forecasts and unknowns; explain affected assets and possible scenarios without presenting forecasts as facts.",
+        boss1: "You are DAGBO's BOSS1 trading coach. Teach clearly, check reasoning and emphasise risk management.",
+        fast: "You are DAGBO's fast assistant. Be concise and use only supplied facts."
       };
-      const systemPrompt = (taskInstructions[selectedTask] || "You are the OpenAI-powered DAGBO assistant.") + " You are assisting " + (safeName || "Oga") +
+      const systemPrompt = (taskInstructions[selectedTask] || "You are DAGBO's AI Market Commander.") + " You are assisting " + (safeName || "Oga") +
         ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise, clear and Nigerian-friendly; use Pidgin naturally when useful. For live-price questions, use only a verified live quote supplied in the context; if unavailable, say so and never guess. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When asked for a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit only when supported by fresh market data and a valid setup. If fresh data or a valid setup is missing, return WAIT and say entry/SL/TP are unavailable. Never guarantee profits. Ordinary answers should usually be 1-4 short sentences.";
       const userContent = question.trim() +
         (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") +
+        (liveCandleContext ? "\n\nLIVE CHART CONTEXT: " + liveCandleContext : "") +
         (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "");
       const messages = [{ role: "system", content: systemPrompt }]
         .concat(safeHistory)
