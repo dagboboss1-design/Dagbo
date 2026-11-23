@@ -1037,13 +1037,23 @@
   }
 
   window.loadAllSignals=function(){loadAllSignals();};
-  // Keep scanner startup independent from optional profile/stat UI failures.
-  try { renderProfileControls(); }
-  catch (error) { console.error('DAGBO profile controls failed to initialize:', error); }
-  try { updateScalpStats(); }
-  catch (error) { console.warn('DAGBO scalp statistics unavailable:', error); }
+
+  // Start the actual market scan BEFORE optional profile/stat widgets.
+  // These widgets must never delay or block the live-data scanner.
+  if (initialStatus) initialStatus.textContent = 'Starting live market scan...';
   loadAllSignals({resume:true});
   window.dispatchEvent(new Event('dagbo:scanner-started'));
+
+  // Render secondary controls only after the scanner request has started.
+  // Run them on the next task so a slow profile/stat initializer cannot leave
+  // the main scan stuck on its startup message.
+  setTimeout(function(){
+    try { renderProfileControls(); }
+    catch (error) { console.error('DAGBO profile controls failed to initialize:', error); }
+    try { updateScalpStats(); }
+    catch (error) { console.warn('DAGBO scalp statistics unavailable:', error); }
+  }, 0);
+
   try { startLifecycleClock(); }
   catch (error) { console.warn('DAGBO signal lifecycle clock unavailable:', error); }
   // Scan once per selected candle timeframe while the page is active.
