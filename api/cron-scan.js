@@ -95,7 +95,7 @@ function validAuth(req) {
   const headers = req.headers || {};
   const authorization = String(headers.authorization || "").trim();
   const candidates = [
-    authorization.replace(/^Bearer\\s+/i, "").trim(),
+    authorization.replace(/^Bearer\s+/i, "").trim(),
     headers["x-dagbo-cron-secret"],
     headers["x-cron-secret"]
   ].filter(value => typeof value === "string" && value.trim()).map(value => value.trim());
