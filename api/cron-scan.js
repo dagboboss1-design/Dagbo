@@ -89,12 +89,21 @@ function rsi(values, period) {
 function analyze(candles, pair) { return confluence.analyze(candles, pair); }
 
 function validAuth(req) {
-  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET;
-  const auth = (req.headers && req.headers.authorization) || "";
+  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET ||
+    process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET;
   if (!secret) return false;
-  const a = Buffer.from(auth);
-  const b = Buffer.from("Bearer " + secret);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  const headers = req.headers || {};
+  const authorization = String(headers.authorization || "").trim();
+  const candidates = [
+    authorization.replace(/^Bearer\\s+/i, "").trim(),
+    headers["x-dagbo-cron-secret"],
+    headers["x-cron-secret"]
+  ].filter(value => typeof value === "string" && value.trim()).map(value => value.trim());
+  const expected = Buffer.from(String(secret));
+  return candidates.some(value => {
+    const supplied = Buffer.from(value);
+    return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+  });
 }
 function vapidReady() {
   return !!(process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
@@ -638,6 +647,24 @@ async function runPairIntelligence(pairs, apiKey) {
 }
 
 module.exports = async function handler(req, res) {
+  if (req.method === "GET" && req.query && req.query.view === "status") {
+    try {
+      const raw = await redis.get("dagbo:cron:scan:last");
+      const lockState = await redis.get("dagbo:cron:scan:lock");
+      let lastScan = raw;
+      if (typeof raw === "string") { try { lastScan = JSON.parse(raw); } catch (e) { lastScan = null; } }
+      return res.status(200).json({
+        success: true,
+        schedulerSecretConfigured: !!(process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET),
+        redisConfigured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
+        marketDataKeyConfigured: !!process.env.TWELVE_DATA_API_KEY,
+        scanRunning: !!lockState,
+        lastScan: lastScan || null
+      });
+    } catch (error) {
+      return res.status(503).json({ success: false, error: "Scanner status unavailable: " + error.message });
+    }
+  }
   if (req.method === "GET" && req.query && req.query.view === "pair-intelligence") {
     const raw = await redis.get("dagbo:pair-intelligence:last");
     if (!raw) return res.status(200).json({ success: true, snapshot: null, message: "No pair-intelligence scan has completed yet." });
@@ -645,7 +672,11 @@ module.exports = async function handler(req, res) {
     if (typeof raw === "string") { try { snapshot = JSON.parse(raw); } catch (e) { snapshot = null; } }
     return res.status(200).json({ success: true, snapshot });
   }
-  if (!validAuth(req)) return res.status(401).json({ error: "Unauthorized scheduled scan" });
+  if (!validAuth(req)) {
+    console.warn("DAGBO scheduled scan rejected: missing or invalid cron authorization header");
+    return res.status(401).json({ error: "Unauthorized scheduled scan. Send Authorization: Bearer <DAGBO_CRON_SECRET> or x-dagbo-cron-secret." });
+  }
+  console.log("DAGBO scheduled scan started", new Date().toISOString());
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   // The scheduled scanner must use the same provider failover manager as the Signals page.
   // VERCEL_URL targets this deployment; production hostname is the safe fallback.
@@ -659,9 +690,10 @@ module.exports = async function handler(req, res) {
   }
 
   const lock = "dagbo:cron:scan:lock";
-  const acquired = await redis.set(lock, String(Date.now()), { nx: true, ex: 13 * 60 });
+  const acquired = await redis.set(lock, String(Date.now()), { nx: true, ex: 4 * 60 });
   if (acquired !== "OK") return res.status(200).json({ skipped: true, reason: "A scan is already running" });
 
+  const scanStartedAt = Date.now();
   try {
     // The scheduled scanner also uses the Twelve Data key for direct-only
     // context feeds (for example DXY/monthly history). The shared market-data
@@ -731,13 +763,18 @@ module.exports = async function handler(req, res) {
       await redis.set(stateKey, JSON.stringify({ signal: analysis.signal, candleTime: analysis.candleTime, scannedAt: new Date().toISOString() }), { ex: 60 * 60 * 24 * 7 });
     }
 
+    // Keep the time-critical 15m signal scan separate from the much heavier
+    // higher-timeframe/correlation workload. Run that workload only when its
+    // scheduler explicitly requests it with ?includeIntelligence=1.
     let pairIntelligence = null;
-    try {
-      const configuredHtfPairs = (await getConfiguredForexPairs()).filter(pair => isMarketOpen(pair));
-      const htfBatch = await selectRotatingBatch("dagbo:scan:cursor:htf", configuredHtfPairs, MAX_HTF_PAIRS);
-      pairIntelligence = await runPairIntelligence(htfBatch, apiKey);
-    } catch (pairError) {
-      console.error("DAGBO pair-intelligence scan failed:", pairError.message);
+    if (req.query && String(req.query.includeIntelligence || "") === "1") {
+      try {
+        const configuredHtfPairs = (await getConfiguredForexPairs()).filter(pair => isMarketOpen(pair));
+        const htfBatch = await selectRotatingBatch("dagbo:scan:cursor:htf", configuredHtfPairs, MAX_HTF_PAIRS);
+        pairIntelligence = await runPairIntelligence(htfBatch, apiKey);
+      } catch (pairError) {
+        console.error("DAGBO pair-intelligence scan failed:", pairError.message);
+      }
     }
 
     const tradeSummary = await monitorTrades(results, apiKey);
@@ -772,8 +809,14 @@ module.exports = async function handler(req, res) {
       note: "News alerts and spike analysis run separately for GBPUSD, GBPJPY, EURUSD and XAUUSD; pre-news bias is not a prediction or broker order."
     };
     await redis.set("dagbo:cron:scan:last", JSON.stringify({
-      scannedAt: responseBody.scannedAt, scanned: responseBody.scanned, errors
+      scannedAt: responseBody.scannedAt, scanned: responseBody.scanned, errors,
+      durationMs: Date.now() - scanStartedAt
     }), { ex: 60 * 60 * 24 * 7 });
+    console.log("DAGBO scheduled scan completed", JSON.stringify({
+      scanned: responseBody.scanned.length, errors: errors.length,
+      durationMs: Date.now() - scanStartedAt
+    }));
+    responseBody.durationMs = Date.now() - scanStartedAt;
     return res.status(200).json(responseBody);
   } catch (err) {
     console.error("DAGBO 15m scan failed:", err);
