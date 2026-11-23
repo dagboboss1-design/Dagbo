@@ -140,6 +140,7 @@
   var initialStatus = document.getElementById('loadingText');
   if (initialStatus) initialStatus.textContent = 'Starting DAGBO scanner...';
 
+  try {
   var settings = {};
   try { settings = JSON.parse(localStorage.getItem('dagbo_settings')) || {}; } catch(e){}
   var enabledPairs = Array.isArray(settings.pairs) && settings.pairs.length ? settings.pairs : ['XAUUSD', 'EURUSD', 'GBPUSD', 'US30', 'BTCUSD'];
@@ -1071,6 +1072,20 @@
     }
   });
 
+
+  } catch (startupError) {
+    console.error('DAGBO scanner startup failed:', startupError);
+    var failedStatus = document.getElementById('loadingText');
+    if (failedStatus) failedStatus.textContent = 'Scanner startup failed: ' + String(startupError && startupError.message || startupError) + '. Please send this message to support.';
+    var failedGrid = document.getElementById('signals-grid');
+    if (failedGrid) {
+      var diagnostic = document.createElement('div');
+      diagnostic.className = 'dg-card';
+      diagnostic.style.cssText = 'margin-top:10px;padding:14px;border:1px solid #b7791f;color:var(--dg-text)';
+      diagnostic.textContent = 'DAGBO could not initialize its scanner. The error above identifies the failing startup step.';
+      failedGrid.appendChild(diagnostic);
+    }
+  }
 })();
 </script>
 <script src="navigation.js" defer></script>
