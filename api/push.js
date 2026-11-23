@@ -367,14 +367,14 @@ module.exports = async function handler(req, res) {
       let liveQuoteContext = "";
       let liveCandleContext = "";
       if (asksAnalysis && quotePair) {
-        const tf = /\\b(5m|5 min|5-minute|5 minute)\\b/i.test(question) ? "5" :
-          /\\b(30m|30 min|30-minute|30 minute)\\b/i.test(question) ? "30" :
-          /\\b(1h|1 hour|hourly)\\b/i.test(question) ? "60" :
-          /\\b(4h|4 hour|4-hour)\\b/i.test(question) ? "240" : "15";
+        const tf = /\b(5m|5 min|5-minute|5 minute)\b/i.test(question) ? "5" :
+          /\b(30m|30 min|30-minute|30 minute)\b/i.test(question) ? "30" :
+          /\b(1h|1 hour|hourly)\b/i.test(question) ? "60" :
+          /\b(4h|4 hour|4-hour)\b/i.test(question) ? "240" : "15";
         const timeframeMs = { "5":300000, "15":900000, "30":1800000, "60":3600000, "240":14400000 };
         const minCandles = tf === "5" ? 30 : 60;
         try {
-          const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\\/\\//, "");
+          const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
           const candleUrl = "https://" + host + "/api/market-data?pair=" +
             encodeURIComponent(quotePair) + "&tf=" + encodeURIComponent(tf);
           const candleResponse = await fetch(candleUrl, {
@@ -387,13 +387,13 @@ module.exports = async function handler(req, res) {
             const ordered = candleData.values.slice().sort(function(a,b) {
               function stamp(x) {
                 const raw = String(x.datetime || "");
-                return Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? "" : "Z"));
+                return Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? "" : "Z"));
               }
               return stamp(a) - stamp(b);
             });
             const bars = ordered.filter(function(bar) {
               const raw = String(bar.datetime || "");
-              const stamp = Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw) ? "" : "Z"));
+              const stamp = Date.parse(raw.replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(raw) ? "" : "Z"));
               return Number.isFinite(stamp) && stamp + timeframeMs[tf] <= Date.now() &&
                 [bar.open,bar.high,bar.low,bar.close].every(function(v){return Number.isFinite(Number(v));});
             }).map(function(bar) {
