@@ -34,11 +34,25 @@ function redisClient() {
   return new Redis({ url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN });
 }
 
+async function withTimeout(promise, timeoutMs, label) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error((label || 'Market cache') + ' timed out')), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function readCache(key) {
   try {
     const redis = redisClient();
     if (redis) {
-      const value = await redis.get(key);
+      const value = await withTimeout(redis.get(key), 1200, 'Market cache read');
       if (value) return typeof value === "string" ? JSON.parse(value) : value;
     }
   } catch (error) { console.error("DAGBO market cache read:", error.message); }
@@ -49,7 +63,7 @@ async function writeCache(key, value) {
   memoryCache.set(key, value);
   try {
     const redis = redisClient();
-    if (redis) await redis.set(key, JSON.stringify(value), { ex: 600 });
+    if (redis) await withTimeout(redis.set(key, JSON.stringify(value), { ex: 600 }), 1200, 'Market cache write');
   } catch (error) { console.error("DAGBO market cache write:", error.message); }
 }
 
@@ -57,8 +71,8 @@ async function claimTwelveDataSlot() {
   try {
     const redis = redisClient();
     if (redis) {
-      const count = await redis.incr("dagbo:market:twelve:minute");
-      if (count === 1) await redis.expire("dagbo:market:twelve:minute", 60);
+      const count = await withTimeout(redis.incr('dagbo:market:twelve:minute'), 1200, 'Market quota check');
+      if (count === 1) await withTimeout(redis.expire('dagbo:market:twelve:minute', 60), 1200, 'Market quota expiry');
       return count <= MAX_TWELVE_CALLS_PER_MINUTE;
     }
   } catch (error) { console.error("DAGBO market rate limiter:", error.message); }
