@@ -171,7 +171,19 @@
         else{old.status=direction==='WAIT'?'NO_TRADE':'ACTIVE';item.lifecycleStatus=old.status;}
         signalCycles[key]=old;return;
       }
-      var cycle={anchor:now,duration:duration,direction:direction,status:direction==='WAIT'?'NO_TRADE':'ACTIVE',lastCheckedAt:now,lastConfirmedAt:direction==='WAIT'?null:now};
+      // Keep the same signal cycle while the provider is returning the same
+      // closed candle. A page refresh or 2-minute UI tick must not restart its
+      // validity clock and keep an old setup alive indefinitely.
+      var candleTime=String(item.candleTime||'');
+      if(old&&candleTime&&String(old.candleTime||'')===candleTime&&old.direction===direction){
+        item.lifecycleStatus=old.status|| (direction==='WAIT'?'NO_TRADE':'ACTIVE');
+        item.lifecycleAnchor=old.anchor;
+        item.lifecycleNextScan=old.anchor+duration*scanFactor(currentSignalTF);
+        old.lastCheckedAt=now;
+        signalCycles[key]=old;
+        return;
+      }
+      var cycle={anchor:now,duration:duration,direction:direction,candleTime:candleTime||null,status:direction==='WAIT'?'NO_TRADE':'ACTIVE',lastCheckedAt:now,lastConfirmedAt:direction==='WAIT'?null:now};
       signalCycles[key]=cycle;item.lifecycleStatus=cycle.status;item.lifecycleAnchor=now;item.lifecycleNextScan=now+duration*scanFactor(currentSignalTF);
     });
     saveSignalCycles();
@@ -980,10 +992,10 @@
   loadAllSignals({resume:true});
   try { startLifecycleClock(); }
   catch (error) { console.warn('DAGBO signal lifecycle clock unavailable:', error); }
-  // Run a fresh Signal Board scan every two minutes while this page is active.
-  // The request cache and shared Twelve Data limiter protect the provider quota.
+  // Scan once per selected candle timeframe while the page is active.
+  // Manual Refresh remains available for an immediate check.
   if (window.signalAutoScanTimer) clearInterval(window.signalAutoScanTimer);
-  var signalScanIntervalMs = 120000;
+  var signalScanIntervalMs = tfDuration(currentSignalTF);
   window.signalAutoScanTimer = setInterval(function() {
     if (!document.hidden) loadAllSignals({scheduled:true});
   }, signalScanIntervalMs);
