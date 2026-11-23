@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F5F5F7" id="themeColor">
-<title>Ask AI · DAGBO SIGNAL</title>
+<title>AI Commander · DAGBO SIGNAL</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="dagbo.css">
@@ -43,7 +43,7 @@
   </div>
 
   <div class="ai-header-card" style="margin-top:16px">
-    <div class="ai-avatar">🤖</div>
+    <div class="ai-avatar" aria-hidden="true">◈</div>
     <div style="flex:1">
       <div style="font-size:18px;font-weight:700;display:flex;align-items:center">Dagbo AI <span class="ai-status">AI assistant</span></div>
       <div class="dg-muted" style="font-size:13px;margin-top:2px">AI Market Commander · Trading teacher · Signal explainer</div>
@@ -52,7 +52,7 @@
 
   <section class="dg-card" style="margin-bottom:18px">
     <div class="dg-card__head"><h2 class="dg-card__title">🧠 AI Market Commander</h2><span class="dg-pill dg-pill--open">Context-aware</span></div>
-    <p class="dg-muted" style="font-size:13px;line-height:1.5;margin:6px 0 12px">Ask Dagbo to explain your latest saved Signals-page scan, market structure concepts or news you provide. It does not have an independent live price feed.</p>
+    <p class="dg-muted" style="font-size:13px;line-height:1.5;margin:6px 0 12px">Ask Dagbo to analyse a named FX, GOLD or crypto market using fresh Twelve Data candles where available, explain your saved signal scans, teach trading concepts or review news. If live data is unavailable, it will tell you.</p>
     <div class="quick-chips" style="margin-top:0">
       <button class="quick-chip" onclick="askQuestion('Explain my latest DAGBO signal scan. Which markets show confluence and what confirmation is still needed?')">📊 Explain my signals</button>
       <button class="quick-chip" onclick="askQuestion('Explain how I can choose between scalping and intraday trading in the current market conditions. Do not invent live data.')">⚡ Scalping or intraday?</button>
@@ -81,7 +81,7 @@
     <label class="dg-switch"><input type="checkbox" id="tgAutoRead" onchange="toggleAutoRead(this)"><span class="dg-switch__track"></span></label>
   </div>
   
-  <p class="dg-note">Dagbo AI has no independent live price feed and does not execute trades.<br>Verify market data and risk on your broker/chart before trading.</p>
+  <p class="dg-note">For chart analysis, name the pair and timeframe (for example, XAUUSD 15m). Dagbo uses available live candles and never invents prices or trade levels. It does not execute trades.</p>
 </main>
 
 
@@ -602,7 +602,7 @@ function toggleAutoRead(el) {
 
   if (!restored) {
     var name = getName();
-    addMessage('ai', "Hello " + name + "! 👋<br>I'm Dagbo AI. How can I help you today?<br><br>✅ Explain any signal<br>✅ Teach trading concepts<br>✅ Answer your questions");
+    addMessage('ai', "Hello " + name + "! I'm Dagbo AI. How can I help you today?\n\n- Explain any signal\n- Teach trading concepts\n- Analyse a named market\n- Answer your trading questions");
   }
 
   // Accept a headline passed from the Market News page.
