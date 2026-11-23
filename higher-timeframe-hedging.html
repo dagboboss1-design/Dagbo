@@ -16,7 +16,7 @@
 'use strict';
 var settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings'))||{}}catch(e){}
 var pairs=Array.isArray(settings.pairs)&&settings.pairs.length?settings.pairs:['XAUUSD','EURUSD','GBPUSD','US30','BTCUSD'];
-var basketPairs=pairs.map(function(p){return String(p||'').toUpperCase().replace(/[^A-Z]/g,'')}).filter(function(p,i,a){return /^[A-Z]{6}$/.test(p)&&a.indexOf(p)===i&&(['XAU','XAG'].indexOf(p.slice(0,3))>=0||['USD','EUR','GBP','JPY','AUD','NZD','CAD','CHF'].indexOf(p.slice(0,3))>=0)&&(['USD','EUR','GBP','JPY','AUD','NZD','CAD','CHF'].indexOf(p.slice(3,6))>=0)});
+var basketPairs=pairs.map(function(p){var s=String(p||'').toUpperCase().replace(/[^A-Z]/g,'');return s==='GOLD'?'XAUUSD':s==='SILVER'?'XAGUSD':s}).filter(function(p,i,a){return /^[A-Z]{6}$/.test(p)&&a.indexOf(p)===i&&(['XAU','XAG'].indexOf(p.slice(0,3))>=0||['USD','EUR','GBP','JPY','AUD','NZD','CAD','CHF'].indexOf(p.slice(0,3))>=0)&&(['USD','EUR','GBP','JPY','AUD','NZD','CAD','CHF'].indexOf(p.slice(3,6))>=0)});
 var map={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1day','1week':'1week'};
 var ms={'60':3600000,'240':14400000,'1day':86400000};
 function el(id){return document.getElementById(id)}
