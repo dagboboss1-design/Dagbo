@@ -910,34 +910,37 @@
         return;
       }
 
-      // News context is optional. Do not delay a clear all-markets-closed
-      // state; when at least one market is open, load context independently.
-      try { await loadNewsSignalContext(); }
-      catch(newsError) {
-        console.warn('DAGBO news context unavailable; continuing technical scan:', newsError);
-      }
+      // News context is optional: start it alongside the technical scan.
+      // It must never hold up live candle retrieval or signal calculation.
+      loadNewsSignalContext();
 
-      // Fetch up to six OPEN pairs together. Closed pairs do not consume
-      // Twelve Data credits or force the scanner to wait for another quota window.
-      var batchSize = 6;
-      for (var start = 0; start < openPairs.length; start += batchSize) {
-        if (start > 0) {
-          if (loading) loading.innerText = 'Waiting for the next safe data window…';
-          await new Promise(function(resolve) { setTimeout(resolve, 62000); });
-        }
-        var batch = openPairs.slice(start, start + batchSize);
-        var results = await Promise.all(batch.map(function(pair) {
-          return fetchPairData(pair, currentSignalTF).then(function(data) {
-            return { pair: pair, data: data };
-          }).catch(function(error) {
-            console.error('DAGBO pair scan failed:', pair, error);
-            return { pair: pair, data: { pair: pair, error: 'Temporary scan failure. Refresh to retry.', errorStage: 'network' } };
-          });
-        }));
-        results.forEach(function(result) {
-          if (result.data) signalsData[result.pair] = result.data;
+      // Start every eligible pair in the same scan cycle. The market-data
+      // endpoint enforces the Twelve Data quota centrally; pairs beyond the
+      // six-call allowance use configured backup providers or return a clear
+      // data error. Never sleep for a minute between batches.
+      var completedPairs = 0;
+      var results = await Promise.all(openPairs.map(function(pair) {
+        return fetchPairData(pair, currentSignalTF).then(function(data) {
+          completedPairs += 1;
+          if (data) signalsData[pair] = data;
+          if (loading) loading.innerText = 'Scanning ' + scannerProfileName() +
+            ' · ' + completedPairs + '/' + openPairs.length + ' markets checked...';
+          renderCards();
+          return { pair: pair, data: data };
+        }).catch(function(error) {
+          console.error('DAGBO pair scan failed:', pair, error);
+          completedPairs += 1;
+          var failure = { pair: pair, error: 'Temporary scan failure. Refresh to retry.', errorStage: 'network' };
+          signalsData[pair] = failure;
+          if (loading) loading.innerText = 'Scanning ' + scannerProfileName() +
+            ' · ' + completedPairs + '/' + openPairs.length + ' markets checked...';
+          renderCards();
+          return { pair: pair, data: failure };
         });
-      }
+      }));
+      results.forEach(function(result) {
+        if (result.data) signalsData[result.pair] = result.data;
+      });
 
       applyFreshScanCycles(options);
       recordSignalSnapshot();
