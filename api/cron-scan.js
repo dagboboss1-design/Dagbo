@@ -668,6 +668,8 @@ module.exports = async function handler(req, res) {
         schedulerSecretConfigured: !!(process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET),
         redisConfigured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
         marketDataKeyConfigured: !!process.env.TWELVE_DATA_API_KEY,
+        fcsAccessKeyConfigured: !!(process.env.FCS_API_KEY || process.env.FCS_ACCESS_KEY || process.env.FCS_API_ACCESS_KEY || process.env.FCSAPI_ACCESS_KEY),
+        fmpKeyConfigured: !!(process.env.FMP_API_KEY || process.env.FINANCIAL_MODELING_PREP_API_KEY || process.env.FMP_ACCESS_KEY || process.env.FMP_KEY),
         scanRunning: !!lockState,
         lastScan: lastScan || null
       });
