@@ -12,12 +12,12 @@ module.exports = async function handler(req,res){
   const pair=String(req.query.pair||'XAUUSD').toUpperCase();
   const interval=String(req.query.interval||'15');
   if(!SYMBOLS[pair]||!INTERVALS[interval])return res.status(400).json({error:'Unsupported market or timeframe'});
-  const key=process.env.TWELVE_DATA_API_KEY;
+  const key=process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_KEY;
   if(!key)return res.status(503).json({error:'Live chart data is not configured. Add TWELVE_DATA_API_KEY in Vercel environment variables.'});
   const url='https://api.twelvedata.com/time_series?symbol='+encodeURIComponent(SYMBOLS[pair])+
     '&interval='+encodeURIComponent(INTERVALS[interval])+'&timezone=UTC&outputsize=250&apikey='+encodeURIComponent(key);
   try{
-    const upstream=await fetch(url);const data=await upstream.json();
+    const upstream=await fetch(url,{signal:AbortSignal.timeout(8000)});const data=await upstream.json();
     if(!upstream.ok||data.status==='error'||!Array.isArray(data.values))
       return res.status(502).json({error:data.message||'Live candles are unavailable for this market'});
     const candles=data.values.map(c=>({time:Math.floor(Date.parse(c.datetime.replace(' ','T')+'Z')/1000),
