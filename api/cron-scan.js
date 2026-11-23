@@ -309,8 +309,11 @@ async function fetchTradeMarket(pair, apiKey) {
     return { time, datetime:raw, high:num(c.high), low:num(c.low), close:num(c.close) };
   }).filter(c => Number.isFinite(c.time) && [c.high,c.low,c.close].every(v => v !== null))
     .sort((a,b)=>a.time-b.time);
-  if (!candles.length) throw new Error("Invalid trade-monitor candle for " + pair);
-  const candle = candles[candles.length-1];
+  // Use only a fully closed 15-minute candle; the forming candle can reverse
+  // before close and must never trigger an automatic SL/TP journal result.
+  const closedCandles = candles.filter(c => c.time + 15 * 60 * 1000 <= Date.now());
+  if (!closedCandles.length) throw new Error("No fully closed 15-minute trade-monitor candle for " + pair);
+  const candle = closedCandles[closedCandles.length-1];
   return { pair, entry:candle.close, candleHigh:candle.high, candleLow:candle.low,
     candleTime:candle.datetime || null, signal:null };
 }
