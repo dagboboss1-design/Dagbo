@@ -346,6 +346,26 @@
     };
   }
 
+  // Higher-timeframe direction check; only run after a primary setup appears
+  // so neutral scans do not spend extra market-data requests.
+  async function fetchHigherTimeframeContext(pair, profile, primaryTf) {
+    var contextTf=null, contextLabel='';
+    if(profile==='scalping'||profile==='momentum'){contextTf='15';contextLabel='15m confirmation';}
+    else if(profile==='day'||['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0){contextTf=String(primaryTf)==='60'?'240':'60';contextLabel=timeframeLabel(contextTf)+' confirmation';}
+    else if(profile==='swing'||profile==='trend-following'||profile==='h4'){contextTf='1day';contextLabel='Daily trend context';}
+    else return {checked:false,direction:'WAIT',label:'Not required'};
+    var response=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(contextTf),{cache:'no-store',headers:{'Accept':'application/json'}});
+    var payload=await response.json();
+    if(!response.ok||payload.error||payload.stale||!Array.isArray(payload.values))throw new Error(payload.error||('No fresh '+contextLabel+' candles'));
+    var duration=TF_MILLISECONDS[String(contextTf)]||86400000;
+    var bars=payload.values.filter(function(c){var raw=String(c.datetime||''),stamp=Date.parse(raw.replace(' ','T')+(/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw)?'':'Z'));return Number.isFinite(stamp)&&stamp+duration<=Date.now();}).sort(function(a,b){function t(c){var raw=String(c.datetime||'');return Date.parse(raw.replace(' ','T')+(/(Z|[+-]\\d\\d:\\d\\d)$/.test(raw)?'':'Z'));}return t(a)-t(b);});
+    if(bars.length<55)throw new Error('Insufficient closed candles for '+contextLabel);
+    var closes=bars.map(function(c){return Number(c.close);});
+    if(closes.some(function(v){return !Number.isFinite(v)||v<=0;}))throw new Error('Invalid '+contextLabel+' candle data');
+    var fast=calculateEMA(closes,20),slow=calculateEMA(closes,50),last=closes[closes.length-1];
+    return {checked:true,timeframe:contextTf,label:contextLabel,direction:fast>slow&&last>fast?'BUY':fast<slow&&last<fast?'SELL':'WAIT',provider:payload.provider||'Market data'};
+  }
+
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
     // Hedging is basket-level intelligence, not a single-pair BUY/SELL strategy.
@@ -416,7 +436,27 @@
 
       var analysis=analyseAllMethods(candles, activeTradingProfile);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
+      var timeframeContext={checked:false,direction:'WAIT',label:'Not required'};
       var final=analysis.final;
+      // Do not publish a directional signal unless its selected higher timeframe agrees.
+      // Missing or mixed context fails closed rather than guessing.
+      if(final.indexOf('BUY')>=0||final.indexOf('SELL')>=0){
+        try{
+          timeframeContext=await fetchHigherTimeframeContext(pair,activeTradingProfile,tf);
+          if(timeframeContext.checked&&timeframeContext.direction!==final.replace(/^HIGH CONFIDENCE\\s+/,'')&&timeframeContext.direction!=='WAIT'){
+            analysis.final='NO TRADE';analysis.direction='WAIT';
+            analysis.evidence=(analysis.evidence||[]).concat(['Multi-timeframe filter: primary setup disagrees with '+timeframeContext.label+' ('+timeframeContext.direction+')']);
+          }else if(timeframeContext.checked&&timeframeContext.direction==='WAIT'){
+            analysis.final='NO TRADE';analysis.direction='WAIT';
+            analysis.evidence=(analysis.evidence||[]).concat(['Multi-timeframe filter: '+timeframeContext.label+' trend is mixed']);
+          }
+        }catch(contextError){
+          timeframeContext={checked:false,direction:'WAIT',label:'Context unavailable',error:contextError.message};
+          analysis.final='NO TRADE';analysis.direction='WAIT';
+          analysis.evidence=(analysis.evidence||[]).concat(['Multi-timeframe filter blocked entry: '+contextError.message]);
+        }
+        final=analysis.final;
+      }
       // Do not surface another entry for a pair that already has an OPEN
       // Journal position on this device. This avoids duplicate same-pair trades.
       if(final.indexOf('BUY')>=0||final.indexOf('SELL')>=0){
@@ -464,7 +504,7 @@
       }
       var lastC=candles[candles.length-1];
       return {
-        pair:pair,final:final,entry:entry,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,
+        pair:pair,final:final,entry:entry,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,timeframeContext:timeframeContext,
         provider:data.provider||'Market data',marketDataType:data.marketDataType||'DIRECT',sourceSymbol:data.sourceSymbol||null,marketLabel:data.marketLabel||null,proxyNotice:data.proxyNotice||null,
         s1:analysis.emaTrend,s2:analysis.candleName,s3:analysis.structure,
         strategy:analysis.evidence.length?analysis.evidence.join(' · '):'No method produced directional evidence',
