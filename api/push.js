@@ -391,7 +391,6 @@ module.exports = async function handler(req, res) {
             ". Do not issue a directional trade call or invent entry/SL/TP.";
           console.warn("DAGBO AI candle context unavailable:", candleError.message);
         }
-      }
       } else if (asksAnalysis && !quotePair) {
         liveCandleContext = "No instrument was identified. Ask the user which pair or market and timeframe to analyse.";
       }
