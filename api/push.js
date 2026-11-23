@@ -76,6 +76,7 @@ function getConfiguredAIProviders() {
     openai: !!(process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY),
     claude: !!process.env.ANTHROPIC_API_KEY,
     gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.Gemini_API_Key),
+    groq: !!process.env.GROQ_API_KEY
   };
 }
 
@@ -84,12 +85,13 @@ function chooseAIProvider(task) {
   if (section === "signals") return "claude";
   if (section === "journal") return "openai";
   if (section === "news") return "gemini";
+  if (section === "assistant" || section === "boss1" || section === "fast") return "groq";
   return "openai";
 }
 
 function getAIProviderOrder(primary, configured) {
   // Use the configured first-choice provider, then fall back without exposing provider names.
-  const order = [primary, "openai", "gemini", "claude"];
+  const order = [primary, "groq", "openai", "gemini", "claude"];
   return order.filter(function(name, index, all) {
     return !!configured[name] && all.indexOf(name) === index;
   });
@@ -135,6 +137,17 @@ async function callAIProvider(provider, messages, maxTokens, timeoutMs) {
       }),
       generationConfig: { temperature: 0.3, maxOutputTokens: outputLimit }
     };
+  } else if (provider === "groq") {
+    const key = process.env.GROQ_API_KEY;
+    if (!key) throw new Error("Groq is not configured");
+    model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+    url = "https://api.groq.com/openai/v1/chat/completions";
+    headers.Authorization = "Bearer " + key;
+    body = {
+      model: model, messages: messages, temperature: 0.3,
+      max_completion_tokens: Math.max(outputLimit, 300),
+      reasoning_effort: "low", include_reasoning: false
+    };
   } else {
     throw new Error("Unsupported AI provider");
   }
@@ -162,7 +175,10 @@ async function callAIProvider(provider, messages, maxTokens, timeoutMs) {
     answer = data.candidates && data.candidates[0] && data.candidates[0].content &&
       data.candidates[0].content.parts ? data.candidates[0].content.parts.map(function(part) { return part.text || ""; }).join("\n") : "";
   } else {
-    answer = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || "";
+    const message = data.choices && data.choices[0] && data.choices[0].message;
+    const content = message && message.content;
+    answer = typeof content === "string" ? content :
+      Array.isArray(content) ? content.map(function(part) { return typeof part === "string" ? part : (part && part.text) || ""; }).join("\n") : "";
   }
   if (typeof answer !== "string" || !answer.trim()) throw new Error(provider + " returned an empty answer");
   return { answer: answer.trim(), provider: provider, model: model };
@@ -468,7 +484,8 @@ module.exports = async function handler(req, res) {
       }
       if (!result) {
         return res.status(502).json({
-          error: "AI service is temporarily unavailable. Please try again shortly.",
+          error: "AI connections are not responding. Check provider credits and project access, then try again.",
+          errorCode: "AI_PROVIDER_UNAVAILABLE",
         });
       }
 
