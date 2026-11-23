@@ -99,7 +99,8 @@ function getAIProviderOrder(primary, configured) {
   });
 }
 
-async function callAIProvider(provider, messages) {
+async function callAIProvider(provider, messages, maxTokens) {
+  const outputLimit = Number.isInteger(maxTokens) ? Math.max(60, Math.min(500, maxTokens)) : 500;
   const systemMessage = messages.find(function(m) { return m.role === "system"; });
   const conversation = messages.filter(function(m) { return m.role !== "system"; });
   let url, headers = { "Content-Type": "application/json" }, body, model;
@@ -110,7 +111,7 @@ async function callAIProvider(provider, messages) {
     model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
     url = "https://api.openai.com/v1/chat/completions";
     headers.Authorization = "Bearer " + key;
-    body = { model: model, messages: messages, temperature: 0.3, max_tokens: 500 };
+    body = { model: model, messages: messages, temperature: 0.3, max_tokens: outputLimit };
   } else if (provider === "claude") {
     const key = process.env.ANTHROPIC_API_KEY;
     if (!key) throw new Error("Claude is not configured");
@@ -120,7 +121,7 @@ async function callAIProvider(provider, messages) {
     headers["anthropic-version"] = "2023-06-01";
     body = {
       model: model,
-      max_tokens: 500,
+      max_tokens: outputLimit,
       system: systemMessage ? systemMessage.content : "",
       messages: conversation.map(function(m) {
         return { role: m.role === "assistant" ? "assistant" : "user", content: m.content };
@@ -136,7 +137,7 @@ async function callAIProvider(provider, messages) {
       contents: conversation.map(function(m) {
         return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] };
       }),
-      generationConfig: { temperature: 0.3, maxOutputTokens: 500 }
+      generationConfig: { temperature: 0.3, maxOutputTokens: outputLimit }
     };
   } else {
     const key = process.env.GROQ_API_KEY;
@@ -144,7 +145,7 @@ async function callAIProvider(provider, messages) {
     model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
     url = "https://api.groq.com/openai/v1/chat/completions";
     headers.Authorization = "Bearer " + key;
-    body = { model: model, messages: messages, temperature: 0.3, max_tokens: 500 };
+    body = { model: model, messages: messages, temperature: 0.3, max_tokens: outputLimit };
   }
 
   const response = await fetch(url, {
@@ -440,8 +441,11 @@ module.exports = async function handler(req, res) {
         boss1: "You are DAGBO's BOSS1 trading coach. Teach clearly, check reasoning and emphasise risk management.",
         fast: "You are DAGBO's fast assistant. Be concise and use only supplied facts."
       };
+      const isSimpleQuestion = question.trim().split(/\\s+/).length <= 12 &&
+        !/\\b(analy[sz]e|analysis|chart|signal|setup|buy|sell|long|short|trend|direction|entry|technical|market structure|support|resistance|bias|compare|difference|explain|teach|steps|how to|how do i|why|calculate|review|journal|news|strategy|plan)\\b/i.test(question);
+      const answerTokenLimit = isSimpleQuestion ? 100 : 500;
       const systemPrompt = (taskInstructions[selectedTask] || "You are DAGBO's AI Market Commander.") + " You are assisting " + (safeName || "Oga") +
-        ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise, clear and Nigerian-friendly; use Pidgin naturally when useful. For live-price questions, use only a verified live quote supplied in the context; if unavailable, say so and never guess. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When asked for a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit only when supported by fresh market data and a valid setup. If fresh data or a valid setup is missing, return WAIT and say entry/SL/TP are unavailable. Never guarantee profits. Ordinary answers should usually be 1-4 short sentences.";
+        ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise, clear and Nigerian-friendly; use Pidgin naturally when useful. For simple factual questions, answer in ONE short sentence, ideally under 20 words. Do not add greetings, headings, bullet points, repeated explanations or unsolicited follow-up. For detailed requests, give only the details needed. For live-price questions, use only a verified live quote supplied in the context; if unavailable, say so and never guess. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When asked for a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit only when supported by fresh market data and a valid setup. If fresh data or a valid setup is missing, return WAIT and say entry/SL/TP are unavailable. Never guarantee profits. Ordinary answers should usually be 1-4 short sentences.";
       const userContent = question.trim() +
         (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") +
         (liveCandleContext ? "\n\nLIVE CHART CONTEXT: " + liveCandleContext : "") +
@@ -465,7 +469,7 @@ module.exports = async function handler(req, res) {
       for (const providerName of providerOrder) {
         const startedAt = Date.now();
         try {
-          result = await callAIProvider(providerName, messages);
+          result = await callAIProvider(providerName, messages, answerTokenLimit);
           attempts.push({ provider: providerName, ok: true, latencyMs: Date.now() - startedAt });
           break;
         } catch (error) {
@@ -479,6 +483,14 @@ module.exports = async function handler(req, res) {
           error: "DAGBO AI providers could not answer. Check provider keys, model access and API billing.",
           attempts: attempts
         });
+      }
+
+      if (isSimpleQuestion) {
+        const firstSentence = result.answer.match(/^[\\s\\S]*?[.!?](?:\\s|$)/);
+        let concise = firstSentence ? firstSentence[0].trim() : result.answer.trim();
+        const words = concise.split(/\\s+/);
+        if (words.length > 32) concise = words.slice(0, 32).join(" ").replace(/[,:;\\-]+$/, "") + "…";
+        result.answer = concise;
       }
 
       // Notify only the device that asked the question. Notification failure never blocks the answer.
