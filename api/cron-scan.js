@@ -90,7 +90,7 @@ function analyze(candles, pair) { return confluence.analyze(candles, pair); }
 
 function validAuth(req) {
   const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET;
-  const auth = req.headers.authorization || "";
+  const auth = (req.headers && req.headers.authorization) || "";
   if (!secret) return false;
   const a = Buffer.from(auth);
   const b = Buffer.from("Bearer " + secret);
@@ -650,7 +650,7 @@ module.exports = async function handler(req, res) {
   // The scheduled scanner must use the same provider failover manager as the Signals page.
   // VERCEL_URL targets this deployment; production hostname is the safe fallback.
   const marketDataHost = process.env.DAGBO_MARKET_DATA_BASE_URL
-    ? process.env.DAGBO_MARKET_DATA_BASE_URL.replace(/\\/$/, "")
+    ? process.env.DAGBO_MARKET_DATA_BASE_URL.replace(/\/$/, "")
     : process.env.VERCEL_URL
       ? "https://" + process.env.VERCEL_URL
       : "https://dagboboss.vercel.app";
