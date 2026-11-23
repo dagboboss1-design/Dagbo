@@ -172,6 +172,8 @@
   var profilePreferenceStore = {};
   try { profilePreferenceStore=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}; } catch(e) {}
   var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
+  // Shared formatter used by scan status, cards, snapshots and timeframe controls.
+  function timeframeLabel(tf){return TF_LABELS[String(tf)]||String(tf);}
   var TF_MILLISECONDS={'5':300000,'15':900000,'30':1800000,'60':3600000,'240':14400000,'1day':86400000,'1week':604800000};
   // Persisted signal lifecycle for the selected timeframe.
   var SIGNAL_CYCLES_KEY='dagbo_signal_cycles_v1', signalCycles={};
@@ -1041,7 +1043,10 @@
   // Start the actual market scan BEFORE optional profile/stat widgets.
   // These widgets must never delay or block the live-data scanner.
   if (initialStatus) initialStatus.textContent = 'Starting live market scan...';
-  loadAllSignals({resume:true});
+  loadAllSignals({resume:true}).catch(function(scanStartupError){
+    console.error('DAGBO initial scan could not start:', scanStartupError);
+    if (initialStatus) initialStatus.textContent = 'Scanner startup failed: ' + String(scanStartupError && scanStartupError.message || scanStartupError);
+  });
   window.dispatchEvent(new Event('dagbo:scanner-started'));
 
   // Render secondary controls only after the scanner request has started.
