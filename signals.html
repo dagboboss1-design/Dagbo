@@ -520,7 +520,17 @@
     var panel = document.getElementById('newsSignalContext');
     if (!panel) return;
     try {
-      var response = await fetch('/api/news-signal', { cache: 'no-store' });
+      // News context is optional and must never block the technical market scan.
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 7000) : null;
+      var response;
+      try {
+        response = await fetch('/api/news-signal', controller
+          ? { cache: 'no-store', signal: controller.signal }
+          : { cache: 'no-store' });
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
       if (!response.ok) throw new Error('News context unavailable');
       var data = await response.json();
       latestNewsCandidate = data && data.candidate ? data.candidate : null;
@@ -957,10 +967,14 @@
   }
 
   window.loadAllSignals=function(){loadAllSignals();};
-  renderProfileControls();
-  updateScalpStats();
+  // Keep scanner startup independent from optional profile/stat UI failures.
+  try { renderProfileControls(); }
+  catch (error) { console.error('DAGBO profile controls failed to initialize:', error); }
+  try { updateScalpStats(); }
+  catch (error) { console.warn('DAGBO scalp statistics unavailable:', error); }
   loadAllSignals({resume:true});
-  startLifecycleClock();
+  try { startLifecycleClock(); }
+  catch (error) { console.warn('DAGBO signal lifecycle clock unavailable:', error); }
   // Run a fresh Signal Board scan every two minutes while this page is active.
   // The request cache and shared Twelve Data limiter protect the provider quota.
   if (window.signalAutoScanTimer) clearInterval(window.signalAutoScanTimer);
