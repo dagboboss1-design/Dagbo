@@ -335,7 +335,7 @@ module.exports = async function handler(req, res) {
       const asksAnalysis = /\b(analy[sz]e|analysis|chart|signal|setup|buy|sell|long|short|trend|direction|entry|technical|market structure|support|resistance|bias)\b/i.test(question);
       const normalizedQuestion = question.toUpperCase().replace(/[^A-Z0-9]/g, "");
       let quotePair = Object.keys(pairSymbols).find(function(pair) {
-        return new RegExp("\\b" + pair + "\\b", "i").test(question) ||
+        return new RegExp("\b" + pair + "\b", "i").test(question) ||
           normalizedQuestion.indexOf(pair.replace(/[^A-Z0-9]/g, "")) >= 0;
       });
       if (!quotePair && (asksPrice || asksAnalysis) && /\b(this pair|current pair|selected pair|my chart|the chart)\b/i.test(question) && safeMarketContext) {
@@ -441,8 +441,8 @@ module.exports = async function handler(req, res) {
         boss1: "You are DAGBO's BOSS1 trading coach. Teach clearly, check reasoning and emphasise risk management.",
         fast: "You are DAGBO's fast assistant. Be concise and use only supplied facts."
       };
-      const isSimpleQuestion = question.trim().split(/\\s+/).length <= 12 &&
-        !/\\b(analy[sz]e|analysis|chart|signal|setup|buy|sell|long|short|trend|direction|entry|technical|market structure|support|resistance|bias|compare|difference|explain|teach|steps|how to|how do i|why|calculate|review|journal|news|strategy|plan)\\b/i.test(question);
+      const isSimpleQuestion = question.trim().split(/\s+/).length <= 12 &&
+        !/\b(analy[sz]e|analysis|chart|signal|setup|buy|sell|long|short|trend|direction|entry|technical|market structure|support|resistance|bias|compare|difference|explain|teach|steps|how to|how do i|why|calculate|review|journal|news|strategy|plan)\b/i.test(question);
       const answerTokenLimit = isSimpleQuestion ? 100 : 500;
       const systemPrompt = (taskInstructions[selectedTask] || "You are DAGBO's AI Market Commander.") + " You are assisting " + (safeName || "Oga") +
         ". Answer exactly what the user asks and perform the requested task; do not add unrelated advice. Be concise, clear and Nigerian-friendly; use Pidgin naturally when useful. For simple factual questions, answer in ONE short sentence, ideally under 20 words. Do not add greetings, headings, bullet points, repeated explanations or unsolicited follow-up. For detailed requests, give only the details needed. For live-price questions, use only a verified live quote supplied in the context; if unavailable, say so and never guess. Never invent prices, news, indicators or market conditions. Treat device snapshots as potentially stale. When asked for a trade signal or setup, provide pair, BUY/SELL/WAIT, timeframe, entry, stop loss and take profit only when supported by fresh market data and a valid setup. If fresh data or a valid setup is missing, return WAIT and say entry/SL/TP are unavailable. Never guarantee profits. Ordinary answers should usually be 1-4 short sentences.";
@@ -486,10 +486,10 @@ module.exports = async function handler(req, res) {
       }
 
       if (isSimpleQuestion) {
-        const firstSentence = result.answer.match(/^[\\s\\S]*?[.!?](?:\\s|$)/);
+        const firstSentence = result.answer.match(/^[\s\S]*?[.!?](?:\s|$)/);
         let concise = firstSentence ? firstSentence[0].trim() : result.answer.trim();
-        const words = concise.split(/\\s+/);
-        if (words.length > 32) concise = words.slice(0, 32).join(" ").replace(/[,:;\\-]+$/, "") + "…";
+        const words = concise.split(/\s+/);
+        if (words.length > 32) concise = words.slice(0, 32).join(" ").replace(/[,:;\-]+$/, "") + "…";
         result.answer = concise;
       }
 
