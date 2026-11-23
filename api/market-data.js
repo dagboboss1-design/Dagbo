@@ -29,7 +29,10 @@ async function fetchJsonWithTimeout(url, options, timeoutMs) {
   const timer = setTimeout(() => controller.abort(), timeoutMs || 9000);
   try {
     const response = await fetch(url, Object.assign({}, options || {}, { signal: controller.signal }));
-    const data = await response.json();
+    const raw = await response.text();
+    let data = {};
+    try { data = raw ? JSON.parse(raw) : {}; }
+    catch (_) { data = { message: String(raw || "Non-JSON provider response").slice(0, 240) }; }
     return { response, data };
   } finally {
     clearTimeout(timer);
