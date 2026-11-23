@@ -1,5 +1,5 @@
 const SYMBOLS = {
-  XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD",
+  XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD", DXY: "DXY",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY", GBPJPY: "GBP/JPY",
   AUDUSD: "AUD/USD", USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
   EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK",
@@ -127,7 +127,7 @@ function normalizeFcsCandles(data) {
   }).filter(Boolean).sort((a,b)=>Date.parse(a.datetime)-Date.parse(b.datetime));
 }
 async function fetchFcsFallback(pair, tf) {
-  const key = process.env.FCS_API_KEY;
+  const key = (process.env.FCS_API_KEY || process.env.FCS_KEY);
   const period = fcsPeriod(tf);
   if (!key || !period) return null;
   const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","USDSEK"];
@@ -148,7 +148,7 @@ async function fetchFcsFallback(pair, tf) {
   return { pair, timeframe:tf, provider:"FCS", providerExchange:"FCS", values };
 }
 async function fetchFmpFallback(pair, tf) {
-  const key = process.env.FMP_API_KEY;
+  const key = (process.env.FMP_API_KEY || process.env.FMP_KEY);
   const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP"];
   const indexPairs = Object.keys(FMP_INDEX_SYMBOLS);
   const isIndex = indexPairs.includes(pair);
@@ -192,7 +192,7 @@ async function fetchFmpFallback(pair, tf) {
   return { pair, timeframe:tf, provider:isIndex ? "Financial Modeling Prep · Index" : "Financial Modeling Prep", providerExchange:"FMP", sourceSymbol:symbol, values };
 }
 async function fetchFcsIndexFallback(pair, tf) {
-  const key = process.env.FCS_API_KEY;
+  const key = (process.env.FCS_API_KEY || process.env.FCS_KEY);
   const symbol = FCS_INDEX_SYMBOLS[pair];
   const period = fcsPeriod(tf);
   if (!key || !symbol || !period) return null;
@@ -300,7 +300,7 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ...cached.payload, cache: "hit", cachedAt: new Date(cached.savedAt).toISOString() });
   }
 
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
+  const apiKey = process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_KEY;
   let primaryFailure = null;
   if (apiKey) {
     const allowed = await claimTwelveDataSlot();
@@ -332,7 +332,7 @@ module.exports = async function handler(req, res) {
       primaryFailure = "Twelve Data request quota is busy";
     }
   } else {
-    primaryFailure = "TWELVE_DATA_API_KEY is not configured";
+    primaryFailure = "TWELVE_DATA_API_KEY (or TWELVE_DATA_KEY) is not configured";
   }
 
   // Provider failover: Twelve Data -> FCS -> FMP (where supported).
