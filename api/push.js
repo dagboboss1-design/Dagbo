@@ -76,7 +76,6 @@ function getConfiguredAIProviders() {
     openai: !!(process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY),
     claude: !!process.env.ANTHROPIC_API_KEY,
     gemini: !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.Gemini_API_Key),
-    groq: !!process.env.GROQ_API_KEY
   };
 }
 
@@ -84,22 +83,19 @@ function chooseAIProvider(task) {
   const section = String(task || "assistant").toLowerCase();
   if (section === "signals") return "claude";
   if (section === "journal") return "openai";
-  if (section === "assistant" || section === "boss1") return "groq";
   if (section === "news") return "gemini";
-  if (section === "fast") return "groq";
   return "openai";
 }
 
 function getAIProviderOrder(primary, configured) {
-  // Keep each page's preferred model first, then use Groq as a dependable
-  // general-purpose fallback. Groq itself falls back to OpenAI.
-  const order = primary === "groq" ? ["groq", "openai"] : [primary, "groq"];
+  // Use the configured first-choice provider, then fall back without exposing provider names.
+  const order = [primary, "openai", "gemini", "claude"];
   return order.filter(function(name, index, all) {
     return !!configured[name] && all.indexOf(name) === index;
   });
 }
 
-async function callAIProvider(provider, messages, maxTokens) {
+async function callAIProvider(provider, messages, maxTokens, timeoutMs) {
   const outputLimit = Number.isInteger(maxTokens) ? Math.max(60, Math.min(500, maxTokens)) : 500;
   const systemMessage = messages.find(function(m) { return m.role === "system"; });
   const conversation = messages.filter(function(m) { return m.role !== "system"; });
@@ -140,19 +136,15 @@ async function callAIProvider(provider, messages, maxTokens) {
       generationConfig: { temperature: 0.3, maxOutputTokens: outputLimit }
     };
   } else {
-    const key = process.env.GROQ_API_KEY;
-    if (!key) throw new Error("Groq is not configured");
-    model = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
-    url = "https://api.groq.com/openai/v1/chat/completions";
-    headers.Authorization = "Bearer " + key;
-    body = { model: model, messages: messages, temperature: 0.3, max_tokens: outputLimit };
+    throw new Error("Unsupported AI provider");
   }
 
+  const requestTimeout = Number.isFinite(timeoutMs) ? Math.max(800, Math.min(8000, timeoutMs)) : 6500;
   const response = await fetch(url, {
     method: "POST",
     headers: headers,
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(3500)
+    signal: AbortSignal.timeout(requestTimeout)
   });
   let data = {};
   try { data = await response.json(); } catch (_) {}
@@ -310,7 +302,7 @@ module.exports = async function handler(req, res) {
       const rate = await checkAiRateLimit(req);
       if (!rate.allowed) {
         res.setHeader("Retry-After", String(AI_RATE_WINDOW_SECONDS));
-        return res.status(429).json({ error: "Dagbo AI is receiving too many requests. Please wait a few minutes and try again." });
+        return res.status(429).json({ error: "AI Commander is receiving too many requests. Please wait a few minutes and try again." });
       }
 
       const safeMarketContext = typeof marketContext === "string" ? marketContext.slice(0, 2500) : "";
@@ -356,56 +348,50 @@ module.exports = async function handler(req, res) {
       }
       let liveQuoteContext = "";
       let liveCandleContext = "";
-      if (asksAnalysis && quotePair && process.env.TWELVE_DATA_API_KEY) {
-        const candleSymbols = {
-          XAUUSD:"XAU/USD", GOLD:"XAU/USD", EURUSD:"EUR/USD", GBPUSD:"GBP/USD",
-          USDJPY:"USD/JPY", GBPJPY:"GBP/JPY", AUDUSD:"AUD/USD", USDCHF:"USD/CHF",
-          USDCAD:"USD/CAD", NZDUSD:"NZD/USD", EURJPY:"EUR/JPY", EURGBP:"EUR/GBP",
-          BTCUSD:"BTC/USD", ETHUSD:"ETH/USD"
-        };
-        const candleSymbol = candleSymbols[quotePair];
-        if (candleSymbol) {
-          const tf = /\b(5m|5 min|5-minute|5 minute)\b/i.test(question) ? "5min" :
-            /\b(30m|30 min|30-minute|30 minute)\b/i.test(question) ? "30min" :
-            /\b(1h|1 hour|hourly)\b/i.test(question) ? "1h" :
-            /\b(4h|4 hour|4-hour)\b/i.test(question) ? "4h" : "15min";
-          try {
-            const candleUrl = "https://api.twelvedata.com/time_series?symbol=" +
-              encodeURIComponent(candleSymbol) + "&interval=" + encodeURIComponent(tf) +
-              "&timezone=UTC&outputsize=24&apikey=" + encodeURIComponent(process.env.TWELVE_DATA_API_KEY);
-            const candleResponse = await fetch(candleUrl, { signal: AbortSignal.timeout(2200) });
-            const candleData = await candleResponse.json();
-            if (candleResponse.ok && Array.isArray(candleData.values) && candleData.values.length >= 5) {
-              const bars = candleData.values.slice(0, 20).reverse().map(function(bar) {
-                return {
-                  time: bar.datetime,
-                  open: Number(bar.open), high: Number(bar.high),
-                  low: Number(bar.low), close: Number(bar.close),
-                  volume: Number(bar.volume || 0)
-                };
-              }).filter(function(bar) {
-                return [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite);
-              });
-              if (bars.length >= 5) {
-                liveCandleContext = "FRESH TWELVE DATA OHLC CANDLES for " + quotePair +
-                  " on " + tf + " timeframe, UTC, newest candle timestamp " +
-                  bars[bars.length - 1].time + ". Candles oldest-to-newest: " +
-                  JSON.stringify(bars) +
-                  ". Use these candles for structure and setup analysis; do not claim indicators that were not calculated.";
-              }
-            } else {
-              liveCandleContext = "Fresh candles are unavailable for " + quotePair +
-                ". Do not issue a directional trade call or invent entry/SL/TP.";
+      if (asksAnalysis && quotePair) {
+        const tf = /\\b(5m|5 min|5-minute|5 minute)\\b/i.test(question) ? "5" :
+          /\\b(30m|30 min|30-minute|30 minute)\\b/i.test(question) ? "30" :
+          /\\b(1h|1 hour|hourly)\\b/i.test(question) ? "60" :
+          /\\b(4h|4 hour|4-hour)\\b/i.test(question) ? "240" : "15";
+        try {
+          const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\\/\\//, "");
+          const candleUrl = "https://" + host + "/api/market-data?pair=" +
+            encodeURIComponent(quotePair) + "&tf=" + encodeURIComponent(tf);
+          const candleResponse = await fetch(candleUrl, {
+            headers: { "Cache-Control": "no-cache" },
+            signal: AbortSignal.timeout(3200)
+          });
+          const candleData = await candleResponse.json();
+          if (candleResponse.ok && !candleData.stale &&
+              Array.isArray(candleData.values) && candleData.values.length >= 5) {
+            const bars = candleData.values.slice(-20).map(function(bar) {
+              return {
+                time: bar.datetime,
+                open: Number(bar.open), high: Number(bar.high),
+                low: Number(bar.low), close: Number(bar.close),
+                volume: Number(bar.volume || 0)
+              };
+            }).filter(function(bar) {
+              return [bar.open, bar.high, bar.low, bar.close].every(Number.isFinite);
+            });
+            if (bars.length >= 5) {
+              liveCandleContext = "FRESH MARKET-DATA OHLC candles for " + quotePair +
+                " on " + tf + " timeframe. Source: " + String(candleData.provider || "market-data service") +
+                ". Newest candle timestamp " + bars[bars.length - 1].time +
+                ". Candles oldest-to-newest: " + JSON.stringify(bars) +
+                ". Use these candles for structure and setup analysis; do not claim indicators that were not calculated.";
             }
-          } catch (candleError) {
-            liveCandleContext = "Live candle request failed for " + quotePair +
+          } else {
+            liveCandleContext = "Fresh candles are unavailable for " + quotePair +
+              ". Provider response: " + String(candleData.error || "No current candles returned") +
               ". Do not issue a directional trade call or invent entry/SL/TP.";
-            console.warn("DAGBO AI candle context unavailable:", candleError.message);
           }
-        } else {
-          liveCandleContext = "No supported live candle mapping is available for " + quotePair +
-            ". Ask the user to select a supported FX, GOLD or crypto pair; do not invent chart analysis.";
+        } catch (candleError) {
+          liveCandleContext = "Live candle request failed for " + quotePair +
+            ". Do not issue a directional trade call or invent entry/SL/TP.";
+          console.warn("DAGBO AI candle context unavailable:", candleError.message);
         }
+      }
       } else if (asksAnalysis && !quotePair) {
         liveCandleContext = "No instrument was identified. Ask the user which pair or market and timeframe to analyse.";
       }
@@ -466,10 +452,13 @@ module.exports = async function handler(req, res) {
       let result = null;
       let lastError = null;
       const attempts = [];
+      const aiDeadline = Date.now() + 8800;
       for (const providerName of providerOrder) {
+        const remainingMs = aiDeadline - Date.now();
+        if (remainingMs < 900) break;
         const startedAt = Date.now();
         try {
-          result = await callAIProvider(providerName, messages, answerTokenLimit);
+          result = await callAIProvider(providerName, messages, answerTokenLimit, Math.min(6200, remainingMs - 250));
           attempts.push({ provider: providerName, ok: true, latencyMs: Date.now() - startedAt });
           break;
         } catch (error) {
@@ -497,7 +486,7 @@ module.exports = async function handler(req, res) {
         try {
           configureVapid();
           await webpush.sendNotification(subscription, JSON.stringify({
-            title: "🤖 Dagbo AI Answer",
+            title: "🤖 AI Commander Answer",
             body: result.answer.replace(/\s+/g, " ").slice(0, 190) + (result.answer.length > 190 ? "…" : ""),
             url: "/ai.html",
             tag: "dagbo-ai-" + Date.now()
