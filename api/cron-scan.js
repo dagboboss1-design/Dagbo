@@ -651,7 +651,7 @@ module.exports = async function handler(req, res) {
   // VERCEL_URL targets this deployment; production hostname is the safe fallback.
   const marketDataHost = process.env.VERCEL_URL
     ? "https://" + process.env.VERCEL_URL
-    : "https://dagboboss.vercel.app";
+    : "https://dagbo-v9g7.vercel.app";
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     return res.status(503).json({ error: "Upstash Redis is not configured" });
   }
