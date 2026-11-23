@@ -492,7 +492,7 @@ module.exports = async function handler(req, res) {
       const userContent = question.trim() +
         (liveQuoteContext ? "\n\nLIVE QUOTE CONTEXT: " + liveQuoteContext : "") +
         (liveCandleContext ? "\n\nLIVE CHART CONTEXT: " + liveCandleContext : "") +
-        (safeMarketContext ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "");
+        (safeMarketContext && (selectedTask === "journal" || ((asksAnalysis || asksPrice) && !!quotePair)) ? "\n\nLatest saved DAGBO signal context (device snapshot; may be stale): " + safeMarketContext : "");
       const messages = [{ role: "system", content: systemPrompt }]
         .concat(safeHistory)
         .concat([{ role: "user", content: userContent }]);
