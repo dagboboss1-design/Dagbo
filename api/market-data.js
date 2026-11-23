@@ -3,7 +3,14 @@ const SYMBOLS = {
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY", GBPJPY: "GBP/JPY",
   AUDUSD: "AUD/USD", USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
   EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK",
-  US30: "DJI", US100: "NDX", NAS100: "NDX", US500: "SPX"
+  US30: "DIA", US100: "QQQ", NAS100: "QQQ", US500: "SPY"
+};
+
+const ETF_PROXY_SYMBOLS = {
+  US30: "DIA",
+  US100: "QQQ",
+  NAS100: "QQQ",
+  US500: "SPY"
 };
 
 const BINANCE_SYMBOLS = {
@@ -277,9 +284,15 @@ module.exports = async function handler(req, res) {
 
   const symbol = SYMBOLS[pair];
   if (!symbol) return res.status(400).json({ error: "Unsupported market pair" });
+  const isIndexProxy = Object.prototype.hasOwnProperty.call(ETF_PROXY_SYMBOLS, pair);
+  const proxyMeta = isIndexProxy ? {
+    marketDataType: "ETF_PROXY", sourceSymbol: ETF_PROXY_SYMBOLS[pair],
+    marketLabel: pair + " directional proxy · " + ETF_PROXY_SYMBOLS[pair] + " ETF",
+    proxyNotice: "This is an ETF proxy, not the broker's exact index CFD price. Entry, stop and target prices are in " + ETF_PROXY_SYMBOLS[pair] + " ETF units."
+  } : {};
 
 
-  const cacheKey = "dagbo:market:candles:" + pair + ":" + tf;
+  const cacheKey = "dagbo:market:candles:v2:" + pair + ":" + tf;
   const cached = await readCache(cacheKey);
   const cacheAge = cached ? Date.now() - Number(cached.savedAt || 0) : Infinity;
   if (cached && cacheAge <= CACHE_SECONDS * 1000) {
@@ -304,9 +317,9 @@ module.exports = async function handler(req, res) {
           primaryFailure = "Twelve Data returned fewer than 30 candles";
         } else {
           const payload = {
-            pair, timeframe:tf, provider:"Twelve Data",
+            pair, timeframe:tf, provider:isIndexProxy ? "Twelve Data · ETF proxy" : "Twelve Data",
             providerExchange:data.meta && data.meta.exchange ? data.meta.exchange : null,
-            values:data.values
+            values:data.values, ...proxyMeta
           };
           await writeCache(cacheKey, { savedAt:Date.now(), payload });
           res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
@@ -323,7 +336,9 @@ module.exports = async function handler(req, res) {
   }
 
   // Provider failover: Twelve Data -> FCS -> FMP (where supported).
-  const backup = await fetchBackupCandles(pair, tf);
+  const backup = isIndexProxy
+    ? { payload:null, failures:["The index ETF proxy could not be fetched from Twelve Data; FCS/FMP index feeds are not enabled on the current account."] }
+    : await fetchBackupCandles(pair, tf);
   if (backup.payload) {
     const payload = backup.payload;
     await writeCache(cacheKey, { savedAt:Date.now(), payload });
