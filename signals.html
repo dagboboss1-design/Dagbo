@@ -179,6 +179,9 @@
   var SIGNAL_CYCLES_KEY='dagbo_signal_cycles_v1', signalCycles={};
   try{signalCycles=JSON.parse(localStorage.getItem(SIGNAL_CYCLES_KEY)||'{}')||{};}catch(e){}
   var lifecycleTimer=null,lifecycleScanBusy=false,signalLoadInProgress=false;
+  // A profile/timeframe change invalidates any older in-flight scan. Only the newest
+  // requested scan may write cards, snapshots, lifecycle state or notifications.
+  var scanGeneration=0,pendingScanOptions=null;
   function cycleKey(pair,tf){return String(tf)+'::'+String(pair).toUpperCase();}
   function tfDuration(tf){return TF_MILLISECONDS[String(tf)]||900000;}
   function scanFactor(tf){return String(tf)==='15'?4:3;}
@@ -263,6 +266,9 @@
       b.addEventListener('click',function(){
         activeTradingProfile=p.id;activeProfileConfig=p;currentSignalTF=p.primaryTf||'15';
         try{localStorage.setItem('dagbo_active_trading_profile',p.id);}catch(e){}
+        // Remove cards from the previous profile immediately; they must never be
+        // mixed with results from the newly selected trading style.
+        signalsData={};renderCards();
         renderProfileControls();updateScalpStats();resetSignalAutoScanTimer();loadAllSignals();
       });tabs.appendChild(b);
     });
@@ -896,6 +902,7 @@
 
   window.changeSignalTF = function(tf) {
     currentSignalTF = String(tf);
+    signalsData={};renderCards();
     renderProfileControls();
     updateScalpStats();
     resetSignalAutoScanTimer();
@@ -933,13 +940,16 @@
 
   // --- INITIALIZE ---
   async function loadAllSignals(options) {
+    options=options||{};
+    var thisScan=++scanGeneration;
     if(signalLoadInProgress) {
-      var busyLabel = document.getElementById('loadingText');
-      if (busyLabel) busyLabel.innerText = 'A scan is already running. Please wait for it to finish.';
+      // Queue the latest requested profile/timeframe instead of silently dropping it.
+      pendingScanOptions=options;
+      var busyLabel=document.getElementById('loadingText');
+      if(busyLabel)busyLabel.innerText='Switching scanner profile · finishing the previous request safely...';
       return;
     }
     signalLoadInProgress=true;
-    options=options||{};
     var loading = document.getElementById('loadingText');
     var updatedLabel = document.getElementById('lastUpdated');
     if (loading) loading.innerText = 'Scanning '+scannerProfileName()+' ('+timeframeLabel(currentSignalTF)+') live candles...';
@@ -993,6 +1003,7 @@
       var results = [];
       var lastMarketRequestAt = 0;
       for (var pairIndex = 0; pairIndex < openPairs.length; pairIndex++) {
+        if(thisScan!==scanGeneration)return;
         var pair = openPairs[pairIndex];
         var waitMs = Math.max(0, 10200 - (Date.now() - lastMarketRequestAt));
         if (waitMs > 0) {
@@ -1000,10 +1011,12 @@
             completedPairs + '/' + openPairs.length + ' markets checked...';
           await new Promise(function(resolve) { setTimeout(resolve, waitMs); });
         }
+        if(thisScan!==scanGeneration)return;
         lastMarketRequestAt = Date.now();
         var pairResult;
         try {
           var pairData = await fetchPairData(pair, currentSignalTF);
+          if(thisScan!==scanGeneration)return;
           if (pairData) signalsData[pair] = pairData;
           pairResult = { pair: pair, data: pairData };
         } catch (error) {
@@ -1018,6 +1031,7 @@
           ' · ' + completedPairs + '/' + openPairs.length + ' markets checked...';
         renderCards();
       }
+      if(thisScan!==scanGeneration)return;
       results.forEach(function(result) {
         if (result.data) signalsData[result.pair] = result.data;
       });
@@ -1046,6 +1060,10 @@
       }
     } finally {
       signalLoadInProgress = false;
+      if(pendingScanOptions){
+        var queuedOptions=pendingScanOptions;pendingScanOptions=null;
+        loadAllSignals(queuedOptions);
+      }
     }
   }
 
