@@ -211,15 +211,63 @@ async function fetchFcsIndexFallback(pair, tf) {
   };
 }
 
+const PROVIDER_COOLDOWN_SECONDS = 30 * 60;
+
+function isPermanentProviderFailure(error) {
+  return /invalid api access key|valid api access key|invalid api key|unauthorized|forbidden|restricted endpoint|not available under your current subscription/i
+    .test(String(error && error.message || error || ""));
+}
+
+async function isProviderCoolingDown(provider) {
+  const key = "dagbo:market:provider-disabled:" + provider;
+  const state = await readCache(key);
+  return !!(state && Number(state.disabledUntil) > Date.now());
+}
+
+async function disableProvider(provider, reason) {
+  const key = "dagbo:market:provider-disabled:" + provider;
+  const state = {
+    disabledUntil: Date.now() + PROVIDER_COOLDOWN_SECONDS * 1000,
+    reason: String(reason || "Provider authentication or plan restriction").slice(0, 180)
+  };
+  memoryCache.set(key, state);
+  try {
+    const redis = redisClient();
+    if (redis) {
+      await withTimeout(
+        redis.set(key, JSON.stringify(state), { ex: PROVIDER_COOLDOWN_SECONDS }),
+        1200,
+        "Provider cooldown write"
+      );
+    }
+  } catch (error) {
+    console.error("DAGBO provider cooldown storage:", error.message);
+  }
+}
+
 async function fetchBackupCandles(pair, tf) {
   const failures = [];
-  for (const provider of [fetchFcsIndexFallback, fetchFcsFallback, fetchFmpFallback]) {
+  const providers = [
+    { name: "FCS", fetch: fetchFcsIndexFallback },
+    { name: "FCS", fetch: fetchFcsFallback },
+    { name: "FMP", fetch: fetchFmpFallback }
+  ];
+  for (const provider of providers) {
+    if (await isProviderCoolingDown(provider.name)) {
+      failures.push(provider.name + " temporarily paused after an authentication/subscription error");
+      continue;
+    }
     try {
-      const payload = await provider(pair, tf);
+      const payload = await provider.fetch(pair, tf);
       if (payload) return { payload, failures };
     } catch (error) {
-      failures.push(error.message || String(error));
-      console.error("DAGBO market backup error:", error.message);
+      const message = error.message || String(error);
+      failures.push(message);
+      console.error("DAGBO market backup error:", message);
+      // Do not hammer a provider with a known-invalid key or unsupported plan.
+      if (isPermanentProviderFailure(error)) {
+        await disableProvider(provider.name, message);
+      }
     }
   }
   return { payload:null, failures };
