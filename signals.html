@@ -232,7 +232,7 @@
       b.addEventListener('click',function(){
         activeTradingProfile=p.id;activeProfileConfig=p;currentSignalTF=p.primaryTf||'15';
         try{localStorage.setItem('dagbo_active_trading_profile',p.id);}catch(e){}
-        renderProfileControls();updateScalpStats();loadAllSignals();
+        renderProfileControls();updateScalpStats();resetSignalAutoScanTimer();loadAllSignals();
       });tabs.appendChild(b);
     });
     (activeProfileConfig.timeframes||[activeProfileConfig.primary]).forEach(function(label){
@@ -374,6 +374,23 @@
       var analysis=analyseAllMethods(candles, activeTradingProfile);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
       var final=analysis.final;
+      // Do not surface another entry for a pair that already has an OPEN
+      // Journal position on this device. This avoids duplicate same-pair trades.
+      if(final.indexOf('BUY')>=0||final.indexOf('SELL')>=0){
+        var journalTrades=[];
+        try{journalTrades=JSON.parse(localStorage.getItem('dagbo_journal')||'[]')||[];}catch(e){}
+        var openPairTrade=Array.isArray(journalTrades)&&journalTrades.some(function(trade){
+          return String(trade.pair||'').toUpperCase()===String(pair).toUpperCase()&&String(trade.result||'').toUpperCase()==='OPEN';
+        });
+        if(openPairTrade){
+          return {pair:pair,final:'NO TRADE',activeTradeOnPair:true,
+            strategy:'An OPEN Journal trade already exists for this pair. DAGBO will not create a duplicate setup until that trade is closed.',
+            evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
+            confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold,
+            rsiValue:analysis.rsi,emaTrend:analysis.emaTrend==='BUY'?'BULLISH':analysis.emaTrend==='SELL'?'BEARISH':'MIXED',
+            bb:analysis.bb,volume:analysis.volume,pattern:analysis.pattern,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg};
+        }
+      }
       var entry=parseFloat(candles[candles.length-1].close);
       var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
       var atrSum=0;
@@ -649,7 +666,7 @@
           debugText +
           '<div style="text-align:center;padding:16px 0">' +
             '<div class="dg-signal__word ' + cls + '" style="font-size:28px">NO TRADE</div>' +
-            '<div class="dg-muted" style="font-size:13px;margin-top:4px">Market is quiet. Systems say WAIT.</div>' +
+            '<div class="dg-muted" style="font-size:13px;margin-top:4px">'+(s.activeTradeOnPair?'An OPEN Journal trade already exists for this pair. No duplicate signal will be issued until it is closed.':'Market is quiet. Systems say WAIT.')+'</div>' +
           '</div>';
       } else {
         // Smart Decimal Logic: format each market with its appropriate price precision.
@@ -844,6 +861,7 @@
     currentSignalTF = String(tf);
     renderProfileControls();
     updateScalpStats();
+    resetSignalAutoScanTimer();
     loadAllSignals();
   };
 
@@ -993,12 +1011,15 @@
   try { startLifecycleClock(); }
   catch (error) { console.warn('DAGBO signal lifecycle clock unavailable:', error); }
   // Scan once per selected candle timeframe while the page is active.
-  // Manual Refresh remains available for an immediate check.
-  if (window.signalAutoScanTimer) clearInterval(window.signalAutoScanTimer);
-  var signalScanIntervalMs = tfDuration(currentSignalTF);
-  window.signalAutoScanTimer = setInterval(function() {
-    if (!document.hidden) loadAllSignals({scheduled:true});
-  }, signalScanIntervalMs);
+  // Reset this timer whenever the user changes profile or timeframe.
+  function resetSignalAutoScanTimer(){
+    if(window.signalAutoScanTimer)clearInterval(window.signalAutoScanTimer);
+    var signalScanIntervalMs=tfDuration(currentSignalTF);
+    window.signalAutoScanTimer=setInterval(function(){
+      if(!document.hidden)loadAllSignals({scheduled:true});
+    },signalScanIntervalMs);
+  }
+  resetSignalAutoScanTimer();
 
   window.addEventListener('load', async function() {
     try {
