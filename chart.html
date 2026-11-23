@@ -11,18 +11,23 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
 #tv-full-chart iframe{width:100%!important;height:100%!important;border:0!important}
 .dg-tabbar{position:fixed!important;left:0;right:0;bottom:0;z-index:50;background:#000!important;border-top:1px solid #252525!important}
 /* Keep the embedded chart unchanged; this cover tucks away its built-in left drawing rail. */
-#drawing-toolbar-cover{position:fixed;z-index:18;left:0;top:0;bottom:72px;width:112px;background:#000;display:none}
+#chart-controls{position:fixed;z-index:22;top:calc(9px + env(safe-area-inset-top,0px));left:58px;right:12px;display:flex;justify-content:flex-end;gap:7px;pointer-events:none}
+#chart-controls select{pointer-events:auto;min-width:0;height:38px;border:1px solid #343434;border-radius:10px;background:#151515;color:#fff;padding:0 10px;font-size:12px;font-weight:650;outline:none;box-shadow:0 3px 14px #0008}
+#chart-pair{flex:1;max-width:190px}
+#chart-timeframe{width:76px}
+#drawing-toolbar-cover{position:fixed;z-index:18;left:0;top:52px;bottom:72px;width:112px;background:#000;display:none}
 #drawing-toolbar-cover.is-hidden{display:block}
 #drawing-toolbar-toggle{position:fixed;z-index:25;right:16px;bottom:88px;width:44px;height:44px;border:1px solid #343434;border-radius:12px;background:#151515;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 14px #0009;touch-action:manipulation;padding:0}
 #drawing-toolbar-toggle svg{width:21px;height:21px;display:block}
 #drawing-toolbar-toggle:active{background:#242424}
 #drawing-toolbar-toggle:focus-visible{outline:2px solid #fff;outline-offset:2px}
 </style></head><body>
-<div id="tv-full-chart"><div class="tradingview-widget-container" style="height:100%;width:100%">
-<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
-<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-{"autosize":true,"symbol":"CAPITALCOM:XAUUSD","interval":"15","timezone":"Africa/Lagos","theme":"dark","style":"1","locale":"en","allow_symbol_change":true,"hide_top_toolbar":false,"hide_side_toolbar":false,"hide_legend":false,"hide_volume":false,"withdateranges":true,"save_image":true,"calendar":false,"details":false,"hotlist":false,"studies":[],"backgroundColor":"#000000","gridColor":"rgba(255,255,255,0.08)"}
-</script></div></div>
+<div id="tv-full-chart"><div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div></div>
+<div id="chart-controls" aria-label="Chart controls">
+<select id="chart-pair" aria-label="Select market"></select>
+<select id="chart-timeframe" aria-label="Select timeframe">
+<option value="5">5m</option><option value="15" selected>15m</option><option value="30">30m</option><option value="60">1H</option><option value="240">4H</option><option value="1D">1D</option><option value="1W">1W</option>
+</select></div>
 <div id="drawing-toolbar-cover" aria-hidden="true"></div>
 <button id="drawing-toolbar-toggle" type="button" aria-label="Hide drawing toolbar" aria-pressed="false" title="Hide drawing toolbar">
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 5 5 5"/><path d="M4 20l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.2 16.1 4 20Z"/><path d="M13 6l5 5"/></svg></button>
@@ -35,8 +40,66 @@ html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hid
 <a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
 <a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a></nav>
 <script>
-(()=>{const cover=document.getElementById('drawing-toolbar-cover');const toggle=document.getElementById('drawing-toolbar-toggle');const key='dagbo_chart_drawing_toolbar_hidden';let hidden=false;try{hidden=localStorage.getItem(key)==='1'}catch(e){}
-function apply(){cover.classList.toggle('is-hidden',hidden);toggle.classList.toggle('is-hidden',hidden);toggle.textContent=hidden?'›':'‹';toggle.setAttribute('aria-pressed',String(hidden));toggle.setAttribute('aria-label',hidden?'Show drawing toolbar':'Hide drawing toolbar');toggle.title=hidden?'Show drawing toolbar':'Hide drawing toolbar'}
-toggle.addEventListener('click',()=>{hidden=!hidden;try{localStorage.setItem(key,hidden?'1':'0')}catch(e){}apply()});apply()})();
+(()=> {
+  const cover=document.getElementById('drawing-toolbar-cover');
+  const toggle=document.getElementById('drawing-toolbar-toggle');
+  const pairSelect=document.getElementById('chart-pair');
+  const tfSelect=document.getElementById('chart-timeframe');
+  const key='dagbo_chart_drawing_toolbar_hidden';
+  let hidden=false;
+  try{hidden=localStorage.getItem(key)==='1'}catch(e){}
+  function applyToolbar(){
+    cover.classList.toggle('is-hidden',hidden);
+    toggle.classList.toggle('is-hidden',hidden);
+    toggle.textContent=hidden?'›':'‹';
+    toggle.setAttribute('aria-pressed',String(hidden));
+    toggle.setAttribute('aria-label',hidden?'Show drawing toolbar':'Hide drawing toolbar');
+    toggle.title=hidden?'Show drawing toolbar':'Hide drawing toolbar';
+  }
+  toggle.addEventListener('click',()=>{hidden=!hidden;try{localStorage.setItem(key,hidden?'1':'0')}catch(e){}applyToolbar()});
+  const symbols={
+    XAUUSD:'OANDA:XAUUSD',GOLD:'OANDA:XAUUSD',XAGUSD:'OANDA:XAGUSD',
+    EURUSD:'OANDA:EURUSD',GBPUSD:'OANDA:GBPUSD',USDJPY:'OANDA:USDJPY',GBPJPY:'OANDA:GBPJPY',
+    AUDUSD:'OANDA:AUDUSD',USDCHF:'OANDA:USDCHF',USDCAD:'OANDA:USDCAD',NZDUSD:'OANDA:NZDUSD',
+    EURJPY:'OANDA:EURJPY',EURGBP:'OANDA:EURGBP',
+    US30:'AMEX:DIA',US100:'NASDAQ:QQQ',NAS100:'NASDAQ:QQQ',US500:'AMEX:SPY',
+    BTCUSD:'BINANCE:BTCUSDT',ETHUSD:'BINANCE:ETHUSDT'
+  };
+  const labels={US30:'US30 · DIA proxy',US100:'US100 · QQQ proxy',NAS100:'NAS100 · QQQ proxy',US500:'US500 · SPY proxy'};
+  let settings={};try{settings=JSON.parse(localStorage.getItem('dagbo_settings')||'{}')||{}}catch(e){}
+  const allowed=Array.isArray(settings.pairs)&&settings.pairs.length?settings.pairs:['XAUUSD','EURUSD','GBPUSD','US30','BTCUSD'];
+  const query=new URLSearchParams(location.search);
+  let pair=(query.get('pair')||settings.defaultPair||allowed[0]||'XAUUSD').toUpperCase();
+  if(!allowed.includes(pair)&&symbols[pair])allowed.unshift(pair);
+  allowed.forEach(p=>{
+    if(!symbols[p])return;
+    const option=document.createElement('option');option.value=p;option.textContent=labels[p]||p;pairSelect.appendChild(option);
+  });
+  if(!symbols[pair])pair=allowed.find(p=>symbols[p])||'XAUUSD';
+  pairSelect.value=pair;
+  const requestedTf=query.get('tf')||'15';
+  const tfMap={'5':'5','15':'15','30':'30','60':'60','240':'240','1D':'1D','1W':'1W'};
+  tfSelect.value=tfMap[requestedTf]||'15';
+  function renderChart(){
+    const widget=document.querySelector('#tv-full-chart .tradingview-widget-container');
+    widget.innerHTML='<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>';
+    const script=document.createElement('script');
+    script.type='text/javascript';script.async=true;
+    script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.text=JSON.stringify({
+      autosize:true,symbol:symbols[pairSelect.value],interval:tfSelect.value,timezone:'Africa/Lagos',
+      theme:'dark',style:'1',locale:'en',allow_symbol_change:true,hide_top_toolbar:false,
+      hide_side_toolbar:false,hide_legend:false,hide_volume:false,withdateranges:true,save_image:true,
+      calendar:false,details:false,hotlist:false,studies:[],save_chart_properties_to_local_storage:true,
+      backgroundColor:'#000000',gridColor:'rgba(255,255,255,0.08)'
+    });
+    widget.appendChild(script);
+    const params=new URLSearchParams(location.search);params.set('pair',pairSelect.value);params.set('tf',tfSelect.value);
+    history.replaceState(null,'',location.pathname+'?'+params.toString());
+  }
+  pairSelect.addEventListener('change',renderChart);
+  tfSelect.addEventListener('change',renderChart);
+  applyToolbar();renderChart();
+})();
 </script>
 <script src="pwa.js" defer></script><script src="navigation.js" defer></script></body></html>
