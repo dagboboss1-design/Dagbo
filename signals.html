@@ -983,30 +983,41 @@
       // It must never hold up live candle retrieval or signal calculation.
       loadNewsSignalContext();
 
-      // Start every eligible pair in the same scan cycle. The market-data
-      // endpoint enforces the Twelve Data quota centrally; pairs beyond the
-      // six-call allowance use configured backup providers or return a clear
-      // data error. Never sleep for a minute between batches.
+      // Respect the shared Twelve Data Basic-tier request budget.
+      // The API endpoint allows at most six uncached Twelve Data calls per
+      // rolling minute. Parallel requests previously caused later FX/Gold
+      // symbols to be rejected as quota-busy and then showed DATA ERROR.
+      // Queue pair requests at a safe interval; cached pairs return quickly
+      // and do not consume a new provider request.
       var completedPairs = 0;
-      var results = await Promise.all(openPairs.map(function(pair) {
-        return fetchPairData(pair, currentSignalTF).then(function(data) {
-          completedPairs += 1;
-          if (data) signalsData[pair] = data;
-          if (loading) loading.innerText = 'Scanning ' + scannerProfileName() +
-            ' · ' + completedPairs + '/' + openPairs.length + ' markets checked...';
-          renderCards();
-          return { pair: pair, data: data };
-        }).catch(function(error) {
+      var results = [];
+      var lastMarketRequestAt = 0;
+      for (var pairIndex = 0; pairIndex < openPairs.length; pairIndex++) {
+        var pair = openPairs[pairIndex];
+        var waitMs = Math.max(0, 10200 - (Date.now() - lastMarketRequestAt));
+        if (waitMs > 0) {
+          if (loading) loading.innerText = 'Respecting live-data API limits · ' +
+            completedPairs + '/' + openPairs.length + ' markets checked...';
+          await new Promise(function(resolve) { setTimeout(resolve, waitMs); });
+        }
+        lastMarketRequestAt = Date.now();
+        var pairResult;
+        try {
+          var pairData = await fetchPairData(pair, currentSignalTF);
+          if (pairData) signalsData[pair] = pairData;
+          pairResult = { pair: pair, data: pairData };
+        } catch (error) {
           console.error('DAGBO pair scan failed:', pair, error);
-          completedPairs += 1;
           var failure = { pair: pair, error: 'Temporary scan failure. Refresh to retry.', errorStage: 'network' };
           signalsData[pair] = failure;
-          if (loading) loading.innerText = 'Scanning ' + scannerProfileName() +
-            ' · ' + completedPairs + '/' + openPairs.length + ' markets checked...';
-          renderCards();
-          return { pair: pair, data: failure };
-        });
-      }));
+          pairResult = { pair: pair, data: failure };
+        }
+        results.push(pairResult);
+        completedPairs += 1;
+        if (loading) loading.innerText = 'Scanning ' + scannerProfileName() +
+          ' · ' + completedPairs + '/' + openPairs.length + ' markets checked...';
+        renderCards();
+      }
       results.forEach(function(result) {
         if (result.data) signalsData[result.pair] = result.data;
       });
