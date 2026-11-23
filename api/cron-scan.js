@@ -89,9 +89,14 @@ function rsi(values, period) {
 function analyze(candles, pair) { return confluence.analyze(candles, pair); }
 
 function validAuth(req) {
-  const secret = process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET ||
-    process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET;
-  if (!secret) return false;
+  // Older Cron-job.org configurations may use either the dedicated cron secret
+  // or the existing Signal push security value. Accept any configured alias.
+  const secrets = [
+    process.env.DAGBO_CRON_SECRET, process.env.CRON_SECRET,
+    process.env.SIGNAL_PUSH_SECURITY, process.env.Signal_push_security,
+    process.env.SIGNAL_PUSH_SECRET
+  ].filter(value => typeof value === "string" && value.length > 0);
+  if (!secrets.length) return false;
   const headers = req.headers || {};
   const authorization = String(headers.authorization || "").trim();
   const candidates = [
@@ -99,11 +104,11 @@ function validAuth(req) {
     headers["x-dagbo-cron-secret"],
     headers["x-cron-secret"]
   ].filter(value => typeof value === "string" && value.trim()).map(value => value.trim());
-  const expected = Buffer.from(String(secret));
-  return candidates.some(value => {
+  return candidates.some(value => secrets.some(secret => {
     const supplied = Buffer.from(value);
+    const expected = Buffer.from(secret);
     return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
-  });
+  }));
 }
 function vapidReady() {
   return !!(process.env.VAPID_SUBJECT && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
