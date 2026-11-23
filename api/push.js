@@ -522,12 +522,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({
         success: true,
         answer: result.answer,
-        provider: result.provider,
-        model: result.model,
-        fallbackUsed: result.provider !== primary,
-        task: selectedTask,
-        routingReason: "Assigned page role: " + selectedTask,
-        attempts: attempts
+        task: selectedTask
       });
     }
 
