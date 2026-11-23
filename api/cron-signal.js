@@ -3,9 +3,20 @@ const crypto = require("crypto");
 const runScanner = require("./cron-scan");
 const runNewsMonitor = require("./news-monitor");
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
+let redisClient;
+function getRedis() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) throw new Error("Upstash Redis is not configured");
+  if (!redisClient) redisClient = new Redis({ url, token });
+  return redisClient;
+}
+const redis = new Proxy({}, {
+  get(_target, property) {
+    const client = getRedis();
+    const value = client[property];
+    return typeof value === "function" ? value.bind(client) : value;
+  }
 });
 
 function authorized(req) {
