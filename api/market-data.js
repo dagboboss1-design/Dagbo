@@ -231,7 +231,13 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ...cached.payload, cache: "hit", cachedAt: new Date(cached.savedAt).toISOString() });
   }
 
-  const apiKey = process.env.TWELVE_DATA_API_KEY;
+  // The normal key is the primary credential. If it is not configured in
+  // Vercel, use the already-configured dedicated Twelve Data key as a safe
+  // temporary fallback so the scanner does not fail with an empty primary key.
+  // Both requests still share the same global credit limiter.
+  const apiKey = process.env.TWELVE_DATA_API_KEY || process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY;
+  const primaryKeySource = process.env.TWELVE_DATA_API_KEY ? "TWELVE_DATA_API_KEY" :
+    (process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY ? "NEWS_SPIKE_TWELVE_DATA_API_KEY_FALLBACK" : "MISSING");
   let primaryFailure = null;
   if (apiKey) {
     const allowed = await claimTwelveDataSlot();
@@ -249,6 +255,7 @@ module.exports = async function handler(req, res) {
         } else {
           const payload = {
             pair, timeframe:tf, provider:isIndexProxy ? "Twelve Data · ETF proxy" : "Twelve Data",
+            providerKeySource:primaryKeySource,
             providerExchange:data.meta && data.meta.exchange ? data.meta.exchange : null,
             values:data.values, ...proxyMeta
           };
@@ -266,7 +273,7 @@ module.exports = async function handler(req, res) {
     primaryFailure = "TWELVE_DATA_API_KEY is not configured";
   }
 
-  console.warn("DAGBO Twelve Data primary failed for " + pair + " (" + tf + "): " + String(primaryFailure || "unknown provider failure").slice(0, 180));
+  console.error("DAGBO Twelve Data primary failed for " + pair + " (" + tf + ") using " + primaryKeySource + ": " + String(primaryFailure || "unknown provider failure").slice(0, 240));
   // Provider failover: Twelve Data -> FCS only. No third-party candle fallback is permitted.
   const backup = isIndexProxy
     ? { payload:null, failures:["The ETF proxy is not price-compatible with FCS index instruments; no mismatched fallback is used."] }
