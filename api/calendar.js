@@ -5,7 +5,8 @@ module.exports = async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   try {
     const response = await fetch(CALENDAR_URL, {
-      headers: { "User-Agent": "DAGBO-SIGNAL-Economic-Calendar/1.0" }
+      headers: { "User-Agent": "DAGBO-SIGNAL-Economic-Calendar/1.0" },
+      signal: AbortSignal.timeout(6000)
     });
     if (!response.ok) throw new Error("Economic calendar returned HTTP " + response.status);
     const rows = await response.json();

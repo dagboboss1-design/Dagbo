@@ -3,9 +3,20 @@ const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
 const confluence = require("../public/dagbo-confluence.js");
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
+let redisClient;
+function getRedis() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) throw new Error("Upstash Redis is not configured");
+  if (!redisClient) redisClient = new Redis({ url, token });
+  return redisClient;
+}
+const redis = new Proxy({}, {
+  get(_target, property) {
+    const client = getRedis();
+    const value = client[property];
+    return typeof value === "function" ? value.bind(client) : value;
+  }
 });
 
 const SYMBOLS = {
@@ -157,7 +168,7 @@ async function fetchPreNewsCandles(pair, cutoffMs, apiKey) {
   // scheduled pre-news analysis eligible for Twelve Data -> FCS -> FMP.
   const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
-  const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+  const response = await fetch(url, { headers: { "Cache-Control": "no-cache" }, signal: AbortSignal.timeout(8000) });
   const data = await response.json();
   if (!response.ok || data.stale || !Array.isArray(data.values)) {
     throw new Error(data.error || "Live failover manager returned no fresh 15-minute candles for " + pair);
@@ -189,7 +200,8 @@ async function sendNewsAlerts(apiKey) {
   let eventsChecked = 0, newsAlerts = 0, preNewsSignals = 0;
   try {
     const response = await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.json", {
-      headers: { "User-Agent": "DAGBO-SIGNAL-Economic-Calendar/1.0" }
+      headers: { "User-Agent": "DAGBO-SIGNAL-Economic-Calendar/1.0" },
+      signal: AbortSignal.timeout(5000)
     });
     if (!response.ok) throw new Error("Economic calendar HTTP " + response.status);
     const rows = await response.json();
@@ -286,7 +298,7 @@ async function sendNewsAlerts(apiKey) {
 async function fetchTradeMarket(pair, apiKey) {
   const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
-  const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+  const response = await fetch(url, { headers: { "Cache-Control": "no-cache" }, signal: AbortSignal.timeout(8000) });
   const data = await response.json();
   if (!response.ok || data.stale || !Array.isArray(data.values) || !data.values.length) {
     throw new Error(data.error || "No fresh trade-monitor candles for " + pair);
@@ -297,8 +309,11 @@ async function fetchTradeMarket(pair, apiKey) {
     return { time, datetime:raw, high:num(c.high), low:num(c.low), close:num(c.close) };
   }).filter(c => Number.isFinite(c.time) && [c.high,c.low,c.close].every(v => v !== null))
     .sort((a,b)=>a.time-b.time);
-  if (!candles.length) throw new Error("Invalid trade-monitor candle for " + pair);
-  const candle = candles[candles.length-1];
+  // Use only a fully closed 15-minute candle; the forming candle can reverse
+  // before close and must never trigger an automatic SL/TP journal result.
+  const closedCandles = candles.filter(c => c.time + 15 * 60 * 1000 <= Date.now());
+  if (!closedCandles.length) throw new Error("No fully closed 15-minute trade-monitor candle for " + pair);
+  const candle = closedCandles[closedCandles.length-1];
   return { pair, entry:candle.close, candleHigh:candle.high, candleLow:candle.low,
     candleTime:candle.datetime || null, signal:null };
 }
@@ -453,7 +468,7 @@ async function getHtfCandles(pair, frame, apiKey) {
   if (sharedTf && pair !== "DXY") {
     const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace(/^https?:\/\//, "");
     const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=" + sharedTf;
-    const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+    const response = await fetch(url, { headers: { "Cache-Control": "no-cache" }, signal: AbortSignal.timeout(8000) });
     data = await response.json();
     if (!response.ok || data.stale || !Array.isArray(data.values)) {
       throw new Error(data.error || "Live market-data failover unavailable for " + frame.label);
@@ -464,7 +479,7 @@ async function getHtfCandles(pair, frame, apiKey) {
     const url = "https://api.twelvedata.com/time_series?symbol=" +
       encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(frame.key) +
       "&outputsize=80&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     data = await response.json();
     if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
       throw new Error(data.message || "No " + frame.label + " candles");
@@ -662,7 +677,7 @@ module.exports = async function handler(req, res) {
         success: true,
         schedulerSecretConfigured: !!(process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET),
         redisConfigured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
-        marketDataKeyConfigured: !!process.env.TWELVE_DATA_API_KEY,
+        marketDataKeyConfigured: !!(process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_KEY),
         scanRunning: !!lockState,
         lastScan: lastScan || null
       });
@@ -703,7 +718,7 @@ module.exports = async function handler(req, res) {
     // The scheduled scanner also uses the Twelve Data key for direct-only
     // context feeds (for example DXY/monthly history). The shared market-data
     // endpoint remains the primary provider/failover path for trade pairs.
-    const apiKey = process.env.TWELVE_DATA_API_KEY || "";
+    const apiKey = process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_KEY || "";
     const results = {}, errors = [];
     const configuredPairs = await getConfiguredPairs();
     const pairsToScan = await selectRotatingBatch("dagbo:scan:cursor:main", configuredPairs, MAX_PAIRS);
