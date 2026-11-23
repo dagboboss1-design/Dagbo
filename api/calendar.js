@@ -1,37 +1,42 @@
-const CALENDAR_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json";
+const { fetchFcsCalendarEvents } = require("../lib/fcs-calendar");
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
   if (req.method !== "GET") return res.status(405).json({ error: "GET required" });
   try {
-    const response = await fetch(CALENDAR_URL, {
-      headers: { "User-Agent": "DAGBO-SIGNAL-Economic-Calendar/1.0" }
-    });
-    if (!response.ok) throw new Error("Economic calendar returned HTTP " + response.status);
-    const rows = await response.json();
-    if (!Array.isArray(rows)) throw new Error("Calendar response was not a list");
+    const events = await fetchFcsCalendarEvents();
     const now = Date.now();
-    const events = rows.map(row => ({
-      name: String(row.title || "Economic event"),
-      currency: String(row.country || "GLOBAL").toUpperCase(),
-      impact: String(row.impact || "Unknown"),
-      date: new Date(row.date),
-      forecast: row.forecast || "",
-      previous: row.previous || "",
-      actual: row.actual || ""
-    })).filter(event =>
-      !Number.isNaN(event.date.getTime()) &&
+    const visible = events.filter(event =>
       event.date.getTime() >= now - 30 * 60 * 1000 &&
       event.date.getTime() <= now + 7 * 24 * 60 * 60 * 1000
-    ).sort((a,b) => a.date - b.date);
+    ).map(event => ({
+      id: event.id,
+      eventCode: event.eventCode,
+      name: event.name,
+      currency: event.currency,
+      country: event.country,
+      impact: event.impact,
+      date: event.date.toISOString(),
+      forecast: event.forecast,
+      previous: event.previous,
+      actual: event.actual,
+      source: event.source,
+      unit: event.unit,
+      period: event.period,
+      sourceUrl: event.sourceUrl
+    }));
     return res.status(200).json({
       success: true,
-      source: "Forex Factory calendar feed",
+      source: "FCS Economic Calendar",
       fetchedAt: new Date().toISOString(),
-      events
+      events: visible
     });
   } catch (error) {
-    console.error("DAGBO calendar feed error:", error.message);
-    return res.status(502).json({ success: false, error: "Economic calendar is temporarily unavailable" });
+    console.error("DAGBO FCS calendar error:", error.message);
+    return res.status(502).json({
+      success: false,
+      error: "FCS economic calendar is unavailable. Check the FCS plan and API key.",
+      detail: String(error.message || error)
+    });
   }
 };
