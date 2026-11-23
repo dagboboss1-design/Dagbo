@@ -337,7 +337,7 @@ module.exports = async function handler(req, res) {
         XAUUSD:"XAU/USD", GOLD:"XAU/USD", EURUSD:"EUR/USD", GBPUSD:"GBP/USD",
         USDJPY:"USD/JPY", GBPJPY:"GBP/JPY", AUDUSD:"AUD/USD", USDCHF:"USD/CHF",
         USDCAD:"USD/CAD", NZDUSD:"NZD/USD", EURJPY:"EUR/JPY", EURGBP:"EUR/GBP",
-        BTCUSD:"BTC/USD", ETHUSD:"ETH/USD", US30:"DJI", US100:"NDX", NAS100:"NDX", US500:"SPX"
+        BTCUSD:"BTC/USD", ETHUSD:"ETH/USD", US30:"DIA", US100:"QQQ", NAS100:"QQQ", US500:"SPY"
       };
       const asksPrice = /\b(price|quote|trading at|how much is|current value)\b/i.test(question);
       const asksAnalysis = /\b(analy[sz]e|analysis|chart|signal|setup|buy|sell|long|short|trend|direction|entry|technical|market structure|support|resistance|bias)\b/i.test(question);
@@ -395,7 +395,7 @@ module.exports = async function handler(req, res) {
                 " on " + tf + " timeframe. Source: " + String(candleData.provider || "market-data service") +
                 ". Newest candle timestamp " + bars[bars.length - 1].time +
                 ". Candles oldest-to-newest: " + JSON.stringify(bars) +
-                ". Use these candles for structure and setup analysis; do not claim indicators that were not calculated.";
+                ". " + String(candleData.proxyNotice || "") + " Use these candles for structure and setup analysis; do not claim indicators that were not calculated.";
             }
           } else {
             liveCandleContext = "Fresh candles are unavailable for " + quotePair +
@@ -420,7 +420,7 @@ module.exports = async function handler(req, res) {
             const quote = await quoteResponse.json();
             const price = Number(quote.close || quote.price);
             if (quoteResponse.ok && Number.isFinite(price) && price > 0) {
-              liveQuoteContext = "Verified Twelve Data quote for " + quotePair +
+              liveQuoteContext = "Verified Twelve Data quote for " + quotePair + (["US30","US100","NAS100","US500"].includes(quotePair) ? " using ETF proxy " + pairSymbols[quotePair] : "") +
                 ": latest price " + price + ", timestamp " + (quote.datetime || quote.timestamp || "not supplied") + ".";
             } else {
               liveQuoteContext = "Live quote unavailable for " + quotePair + ". Do not guess the price.";
