@@ -145,9 +145,11 @@ async function callAIProvider(provider, messages, maxTokens, timeoutMs) {
     url = "https://api.groq.com/openai/v1/chat/completions";
     headers.Authorization = "Bearer " + key;
     body = {
-      model: model, messages: messages, temperature: 0.3,
-      max_completion_tokens: Math.max(outputLimit, 300),
-      reasoning_effort: "low", include_reasoning: false
+      model: model, messages: messages, temperature: 0.5,
+      // GPT-OSS uses part of its completion budget for internal reasoning.
+      // A 100–300 token cap can be consumed before any user-facing answer is emitted.
+      max_completion_tokens: Math.max(outputLimit, 1200),
+      reasoning_effort: "low", include_reasoning: false, stream: false
     };
   } else {
     throw new Error("Unsupported AI provider");
