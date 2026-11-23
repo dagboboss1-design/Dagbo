@@ -349,12 +349,12 @@ module.exports = async function handler(req, res) {
       let liveQuoteContext = "";
       let liveCandleContext = "";
       if (asksAnalysis && quotePair) {
-        const tf = /\\b(5m|5 min|5-minute|5 minute)\\b/i.test(question) ? "5" :
-          /\\b(30m|30 min|30-minute|30 minute)\\b/i.test(question) ? "30" :
-          /\\b(1h|1 hour|hourly)\\b/i.test(question) ? "60" :
-          /\\b(4h|4 hour|4-hour)\\b/i.test(question) ? "240" : "15";
+        const tf = /\b(5m|5 min|5-minute|5 minute)\b/i.test(question) ? "5" :
+          /\b(30m|30 min|30-minute|30 minute)\b/i.test(question) ? "30" :
+          /\b(1h|1 hour|hourly)\b/i.test(question) ? "60" :
+          /\b(4h|4 hour|4-hour)\b/i.test(question) ? "240" : "15";
         try {
-          const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\\/\\//, "");
+          const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
           const candleUrl = "https://" + host + "/api/market-data?pair=" +
             encodeURIComponent(quotePair) + "&tf=" + encodeURIComponent(tf);
           const candleResponse = await fetch(candleUrl, {
