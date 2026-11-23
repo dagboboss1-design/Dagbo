@@ -649,9 +649,11 @@ module.exports = async function handler(req, res) {
   if (req.method !== "GET" && req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
   // The scheduled scanner must use the same provider failover manager as the Signals page.
   // VERCEL_URL targets this deployment; production hostname is the safe fallback.
-  const marketDataHost = process.env.VERCEL_URL
-    ? "https://" + process.env.VERCEL_URL
-    : "https://dagbo-v9g7.vercel.app";
+  const marketDataHost = process.env.DAGBO_MARKET_DATA_BASE_URL
+    ? process.env.DAGBO_MARKET_DATA_BASE_URL.replace(/\\/$/, "")
+    : process.env.VERCEL_URL
+      ? "https://" + process.env.VERCEL_URL
+      : "https://dagboboss.vercel.app";
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     return res.status(503).json({ error: "Upstash Redis is not configured" });
   }
@@ -661,6 +663,10 @@ module.exports = async function handler(req, res) {
   if (acquired !== "OK") return res.status(200).json({ skipped: true, reason: "A scan is already running" });
 
   try {
+    // The scheduled scanner also uses the Twelve Data key for direct-only
+    // context feeds (for example DXY/monthly history). The shared market-data
+    // endpoint remains the primary provider/failover path for trade pairs.
+    const apiKey = process.env.TWELVE_DATA_API_KEY || "";
     const results = {}, errors = [];
     const configuredPairs = await getConfiguredPairs();
     const pairsToScan = await selectRotatingBatch("dagbo:scan:cursor:main", configuredPairs, MAX_PAIRS);
