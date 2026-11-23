@@ -19,7 +19,7 @@ function authorized(req) {
   const headers = req.headers || {};
   const auth = String(headers.authorization || "").trim();
   const candidates = [
-    auth.replace(/^Bearer\\s+/i, "").trim(),
+    auth.replace(/^Bearer\s+/i, "").trim(),
     headers["x-dagbo-cron-secret"],
     headers["x-cron-secret"]
   ].filter(value => typeof value === "string" && value.trim());
