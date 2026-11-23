@@ -23,7 +23,9 @@ const SYMBOLS = {
   BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
 };
 const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
-const MAX_PAIRS = 6;
+// Keep scheduled scans to two instruments per run. The browser scanner and news monitor
+// share the same Basic-plan minute quota, so six simultaneous scheduled requests starved them.
+const MAX_PAIRS = 2;
 const MAX_HTF_PAIRS = 8;
 
 async function selectRotatingBatch(redisKey, pairs, limit) {
