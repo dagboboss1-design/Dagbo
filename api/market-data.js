@@ -24,12 +24,6 @@ const FCS_INDEX_SYMBOLS = {
   NAS100: "NASDAQ:NDX",
   US500: "SP:SPX"
 };
-const FMP_INDEX_SYMBOLS = {
-  US30: "^DJI",
-  US100: "^NDX",
-  NAS100: "^NDX",
-  US500: "^GSPC"
-};
 
 async function fetchJsonWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController();
@@ -147,50 +141,6 @@ async function fetchFcsFallback(pair, tf) {
   if (values.length < 30) throw new Error("FCS returned fewer than 30 valid candles.");
   return { pair, timeframe:tf, provider:"FCS", providerExchange:"FCS", values };
 }
-async function fetchFmpFallback(pair, tf) {
-  const key = process.env.FMP_API_KEY;
-  const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP"];
-  const indexPairs = Object.keys(FMP_INDEX_SYMBOLS);
-  const isIndex = indexPairs.includes(pair);
-  const fmpPeriods = { "1":"1min", "5":"5min", "15":"15min", "30":"30min", "60":"1hour", "240":"1hour" };
-  const period = fmpPeriods[tf];
-  if (!key || !period || (!fxPairs.includes(pair) && !isIndex)) return null;
-  const symbol = isIndex ? FMP_INDEX_SYMBOLS[pair] : pair;
-  const lookbackDays = tf === "1" || tf === "5" ? 10 : (tf === "15" || tf === "30" ? 25 : 60);
-  const from = new Date(Date.now() - lookbackDays * 86400000).toISOString().slice(0,10);
-  const url = "https://financialmodelingprep.com/stable/historical-chart/" + period +
-    "?symbol=" + encodeURIComponent(symbol) + "&from=" + from + "&apikey=" + encodeURIComponent(key);
-  const result = await fetchJsonWithTimeout(url, { headers: { "Accept":"application/json" } }, 9000);
-  if (!result.response.ok || !Array.isArray(result.data)) {
-    const message = result.data && (result.data.message || result.data.error) || result.response.status;
-    throw new Error("FMP rejected the candle request: " + String(message));
-  }
-  let values = result.data.map(function(row) {
-    const date = new Date(String(row.date || row.datetime || ""));
-    const open=Number(row.open), high=Number(row.high), low=Number(row.low), close=Number(row.close);
-    if (!Number.isFinite(date.getTime()) || ![open,high,low,close].every(Number.isFinite) || open<=0 || high<=0 || low<=0 || close<=0 || high<low) return null;
-    return { datetime:date.toISOString().slice(0,19).replace("T"," "), open:String(open), high:String(high), low:String(low), close:String(close), volume:String(row.volume || 0) };
-  }).filter(Boolean).sort((a,b)=>Date.parse(a.datetime)-Date.parse(b.datetime));
-  if (isIndex && tf === "240") {
-    const buckets = new Map();
-    for (const candle of values) {
-      const stamp = Date.parse(candle.datetime.replace(" ", "T") + "Z");
-      const bucket = Math.floor(stamp / (4 * 60 * 60 * 1000)) * (4 * 60 * 60 * 1000);
-      const key = new Date(bucket).toISOString().slice(0,19).replace("T"," ");
-      const current = buckets.get(key);
-      if (!current) buckets.set(key, { datetime:key, open:candle.open, high:candle.high, low:candle.low, close:candle.close, volume:Number(candle.volume)||0 });
-      else {
-        current.high = String(Math.max(Number(current.high), Number(candle.high)));
-        current.low = String(Math.min(Number(current.low), Number(candle.low)));
-        current.close = candle.close;
-        current.volume += Number(candle.volume)||0;
-      }
-    }
-    values = Array.from(buckets.values()).map(x => ({ ...x, volume:String(x.volume) }));
-  }
-  if (values.length < 30) throw new Error("FMP returned fewer than 30 valid candles.");
-  return { pair, timeframe:tf, provider:isIndex ? "Financial Modeling Prep · Index" : "Financial Modeling Prep", providerExchange:"FMP", sourceSymbol:symbol, values };
-}
 async function fetchFcsIndexFallback(pair, tf) {
   const key = process.env.FCS_API_KEY;
   const symbol = FCS_INDEX_SYMBOLS[pair];
@@ -213,7 +163,7 @@ async function fetchFcsIndexFallback(pair, tf) {
 
 async function fetchBackupCandles(pair, tf) {
   const failures = [];
-  for (const provider of [fetchFcsIndexFallback, fetchFcsFallback, fetchFmpFallback]) {
+  for (const provider of [fetchFcsFallback]) {
     try {
       const payload = await provider(pair, tf);
       if (payload) return { payload, failures };
@@ -335,9 +285,9 @@ module.exports = async function handler(req, res) {
     primaryFailure = "TWELVE_DATA_API_KEY is not configured";
   }
 
-  // Provider failover: Twelve Data -> FCS -> FMP (where supported).
+  // Provider failover: Twelve Data -> FCS only. No third-party candle fallback is permitted.
   const backup = isIndexProxy
-    ? { payload:null, failures:["The index ETF proxy could not be fetched from Twelve Data; FCS/FMP index feeds are not enabled on the current account."] }
+    ? { payload:null, failures:["The ETF proxy is not price-compatible with FCS index instruments; no mismatched fallback is used."] }
     : await fetchBackupCandles(pair, tf);
   if (backup.payload) {
     const payload = backup.payload;
