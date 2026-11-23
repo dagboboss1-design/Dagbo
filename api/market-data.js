@@ -114,7 +114,7 @@ function normalizeFcsCandles(data) {
   }).filter(Boolean).sort((a,b)=>Date.parse(a.datetime)-Date.parse(b.datetime));
 }
 async function fetchFcsFallback(pair, tf) {
-  const key = process.env.FCS_API_KEY;
+  const key = process.env.FCS_API_KEY || process.env.FCS_ACCESS_KEY || process.env.FCS_API_ACCESS_KEY || process.env.FCSAPI_ACCESS_KEY;
   const period = fcsPeriod(tf);
   if (!key || !period) return null;
   const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","USDSEK"];
@@ -138,7 +138,7 @@ async function fetchBackupCandles(pair, tf) {
   const failures = [];
   const authBlock = await readCache("dagbo:market:fcs-auth-blocked");
   if (authBlock && Number(authBlock.until) > Date.now()) {
-    return { payload:null, failures:["FCS_API_KEY was rejected recently; replace the key in Vercel before FCS failover can resume."] };
+    return { payload:null, failures:["FCS access key was rejected recently; verify the FCS credential and Vercel environment before failover can resume."] };
   }
   for (const provider of [fetchFcsFallback]) {
     try {
