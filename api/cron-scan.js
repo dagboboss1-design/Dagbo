@@ -71,6 +71,12 @@ async function getConfiguredPairs() {
 }
 
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+async function claimTwelveDataSlot() {
+  const key = "dagbo:market:twelve:minute";
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, 60);
+  return count <= 7;
+}
 function ema(values, period) {
   if (values.length < period) return values[values.length - 1];
   const k = 2 / (period + 1);
@@ -459,10 +465,11 @@ async function getHtfCandles(pair, frame, apiKey) {
   } else {
     // DXY and monthly history are not currently supported by the shared
     // pair/timeframe manager; retain the existing direct Twelve Data path.
+    if (!await claimTwelveDataSlot()) throw new Error("Shared Twelve Data minute quota is busy; retry on the next intelligence cycle.");
     const url = "https://api.twelvedata.com/time_series?symbol=" +
       encodeURIComponent(symbol) + "&interval=" + encodeURIComponent(frame.key) +
       "&outputsize=80&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(7000) });
     data = await response.json();
     if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
       throw new Error(data.message || "No " + frame.label + " candles");
