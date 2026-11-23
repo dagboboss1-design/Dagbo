@@ -43,6 +43,13 @@ function getRedis() {
   if (!url || !token) throw new Error("Push storage is not configured");
   return new Redis({ url, token });
 }
+async function claimTwelveDataSlot() {
+  const redis = getRedis();
+  const key = "dagbo:market:twelve:minute";
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, 60);
+  return count <= 7;
+}
 
 function configureVapid() {
   const subject = process.env.VAPID_SUBJECT;
@@ -456,6 +463,7 @@ module.exports = async function handler(req, res) {
         const quoteKey = process.env.TWELVE_DATA_API_KEY;
         if (quotePair && quoteKey) {
           try {
+            if (!await claimTwelveDataSlot()) throw new Error("Shared Twelve Data minute quota is busy; retry shortly.");
             const quoteUrl = "https://api.twelvedata.com/quote?symbol=" +
               encodeURIComponent(pairSymbols[quotePair]) + "&apikey=" + encodeURIComponent(quoteKey);
             const quoteResponse = await fetch(quoteUrl, { signal: AbortSignal.timeout(1800) });
