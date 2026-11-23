@@ -18,13 +18,6 @@ const BINANCE_SYMBOLS = {
   ETH: "ETHUSDT", ETHUSD: "ETHUSDT", ETHUSDT: "ETHUSDT"
 };
 
-const FCS_INDEX_SYMBOLS = {
-  US30: "DJ:DJI",
-  US100: "NASDAQ:NDX",
-  NAS100: "NASDAQ:NDX",
-  US500: "SP:SPX"
-};
-
 async function fetchJsonWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || 9000);
@@ -141,26 +134,6 @@ async function fetchFcsFallback(pair, tf) {
   if (values.length < 30) throw new Error("FCS returned fewer than 30 valid candles.");
   return { pair, timeframe:tf, provider:"FCS", providerExchange:"FCS", values };
 }
-async function fetchFcsIndexFallback(pair, tf) {
-  const key = process.env.FCS_API_KEY;
-  const symbol = FCS_INDEX_SYMBOLS[pair];
-  const period = fcsPeriod(tf);
-  if (!key || !symbol || !period) return null;
-  const url = "https://api-v4.fcsapi.com/stock/history?symbol=" + encodeURIComponent(symbol) +
-    "&period=" + encodeURIComponent(period) + "&length=100&access_key=" + encodeURIComponent(key);
-  const result = await fetchJsonWithTimeout(url, { headers: { "Accept": "application/json" } }, 9000);
-  if (!result.response.ok || result.data.status === false || result.data.status === "error" ||
-      (result.data.code !== undefined && Number(result.data.code) !== 200)) {
-    throw new Error("FCS index feed rejected the request: " + String(result.data.msg || result.response.status));
-  }
-  const values = normalizeFcsCandles(result.data);
-  if (values.length < 30) throw new Error("FCS index feed returned fewer than 30 valid candles.");
-  return {
-    pair, timeframe: tf, provider: "FCS Indices", providerExchange: "FCS",
-    sourceSymbol: symbol, values
-  };
-}
-
 async function fetchBackupCandles(pair, tf) {
   const failures = [];
   for (const provider of [fetchFcsFallback]) {
