@@ -1,5 +1,5 @@
-const VERSION = "dagbo-v25";
-const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "settings.html", "dagbo.css", "dagbo-confluence.js", "manifest.json", "icons/dagbo-orbit.svg", "pwa.js", "navigation.js"];
+const VERSION = "dagbo-v26";
+const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "strategy-profiles.html", "higher-timeframe-hedging.html", "replay.html", "market-heatmap.html", "learn.html", "settings.html", "dagbo.css", "dagbo-confluence.js", "manifest.json", "icons/dagbo-orbit.svg", "pwa.js", "navigation.js"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -40,7 +40,7 @@ self.addEventListener("push", (event) => {
       body: data.body || "You have a new trading alert.",
       tag: data.tag || "dagbo-alert",
       icon: "./icons/dagbo-orbit.svg",
-      badge: "./icons/icon-192.png",
+      badge: "./icons/dagbo-orbit.svg",
       timestamp: Date.now(),
       data: { url: data.url || "./signals.html" },
       vibrate: [90, 45, 90],
