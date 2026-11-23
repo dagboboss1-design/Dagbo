@@ -359,7 +359,7 @@ module.exports = async function handler(req, res) {
             encodeURIComponent(quotePair) + "&tf=" + encodeURIComponent(tf);
           const candleResponse = await fetch(candleUrl, {
             headers: { "Cache-Control": "no-cache" },
-            signal: AbortSignal.timeout(3200)
+            signal: AbortSignal.timeout(2200)
           });
           const candleData = await candleResponse.json();
           if (candleResponse.ok && !candleData.stale &&
@@ -451,13 +451,13 @@ module.exports = async function handler(req, res) {
       let result = null;
       let lastError = null;
       const attempts = [];
-      const aiDeadline = Date.now() + 8800;
+      const aiDeadline = Date.now() + 7000;
       for (const providerName of providerOrder) {
         const remainingMs = aiDeadline - Date.now();
         if (remainingMs < 900) break;
         const startedAt = Date.now();
         try {
-          result = await callAIProvider(providerName, messages, answerTokenLimit, Math.min(6200, remainingMs - 250));
+          result = await callAIProvider(providerName, messages, answerTokenLimit, Math.min(5000, remainingMs - 250));
           attempts.push({ provider: providerName, ok: true, latencyMs: Date.now() - startedAt });
           break;
         } catch (error) {
