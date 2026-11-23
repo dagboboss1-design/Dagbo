@@ -27,7 +27,7 @@ module.exports = async function handler(req, res) {
     }));
     return res.status(200).json({
       success: true,
-      source: "FCS Economic Calendar",
+      source: visible.length ? visible[0].source : "FCS primary / FMP backup",
       fetchedAt: new Date().toISOString(),
       events: visible
     });
@@ -35,7 +35,7 @@ module.exports = async function handler(req, res) {
     console.error("DAGBO FCS calendar error:", error.message);
     return res.status(502).json({
       success: false,
-      error: "FCS economic calendar is unavailable. Check the FCS plan and API key.",
+      error: "Economic calendar is unavailable from both FCS and FMP. Check both API keys and FMP plan access.",
       detail: String(error.message || error)
     });
   }
