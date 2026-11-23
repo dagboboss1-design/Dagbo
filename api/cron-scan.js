@@ -746,7 +746,11 @@ module.exports = async function handler(req, res) {
 
     for (const item of fetched) {
       if (item.closed) { results[item.pair] = { signal:'MARKET CLOSED', marketClosed:true }; continue; }
-      if (item.error) { errors.push({ pair: item.pair, error: item.error }); continue; }
+      if (item.error) {
+        errors.push({ pair: item.pair, error: item.error });
+        results[item.pair] = { signal: "DATA UNAVAILABLE", marketDataUnavailable: true, error: item.error };
+        continue;
+      }
       const pair = item.pair, analysis = item.analysis;
       results[pair] = analysis;
       const stateKey = "dagbo:scan:signal:" + pair;
