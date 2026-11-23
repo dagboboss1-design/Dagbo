@@ -76,6 +76,7 @@ module.exports = async function handler(req, res) {
   // Run both current workers from that one compatibility endpoint, while
   // preventing five near-simultaneous schedules from launching duplicate scans.
   const lockKey = "dagbo:cron:dispatcher:lock";
+  let ownsLock = false;
   try {
     const acquired = await redis.set(lockKey, String(Date.now()), { nx: true, ex: 240 });
     if (acquired !== "OK") {
@@ -85,6 +86,7 @@ module.exports = async function handler(req, res) {
         reason: "DAGBO scan and news monitor are already running."
       });
     }
+    ownsLock = true;
 
     const [scanner, news] = await Promise.all([
       invoke(runScanner, req),
@@ -111,8 +113,11 @@ module.exports = async function handler(req, res) {
       detail: String(error.message || error)
     });
   } finally {
-    try { await redis.del(lockKey); } catch (error) {
-      console.error("DAGBO cron dispatcher lock cleanup failed:", error.message);
+    // Only the invocation that acquired the lock may release it.
+    if (ownsLock) {
+      try { await redis.del(lockKey); } catch (error) {
+        console.error("DAGBO cron dispatcher lock cleanup failed:", error.message);
+      }
     }
   }
 };
