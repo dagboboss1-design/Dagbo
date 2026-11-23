@@ -738,7 +738,13 @@ module.exports = async function handler(req, res) {
         if (closedCandles.length < 60) throw new Error("Only " + closedCandles.length + " valid, fully closed 15m candles; 60 are required.");
         const analysis = analyze(closedCandles, pair);
         if (!analysis) throw new Error("Could not calculate indicators from provider candles.");
-        return { pair, analysis, provider: data.provider || "Market-data failover manager" };
+        return {
+          pair, analysis, provider: data.provider || "Market-data failover manager",
+          marketDataType: data.marketDataType || "DIRECT",
+          sourceSymbol: data.sourceSymbol || null,
+          marketLabel: data.marketLabel || null,
+          proxyNotice: data.proxyNotice || null
+        };
       } catch (err) {
         return { pair, error: err && err.name === "AbortError" ? "Market-data failover request timed out." : (err.message || String(err)) };
       }
@@ -752,6 +758,11 @@ module.exports = async function handler(req, res) {
         continue;
       }
       const pair = item.pair, analysis = item.analysis;
+      Object.assign(analysis, {
+        provider: item.provider, marketDataType: item.marketDataType,
+        sourceSymbol: item.sourceSymbol, marketLabel: item.marketLabel,
+        proxyNotice: item.proxyNotice
+      });
       results[pair] = analysis;
       const stateKey = "dagbo:scan:signal:" + pair;
       const previousRaw = await redis.get(stateKey);
@@ -762,7 +773,7 @@ module.exports = async function handler(req, res) {
             (previous.signal.includes("BUY") !== analysis.signal.includes("BUY") ? "🔄 SIGNAL DIRECTION CHANGED" : "📈 SIGNAL STRENGTH CHANGED");
           const body = pair + " · " + analysis.signal + " · Entry " + analysis.entry.toFixed(5) +
             " · SL " + analysis.stopLoss.toFixed(5) + " · TP " + analysis.takeProfit.toFixed(5) +
-            " · " + analysis.confidence + "% " + analysis.quality + " confluence quality (threshold " + analysis.threshold + "). Group score: " + analysis.buyScore + " BUY / " + analysis.sellScore + " SELL. Sources: " +
+            " · " + analysis.confidence + "% " + analysis.quality + " confluence quality (threshold " + analysis.threshold + ")." + (analysis.proxyNotice ? " DATA SOURCE: " + analysis.proxyNotice : "") + " Group score: " + analysis.buyScore + " BUY / " + analysis.sellScore + " SELL. Sources: " +
             analysis.evidence.slice(0, 3).join("; ") + ". Confirm on chart.";
           await broadcast(title, body, "signal-" + pair);
         }
