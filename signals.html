@@ -127,7 +127,7 @@
     XAUUSD: 'XAU/USD', GOLD: 'XAU/USD', XAGUSD: 'XAG/USD', SILVER: 'XAG/USD',
     EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', GBPJPY: 'GBP/JPY',
     AUDUSD: 'AUD/USD', USDCHF: 'USD/CHF', USDCAD: 'USD/CAD', NZDUSD: 'NZD/USD', EURJPY: 'EUR/JPY', EURGBP: 'EUR/GBP',
-    US30: 'DJI', US100: 'NDX', NAS100: 'NDX', US500: 'SPX',
+    US30: 'DIA', US100: 'QQQ', NAS100: 'QQQ', US500: 'SPY',
     BTCUSD: 'BTC/USD', BTC: 'BTC/USD', ETHUSD: 'ETH/USD', ETH: 'ETH/USD'
   };
 
@@ -393,6 +393,7 @@
       var lastC=candles[candles.length-1];
       return {
         pair:pair,final:final,entry:entry,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,
+        provider:data.provider||'Market data',marketDataType:data.marketDataType||'DIRECT',sourceSymbol:data.sourceSymbol||null,marketLabel:data.marketLabel||null,proxyNotice:data.proxyNotice||null,
         s1:analysis.emaTrend,s2:analysis.candleName,s3:analysis.structure,
         strategy:analysis.evidence.length?analysis.evidence.join(' · '):'No method produced directional evidence',
         evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
@@ -602,7 +603,7 @@
 
       if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
       if (s.noMethods) { listHtml += '<section class="dg-card"><strong>'+escapeNewsText(s.pair)+' · NO ACTIVE STRATEGIES</strong><div class="dg-muted" style="margin-top:6px">Enable at least one strategy in the selected Trading Profile to run this scan.</div></section>'; return; }
-      if (s.marketClosed) { listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+s.pair+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.</div></section>'; return; }
+      if (s.marketClosed) { var closedNote=PAIR_TYPES[String(s.pair||'').toUpperCase()] === 'INDEX' ? 'This market uses the DIA / QQQ / SPY ETF proxy, which trades on the US cash session (9:30 AM–4:00 PM New York time). All chart timeframes share this market session.' : 'No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.'; listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+escapeNewsText(s.pair)+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">'+closedNote+'</div></section>'; return; }
       if(s.lifecycleStatus==='EXPIRED'||s.lifecycleStatus==='NO_TRADE'){
         var cycle=cycleFor(s.pair,currentSignalTF);
         var statusTitle=s.lifecycleStatus==='EXPIRED'?'SIGNAL EXPIRED':'NO TRADE';
@@ -622,6 +623,7 @@
 
       // Visual Debug Box
       var debugText = '<div style="font-size:11px;color:var(--dg-text-2);background:var(--dg-inset);padding:10px;border-radius:9px;margin-bottom:10px;line-height:1.6;">' +
+        (s.proxyNotice ? '<b>DATA SOURCE NOTICE:</b> '+escapeNewsText(s.proxyNotice)+'<br>' : '') +
         '<b>'+escapeNewsText(scannerProfileName())+' · active detector groups</b><br>Trend (EMA/MACD): '+s.emaTrend+' · RSI: '+Number(s.rsiValue).toFixed(1)+'<br>' +
         'Volatility: '+s.bb+' · Volume: '+s.volume+'<br>Chart pattern: '+(s.pattern||'No confirmed pattern')+'<br>' +
         'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
