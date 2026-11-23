@@ -21,7 +21,7 @@ async function checkAiRateLimit(req) {
       if (count === 1) await redis.expire(key, AI_RATE_WINDOW_SECONDS);
       return { allowed: count <= AI_RATE_LIMIT, remaining: Math.max(0, AI_RATE_LIMIT - count) };
     } catch (error) {
-      console.error("DAGBO AI rate-limit Redis error:", error.message);
+      console.error("AI Commander rate-limit Redis error:", error.message);
     }
   }
 
@@ -308,7 +308,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, total: ids.length, sent, failed, removed });
     }
 
-    // 5. DAGBO AI — task routing with one automatic fallback provider.
+    // 5. AI Commander — task routing with one automatic fallback provider.
     if (req.method === "POST" && action === "ask-ai") {
       const { question, name, subscription, marketContext, history, task } = req.body || {};
       if (typeof question !== "string" || !question.trim() || question.length > 2000) {
@@ -405,7 +405,7 @@ module.exports = async function handler(req, res) {
         } catch (candleError) {
           liveCandleContext = "Live candle request failed for " + quotePair +
             ". Do not issue a directional trade call or invent entry/SL/TP.";
-          console.warn("DAGBO AI candle context unavailable:", candleError.message);
+          console.warn("AI Commander candle context unavailable:", candleError.message);
         }
       } else if (asksAnalysis && !quotePair) {
         liveCandleContext = "No instrument was identified. Ask the user which pair or market and timeframe to analyse.";
@@ -479,7 +479,7 @@ module.exports = async function handler(req, res) {
         } catch (error) {
           lastError = error;
           attempts.push({ provider: providerName, ok: false, latencyMs: Date.now() - startedAt });
-          console.warn("DAGBO AI provider unavailable:", providerName, error.message);
+          console.warn("AI Commander provider unavailable:", providerName, error.message);
         }
       }
       if (!result) {
@@ -515,10 +515,10 @@ module.exports = async function handler(req, res) {
               await redis.del("dagbo:push:sub:" + id);
               await redis.srem(SUBSCRIPTIONS, id);
             } catch (cleanupError) {
-              console.error("DAGBO AI subscription cleanup error:", cleanupError.message);
+              console.error("AI Commander subscription cleanup error:", cleanupError.message);
             }
           } else {
-            console.error("DAGBO AI push delivery error:", error.message);
+            console.error("AI Commander push delivery error:", error.message);
           }
         }
       }
