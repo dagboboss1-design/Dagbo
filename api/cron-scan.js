@@ -21,7 +21,7 @@ const SYMBOLS = {
   CADJPY: "CAD/JPY", CADCHF: "CAD/CHF", CHFJPY: "CHF/JPY",
   BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
 };
-const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
+const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","BTCUSD"];
 // Scan a bounded rotating batch on each scheduler run. Four concurrent pairs
 // cover a five-pair default watchlist within two cycles without flooding the provider.
 const MAX_PAIRS = 4;
