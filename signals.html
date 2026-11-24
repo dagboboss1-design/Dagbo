@@ -57,7 +57,7 @@
 
 
   <section class="dg-card" style="margin:14px 0">
-    <div class="dg-card__head"><h2 class="dg-card__title">BOSS1 · Seven-Method Analysis</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
+    <div class="dg-card__head"><h2 class="dg-card__title">BOSS1 · Eight-Method Analysis</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
     <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">Every scan audits Technical, Fundamental, Sentiment, Price Action, Volume, Intermarket and Quantitative analysis. Only methods backed by verified data can confirm a direction. Missing feeds are shown as UNAVAILABLE, never guessed.</p>
     <p class="dg-help" style="margin-top:8px">The current candle engine evaluates technical indicators, closed-candle price action, market structure and provider volume. Fundamental, positioning sentiment and synchronized cross-market feeds remain unavailable until connected. Quantitative z-score is a research diagnostic, not a machine-learning prediction or independent trade trigger.</p>
   </section>
@@ -241,7 +241,7 @@
   function groupsForActiveProfile(){
     var categoryMap={
       'Trend':['Trend'],'Trend following':['Trend'],'Trend strength':['Trend'],'Macro trend':[],'Intermarket':[],
-      'Momentum':['Momentum'],'Trend pullback':['Trend','Momentum'],'Intraday value':['Momentum','Volatility','Volume'],'Value':['Momentum','Volatility'],
+      'Momentum':['Momentum','Volume'],'Trend pullback':['Trend','Momentum'],'Intraday value':['Momentum','Volatility','Volume'],'Value':['Momentum','Volatility'],
       'Retracement':['Trend','Momentum','Market structure'],'Trend flip':['Trend','Momentum','Market structure'],'Relative strength':[],'Carry':[],
       'Breakout':['Market structure','Volatility'],'Session range':['Market structure'],'Key levels':['Market structure'],'Structure':['Market structure'],
       'Liquidity':['Market structure'],'SMC':['Market structure'],'Session':['Market structure'],'Levels':['Market structure'],
@@ -497,6 +497,25 @@
         }
         final=analysis.final;
       }
+      // Record the eighth method after the higher-timeframe gate has run.
+      // Missing context is UNAVAILABLE; a scan without a primary setup is NOT RUN.
+      analysis.methodReports = Array.isArray(analysis.methodReports) ? analysis.methodReports : [];
+      analysis.methodReports = analysis.methodReports.filter(function(m){return m.name !== 'Multi-Timeframe Analysis';});
+      var mtfChecks = Array.isArray(timeframeContext.checks) ? timeframeContext.checks : [];
+      var mtfStatus = timeframeContext.checked
+        ? (timeframeContext.direction === 'WAIT' ? 'NEUTRAL' : 'ACTIVE')
+        : (timeframeContext.error ? 'UNAVAILABLE' : 'NOT RUN');
+      var mtfDetail = timeframeContext.checked
+        ? mtfChecks.map(function(x){return x.label + ': ' + x.direction;}).join(' · ')
+        : (timeframeContext.error || 'Not evaluated because the primary candle engine did not produce a directional setup.');
+      analysis.methodReports.push({
+        name:'Multi-Timeframe Analysis',
+        direction:timeframeContext.checked ? timeframeContext.direction : 'WAIT',
+        status:mtfStatus,
+        detail:mtfDetail || 'Higher-timeframe context unavailable.',
+        source:'Closed higher-timeframe candles'
+      });
+
       // A NO TRADE result must never receive SELL-style calculated levels.
       // Executable prices are reserved for a confirmed BUY or SELL.
       if(final.indexOf('BUY')<0&&final.indexOf('SELL')<0){
@@ -802,10 +821,10 @@
         'Market structure: '+s.structure+' · Sweep: '+s.sweep+' · FVG: '+s.fvg+
         '<br><b>Group score:</b> BUY '+s.buyScore+'/'+(s.totalMethods||12)+' · SELL '+s.sellScore+'/'+(s.totalMethods||12)+' · '+Number(s.confidence||0)+'% '+(s.quality||'UNRATED')+' confidence</div>';
       
-      var methodAuditHtml = '<div style="margin-top:12px;padding:11px;border:1px solid var(--dg-line);border-radius:11px"><b style="font-size:12px">BOSS1 · SEVEN-METHOD AUDIT</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px">' +
+      var methodAuditHtml = '<div style="margin-top:12px;padding:11px;border:1px solid var(--dg-line);border-radius:11px"><b style="font-size:12px">BOSS1 · EIGHT-METHOD AUDIT</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px">' +
         (Array.isArray(s.methodReports)?s.methodReports.map(function(m){
           var status=String(m.status||'UNAVAILABLE');
-          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='RESEARCH'?'RESEARCH ONLY':'UNAVAILABLE';
+          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='RESEARCH'?'RESEARCH ONLY':status==='NOT RUN'?'NOT RUN':'UNAVAILABLE';
           var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'?'var(--dg-text-2)':'#b7791f';
           return '<div style="padding:7px 8px;border-radius:8px;background:var(--dg-fill);min-width:0"><div style="font-size:11px;font-weight:800">'+escapeNewsText(m.name)+'</div><div style="font-size:10px;font-weight:800;color:'+color+';margin-top:3px">'+label+' · '+escapeNewsText(m.direction||'WAIT')+'</div><div style="font-size:10px;color:var(--dg-text-2);line-height:1.4;margin-top:3px">'+escapeNewsText(m.detail||'No detail available')+'</div></div>';
         }).join(''):'<div class="dg-muted" style="font-size:11px">Method audit unavailable for this result.</div>') +
