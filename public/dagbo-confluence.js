@@ -24,8 +24,8 @@ var slowKs=[];for(var j=0;j<raw.length;j++){var part=raw.slice(Math.max(0,j-kSmo
 var k=slowKs[slowKs.length-1],tail=slowKs.slice(-3),d=tail.reduce(function(a,b){return a+b},0)/tail.length;return {k:k,d:d};
 }
 function analyze(candles,pair,profile,options){
-profile=["scalp","day","intraday","swing","position","event"].indexOf(profile)>=0?profile:"intraday";
-var isScalp=profile==="scalp",isPosition=profile==="position",rsiPeriod=isScalp?7:14,emaFast=isPosition?50:20,emaSlow=isPosition?100:50;
+profile=["scalp","day","intraday","swing","position","event","h4","contrarian"].indexOf(profile)>=0?profile:"intraday";
+var isScalp=profile==="scalp",isPosition=profile==="position",isH4=profile==="h4",isContrarian=profile==="contrarian",rsiPeriod=isScalp?7:14,emaFast=isPosition?50:20,emaSlow=isPosition?100:50;
 if(!Array.isArray(candles)||candles.length<(isScalp?30:60))return null;
 var cs=candles.map(function(x){return n(x.close)}),hs=candles.map(function(x){return n(x.high)}),ls=candles.map(function(x){return n(x.low)});
 if(cs.some(function(x){return x===null})||hs.some(function(x){return x===null})||ls.some(function(x){return x===null}))return null;
@@ -95,7 +95,8 @@ if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.index
 if(!groups.length)return null;
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
-var threshold=profile==="scalp"?65:(profile==="swing"||profile==="position")?75:70,minGroups=isScalp||profile==="position"?3:profile==="event"?2:4;
+var threshold=profile==="scalp"?65:(profile==="swing"||profile==="position"||isH4)?75:70,
+minGroups=isScalp||isPosition||isH4||isContrarian?3:profile==="event"?2:4;
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
 var dir=atrOk&&lead!=="WAIT"&&leadConfidence>=threshold&&leadGroups>=minGroups?lead:"WAIT";
