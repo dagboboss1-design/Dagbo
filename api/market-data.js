@@ -2,15 +2,7 @@ const SYMBOLS = {
   XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY", GBPJPY: "GBP/JPY",
   AUDUSD: "AUD/USD", USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
-  EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK", DXY: "DXY",
-  US30: "DIA", US100: "QQQ", NAS100: "QQQ", US500: "SPY"
-};
-
-const ETF_PROXY_SYMBOLS = {
-  US30: "DIA",
-  US100: "QQQ",
-  NAS100: "QQQ",
-  US500: "SPY"
+  EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK", DXY: "DXY"
 };
 
 const BINANCE_SYMBOLS = {
@@ -175,6 +167,44 @@ module.exports = async function handler(req, res) {
   const interval = intervals[tf];
   if (!interval) return res.status(400).json({ error: "Unsupported timeframe. Use 1, 5, 15, 30, 60, 240, 1day or 1week." });
 
+  // Exact index CFD quotes are not currently connected. Never substitute ETF prices.
+  if (["US30","US100","NAS100","US500"].includes(pair)) {
+    return res.status(503).json({
+      error: "DIRECT INDEX DATA UNAVAILABLE · ETF proxy prices are not valid substitutes for this index. No signal price can be issued.",
+      pair, marketDataType: "UNAVAILABLE"
+    });
+  }
+
+  // A live quote is requested only for a confirmed setup, keeping quote calls
+  // out of routine WAIT scans and avoiding candle-close prices being labelled live.
+  if (String(req.query && req.query.quote || "") === "1") {
+    try {
+      const cryptoSymbol = BINANCE_SYMBOLS[pair];
+      if (cryptoSymbol) {
+        const url = "https://data-api.binance.vision/api/v3/ticker/price?symbol=" + encodeURIComponent(cryptoSymbol);
+        const result = await fetchJsonWithTimeout(url, { headers: { "Accept":"application/json" } }, 7000);
+        const price = Number(result.data && result.data.price);
+        if (!result.response.ok || !Number.isFinite(price) || price <= 0) throw new Error("Binance returned no valid live quote");
+        return res.status(200).json({ pair, symbol: cryptoSymbol, price, provider:"Binance Spot · Live Quote", quoteTime:new Date().toISOString(), marketDataType:"DIRECT" });
+      }
+      const symbol = SYMBOLS[pair];
+      if (!symbol) return res.status(400).json({ error:"Unsupported market pair" });
+      const apiKey = process.env.TWELVE_DATA_API_KEY || process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY;
+      if (!apiKey) throw new Error("Twelve Data live quote key is not configured");
+      const allowed = await claimTwelveDataSlot();
+      if (!allowed) throw new Error("Twelve Data quote quota is busy; retry on the next scan");
+      const url = "https://api.twelvedata.com/price?symbol=" + encodeURIComponent(symbol) + "&apikey=" + encodeURIComponent(apiKey);
+      const result = await fetchJsonWithTimeout(url, {}, 7000);
+      const price = Number(result.data && result.data.price);
+      if (!result.response.ok || result.data.status === "error" || !Number.isFinite(price) || price <= 0) {
+        throw new Error(result.data && result.data.message || "Twelve Data returned no valid live quote");
+      }
+      return res.status(200).json({ pair, symbol, price, provider:"Twelve Data · Live Quote", quoteTime:new Date().toISOString(), marketDataType:"DIRECT" });
+    } catch (error) {
+      return res.status(503).json({ error:"LIVE QUOTE UNAVAILABLE · " + String(error.message || error), pair, marketDataType:"UNAVAILABLE" });
+    }
+  }
+
   // Crypto is served directly from Binance's free, unauthenticated public market-data API.
   // This keeps BTC/ETH requests completely outside the Twelve Data credit quota.
   const binanceSymbol = BINANCE_SYMBOLS[pair];
@@ -215,14 +245,6 @@ module.exports = async function handler(req, res) {
 
   const symbol = SYMBOLS[pair];
   if (!symbol) return res.status(400).json({ error: "Unsupported market pair" });
-  const isIndexProxy = Object.prototype.hasOwnProperty.call(ETF_PROXY_SYMBOLS, pair);
-  const proxyMeta = isIndexProxy ? {
-    marketDataType: "ETF_PROXY", sourceSymbol: ETF_PROXY_SYMBOLS[pair],
-    marketLabel: pair + " directional proxy · " + ETF_PROXY_SYMBOLS[pair] + " ETF",
-    proxyNotice: "This is an ETF proxy, not the broker's exact index CFD price. Entry, stop and target prices are in " + ETF_PROXY_SYMBOLS[pair] + " ETF units."
-  } : {};
-
-
   const cacheKey = "dagbo:market:candles:v2:" + pair + ":" + tf;
   const cached = await readCache(cacheKey);
   const cacheAge = cached ? Date.now() - Number(cached.savedAt || 0) : Infinity;
@@ -254,10 +276,10 @@ module.exports = async function handler(req, res) {
           primaryFailure = "Twelve Data returned fewer than 30 candles";
         } else {
           const payload = {
-            pair, timeframe:tf, provider:isIndexProxy ? "Twelve Data · ETF proxy" : "Twelve Data",
+            pair, timeframe:tf, provider:"Twelve Data",
             providerKeySource:primaryKeySource,
             providerExchange:data.meta && data.meta.exchange ? data.meta.exchange : null,
-            values:data.values, ...proxyMeta
+            values:data.values
           };
           await writeCache(cacheKey, { savedAt:Date.now(), payload });
           res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
@@ -275,9 +297,7 @@ module.exports = async function handler(req, res) {
 
   console.error("DAGBO Twelve Data primary failed for " + pair + " (" + tf + ") using " + primaryKeySource + ": " + String(primaryFailure || "unknown provider failure").slice(0, 240));
   // Provider failover: Twelve Data -> FCS only. No third-party candle fallback is permitted.
-  const backup = isIndexProxy
-    ? { payload:null, failures:["The ETF proxy is not price-compatible with FCS index instruments; no mismatched fallback is used."] }
-    : await fetchBackupCandles(pair, tf);
+  const backup = await fetchBackupCandles(pair, tf);
   if (backup.payload) {
     const payload = backup.payload;
     await writeCache(cacheKey, { savedAt:Date.now(), payload });
