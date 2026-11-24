@@ -241,6 +241,25 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ success: true, message: "Test notification sent to this device" });
     }
 
+    if (req.method === "POST" && action === "sync-pairs") {
+      const { subscription, pairs } = req.body || {};
+      if (!validSubscription(subscription)) return res.status(400).json({ error: "A valid device push subscription is required" });
+      if (!Array.isArray(pairs)) return res.status(400).json({ error: "Enabled pairs must be an array" });
+      const allowedPairs = new Set([
+        "XAUUSD","GOLD","XAGUSD","SILVER","EURUSD","GBPUSD","USDJPY","GBPJPY",
+        "AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","USDSEK",
+        "US30","US100","NAS100","US500","BTCUSD","BTC","ETHUSD","ETH"
+      ]);
+      const safePairs = Array.from(new Set(pairs.map(function(pair) {
+        return String(pair || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      }).filter(function(pair) { return allowedPairs.has(pair); })).values()).slice(0, 30);
+      if (!safePairs.length) return res.status(400).json({ error: "Select at least one supported market in Settings" });
+      const redis = getRedis();
+      const id = getId(subscription.endpoint);
+      await redis.set("dagbo:scan:pairs:" + id, JSON.stringify(safePairs), { ex: 60 * 60 * 24 * 90 });
+      return res.status(200).json({ success: true, pairs: safePairs.length });
+    }
+
     if (req.method === "POST" && action === "subscribe") {
       const subscription = req.body;
       if (!validSubscription(subscription)) return res.status(400).json({ error: "Invalid subscription" });
