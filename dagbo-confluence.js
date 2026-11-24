@@ -66,12 +66,10 @@ var technicalDirection=(trendGroupDir!=="WAIT"&&momentumDir===trendGroupDir)?tre
 methodReports.push(methodReport("Technical Analysis",technicalDirection,
   technicalDirection!=="WAIT"?"ACTIVE":"NEUTRAL",
   "EMA "+emaFast+"/"+emaSlow+", RSI("+rsiPeriod+") "+rv.toFixed(1)+", MACD and Bollinger/ATR checks."));
-var priceDirection=(patternGroupDir!=="WAIT"&&structureGroupDir===patternGroupDir)?patternGroupDir:
-  (patternGroupDir!=="WAIT"&&structureGroupDir==="WAIT"?patternGroupDir:
-  (structureGroupDir!=="WAIT"&&patternGroupDir==="WAIT"?structureGroupDir:"WAIT"));
-methodReports.push(methodReport("Price Action",priceDirection,
+var priceDirection=patternGroupDir;
+methodReports.push(methodReport("Pure Price Action",priceDirection,
   priceDirection!=="WAIT"?"ACTIVE":"NEUTRAL",
-  "Closed-candle patterns, swing structure, BOS/level breaks, liquidity sweep and FVG checks."));
+  priceDirection!=="WAIT"?"A closed-candle chart pattern or candle pattern has confirmed a direction.":"No confirmed chart or candle pattern."));
 methodReports.push(methodReport("Volume Analysis",volumeDir,
   avg>0&&v!==null?"ACTIVE":"UNAVAILABLE",
   avg>0&&v!==null?"Latest volume is "+(v/avg).toFixed(2)+"x its 20-bar average.":"Provider did not supply usable volume; volume confirmation is unavailable.",
@@ -80,8 +78,9 @@ methodReports.push(methodReport("Fundamental Analysis","WAIT","UNAVAILABLE",
   "Verified GDP, CPI, NFP, rate decisions and economic-surprise data are not connected to this candle scan.","Economic data feed"));
 methodReports.push(methodReport("Sentiment Analysis","WAIT","UNAVAILABLE",
   "Verified retail positioning or market-wide positioning data is not connected. Headlines alone are not treated as positioning.","Positioning data feed"));
-methodReports.push(methodReport("Intermarket Analysis","WAIT","UNAVAILABLE",
-  "Synchronized DXY, bond-yield and cross-asset candles are not supplied to this pair scan.","Cross-market data"));
+methodReports.push(methodReport("ICT / SMC",structureDirFinal,
+  structureDirFinal!=="WAIT"?"ACTIVE":"NEUTRAL",
+  "BOS: "+structureDir+" · liquidity sweep: "+sweepDir+" · FVG: "+fvgDir+". A direction is reported only when at least two of these three structure checks agree.","Closed-candle structure data"));
 var logReturns=[];
 for(var qi=Math.max(1,cs.length-21);qi<cs.length;qi++)logReturns.push(Math.log(cs[qi]/cs[qi-1]));
 var qMean=logReturns.reduce(function(a,b){return a+b;},0)/Math.max(1,logReturns.length);
@@ -93,6 +92,8 @@ methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,"RES
 
 var requestedGroups=options&&Array.isArray(options.enabledGroups)?options.enabledGroups:null;
 if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.indexOf(g.name)>=0;});
+// Missing provider volume must not count as a failed vote or dilute confidence.
+if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";});
 if(!groups.length)return null;
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
