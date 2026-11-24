@@ -355,11 +355,15 @@
     else if(profile==='day'||['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0) {
       contextTfs=String(primaryTf)==='60'?['240','1day']:['60','240'];
     } else if(profile==='swing'||profile==='trend-following'||profile==='h4') contextTfs=['1day'];
+    else if(profile==='position') contextTfs=[String(primaryTf)==='1week'?'1day':'1week'];
     else return {checked:false,direction:'WAIT',label:'Not required',checks:[]};
 
     var checks=[];
     for(var i=0;i<contextTfs.length;i++){
-      var contextTf=contextTfs[i],contextLabel=timeframeLabel(contextTf)+' confirmation';
+      var contextTf=contextTfs[i];
+      var contextLabel=profile==='position'
+        ? (contextTf==='1week'?'Weekly macro-trend confirmation':'Daily timing confirmation')
+        : timeframeLabel(contextTf)+' confirmation';
       var response=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(contextTf),{cache:'no-store',headers:{'Accept':'application/json'}});
       var payload=await response.json();
       if(!response.ok||payload.error||payload.stale||!Array.isArray(payload.values)) throw new Error(payload.error||('No fresh '+contextLabel+' candles'));
