@@ -57,9 +57,9 @@
 
 
   <section class="dg-card" style="margin:14px 0">
-    <div class="dg-card__head"><h2 class="dg-card__title">DAGBO Multi-Method Engine</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
-    <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">You do not select a strategy. Every scan checks the available trend and momentum indicators, candlestick behaviour, price-action structure, liquidity sweeps, BOS / CHoCH-style breaks and fair-value-gap conditions. A signal is shown only when enough independent evidence agrees.</p>
-    <p class="dg-help" style="margin-top:8px">Each result names the evidence that actually contributed. A method is marked unavailable when its required data is not present.</p>
+    <div class="dg-card__head"><h2 class="dg-card__title">BOSS1 · Seven-Method Analysis</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
+    <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">Every scan audits Technical, Fundamental, Sentiment, Price Action, Volume, Intermarket and Quantitative analysis. Only methods backed by verified data can confirm a direction. Missing feeds are shown as UNAVAILABLE, never guessed.</p>
+    <p class="dg-help" style="margin-top:8px">The current candle engine evaluates technical indicators, closed-candle price action, market structure and provider volume. Fundamental, positioning sentiment and synchronized cross-market feeds remain unavailable until connected. Quantitative z-score is a research diagnostic, not a machine-learning prediction or independent trade trigger.</p>
   </section>
 
   <!-- PROFILE-DRIVEN SCANNER -->
@@ -240,14 +240,14 @@
   function scannerProfileName(){return activeProfileConfig?activeProfileConfig.name:'Day Trading';}
   function groupsForActiveProfile(){
     var categoryMap={
-      'Trend':['Trend'],'Trend following':['Trend'],'Trend strength':['Trend'],'Macro trend':['Trend'],'Intermarket':['Trend'],
+      'Trend':['Trend'],'Trend following':['Trend'],'Trend strength':['Trend'],'Macro trend':[],'Intermarket':[],
       'Momentum':['Momentum'],'Trend pullback':['Trend','Momentum'],'Intraday value':['Momentum','Volatility','Volume'],'Value':['Momentum','Volatility'],
-      'Retracement':['Trend','Momentum','Market structure'],'Trend flip':['Trend','Momentum','Market structure'],'Relative strength':['Trend','Momentum'],'Carry':['Trend'],
+      'Retracement':['Trend','Momentum','Market structure'],'Trend flip':['Trend','Momentum','Market structure'],'Relative strength':[],'Carry':[],
       'Breakout':['Market structure','Volatility'],'Session range':['Market structure'],'Key levels':['Market structure'],'Structure':['Market structure'],
       'Liquidity':['Market structure'],'SMC':['Market structure'],'Session':['Market structure'],'Levels':['Market structure'],
       'Pattern':['Chart pattern'],'Candlestick':['Chart pattern'],'Reversal':['Chart pattern','Market structure'],
-      'Volatility':['Volatility'],'Volume':['Volume'],'Price action':['Chart pattern','Market structure'],'Cross-market':['Trend','Momentum'],
-      'Economic release':['Volatility'],'Central bank':['Volatility','Trend'],'Risk':[]
+      'Volatility':['Volatility'],'Volume':['Volume'],'Price action':['Chart pattern','Market structure'],'Cross-market':[],
+      'Economic release':[],'Central bank':[],'Risk':[]
     };
     var profile=activeProfileConfig,disabled=profilePreferenceStore.disabled||{},groups={};
     if(!profile)return ['Trend','Momentum','Volatility','Volume','Chart pattern','Market structure'];
