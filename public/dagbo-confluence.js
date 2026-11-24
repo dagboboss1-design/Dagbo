@@ -78,8 +78,9 @@ methodReports.push(methodReport("Fundamental Analysis","WAIT","UNAVAILABLE",
   "Verified GDP, CPI, NFP, rate decisions and economic-surprise data are not connected to this candle scan.","Economic data feed"));
 methodReports.push(methodReport("Sentiment Analysis","WAIT","UNAVAILABLE",
   "Verified retail positioning or market-wide positioning data is not connected. Headlines alone are not treated as positioning.","Positioning data feed"));
-methodReports.push(methodReport("Intermarket Analysis","WAIT","UNAVAILABLE",
-  "Synchronized DXY, bond-yield and cross-asset candles are not supplied to this pair scan.","Cross-market data"));
+methodReports.push(methodReport("ICT / SMC",structureDirFinal,
+  structureDirFinal!=="WAIT"?"ACTIVE":"NEUTRAL",
+  "BOS: "+structureDir+" · liquidity sweep: "+sweepDir+" · FVG: "+fvgDir+". A direction is reported only when at least two of these three structure checks agree.","Closed-candle structure data"));
 var logReturns=[];
 for(var qi=Math.max(1,cs.length-21);qi<cs.length-1;qi++)logReturns.push(Math.log(cs[qi]/cs[qi-1]));
 var latestReturn=Math.log(cs[cs.length-1]/cs[cs.length-2]);
