@@ -455,6 +455,30 @@
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
       var timeframeContext={checked:false,direction:'WAIT',label:'Not required'};
       var final=analysis.final;
+      // News & Event is not a generic 15m technical profile. It must have a
+      // live, unexpired, pair-matched event/news context and technical reaction
+      // must agree with that context; headlines alone never create a trade.
+      if(activeTradingProfile==='event'){
+        var eventCandidate=latestNewsCandidate;
+        var eventAge=eventCandidate&&eventCandidate.createdAt?Date.now()-new Date(eventCandidate.createdAt).getTime():Infinity;
+        var eventValid=!!(eventCandidate&&String(eventCandidate.pair||'').toUpperCase()===String(pair).toUpperCase()&&
+          Number.isFinite(eventAge)&&eventAge>=0&&eventAge<=90*60*1000&&
+          eventCandidate.expiresAt&&Date.now()<new Date(eventCandidate.expiresAt).getTime()&&
+          ['BUY','SELL'].includes(String(eventCandidate.direction||'').toUpperCase()));
+        if(!eventValid){
+          return {pair:pair,final:'NO TRADE',eventContextUnavailable:true,
+            strategy:'Event mode is waiting for a fresh, verified, pair-matched event context. No headline-only direction is allowed.',
+            methodReports:analysis.methodReports||[],evidence:(analysis.evidence||[]).concat(['Event context unavailable or expired for this pair.']),
+            buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
+            confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold};
+        }
+        var technicalDirection=String(final).replace(/^HIGH CONFIDENCE\\s+/,'');
+        if((technicalDirection!=='BUY'&&technicalDirection!=='SELL')||technicalDirection!==String(eventCandidate.direction).toUpperCase()){
+          analysis.final='NO TRADE';analysis.direction='WAIT';
+          analysis.evidence=(analysis.evidence||[]).concat(['Event/news direction and closed-candle technical reaction do not agree.']);
+          final='NO TRADE';
+        }
+      }
       // Do not publish a directional signal unless its selected higher timeframe agrees.
       // Missing or mixed context fails closed rather than guessing.
       if(final.indexOf('BUY')>=0||final.indexOf('SELL')>=0){
@@ -1075,9 +1099,10 @@
         return;
       }
 
-      // News context is optional: start it alongside the technical scan.
-      // It must never hold up live candle retrieval or signal calculation.
-      loadNewsSignalContext();
+      // Event mode requires a current, pair-matched news/event context before
+      // it can evaluate a directional setup. Other profiles keep this optional.
+      if(activeTradingProfile==='event') await loadNewsSignalContext();
+      else loadNewsSignalContext();
 
       // Respect the shared Twelve Data Basic-tier request budget.
       // The API endpoint allows at most six uncached Twelve Data calls per
