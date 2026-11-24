@@ -502,8 +502,13 @@
             bb:analysis.bb,volume:analysis.volume,pattern:analysis.pattern,structure:analysis.structureName,sweep:analysis.sweep,fvg:analysis.fvg};
         }
       }
-      var entry=parseFloat(candles[candles.length-1].close);
       var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
+      var quoteResponse=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(tf)+'&quote=1',{cache:'no-store',headers:{'Accept':'application/json'}});
+      var liveQuote=await quoteResponse.json();
+      if(!quoteResponse.ok||!Number.isFinite(Number(liveQuote.price))||Number(liveQuote.price)<=0){
+        return {pair:pair,error:liveQuote.error||'Live executable quote is unavailable. No entry, SL or TP issued.',errorStage:'live-quote'};
+      }
+      var entry=Number(liveQuote.price);
       var atrSum=0;
       for(var i=1;i<=14;i++){
         var candle=candles[candles.length-i],previous=candles[candles.length-i-1];
@@ -532,8 +537,8 @@
       }
       var lastC=candles[candles.length-1];
       return {
-        pair:pair,final:final,entry:entry,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,timeframeContext:timeframeContext,
-        provider:data.provider||'Market data',marketDataType:data.marketDataType||'DIRECT',sourceSymbol:data.sourceSymbol||null,marketLabel:data.marketLabel||null,proxyNotice:data.proxyNotice||null,
+        pair:pair,final:final,entry:entry,currentPrice:entry,quoteProvider:liveQuote.provider||'Live quote',quoteTime:liveQuote.quoteTime||null,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,timeframeContext:timeframeContext,
+        provider:data.provider||'Market data',marketDataType:'DIRECT',sourceSymbol:data.sourceSymbol||null,marketLabel:data.marketLabel||null,proxyNotice:null,
         s1:analysis.emaTrend,s2:analysis.candleName,s3:analysis.structure,
         strategy:analysis.evidence.length?analysis.evidence.join(' · '):'No method produced directional evidence',
         methodReports:analysis.methodReports||[],evidence:analysis.evidence,buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
@@ -743,7 +748,7 @@
 
       if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
       if (s.noMethods) { listHtml += '<section class="dg-card"><strong>'+escapeNewsText(s.pair)+' · NO ACTIVE STRATEGIES</strong><div class="dg-muted" style="margin-top:6px">Enable at least one strategy in the selected Trading Profile to run this scan.</div></section>'; return; }
-      if (s.marketClosed) { var closedNote=PAIR_TYPES[String(s.pair||'').toUpperCase()] === 'INDEX' ? 'This market uses the DIA / QQQ / SPY ETF proxy, which trades on the US cash session (9:30 AM–4:00 PM New York time). All chart timeframes share this market session.' : 'No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.'; listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+escapeNewsText(s.pair)+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">'+closedNote+'</div></section>'; return; }
+      if (s.marketClosed) { var closedNote=PAIR_TYPES[String(s.pair||'').toUpperCase()] === 'INDEX' ? 'Direct index CFD pricing is not connected. DAGBO will not substitute an ETF price or issue an index signal.' : 'No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.'; listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+escapeNewsText(s.pair)+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">'+closedNote+'</div></section>'; return; }
       if(s.lifecycleStatus==='EXPIRED'||s.lifecycleStatus==='NO_TRADE'){
         var cycle=cycleFor(s.pair,currentSignalTF);
         var statusTitle=s.lifecycleStatus==='EXPIRED'?'SIGNAL EXPIRED':'NO TRADE';
@@ -810,7 +815,7 @@
           '<div class="dg-help" style="margin:-5px 0 10px">'+(s.lifecycleStatus==='RECONFIRMED'?'Fresh scan reconfirmed this direction.':'Signal expires after '+timeframeLabel(currentSignalTF)+' unless reconfirmed.')+'</div>' +
           '<div style="font-size:12px;font-weight:800;margin:0 0 8px;color:var(--dg-text-2)">RISK : REWARD · '+escapeNewsText(s.rr||'1:1')+'</div>' +
           '<div class="dg-grid-4" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
-            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry</span><strong style="font-size:15px">' + fEntry + '</strong></div>' +
+            '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Entry · Live quote</span><strong style="font-size:15px">' + fEntry + '</strong><small style="display:block;font-size:10px;color:var(--dg-text-2)">'+escapeNewsText(s.quoteProvider||'Live quote')+(s.quoteTime?' · '+new Date(s.quoteTime).toLocaleTimeString():'')+'</small></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">Stop Loss</span><strong style="font-size:15px" class="dg-neg">' + fSl + '</strong></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 1</span><strong style="font-size:15px" class="dg-pos">' + fTp1 + '</strong></div>' +
             '<div class="dg-level" style="padding:8px 10px"><span style="font-size:11px">TP 2</span><strong style="font-size:15px" class="dg-pos">' + fTp2 + '</strong></div>' +
