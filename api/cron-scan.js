@@ -19,7 +19,6 @@ const SYMBOLS = {
   AUDJPY: "AUD/JPY", AUDCHF: "AUD/CHF", AUDCAD: "AUD/CAD", AUDNZD: "AUD/NZD",
   NZDJPY: "NZD/JPY", NZDCHF: "NZD/CHF", NZDCAD: "NZD/CAD",
   CADJPY: "CAD/JPY", CADCHF: "CAD/CHF", CHFJPY: "CHF/JPY",
-  US30: "DIA", US100: "QQQ", NAS100: "QQQ", US500: "SPY",
   BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
 };
 const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
@@ -290,6 +289,9 @@ async function sendNewsAlerts(apiKey) {
   return { eventsChecked, newsAlerts, preNewsSignals };
 }
 async function fetchTradeMarket(pair, apiKey) {
+  if (["US30","US100","NAS100","US500"].includes(pair)) {
+    throw new Error("DIRECT INDEX DATA UNAVAILABLE · No index CFD feed is connected; ETF proxy prices are not accepted.");
+  }
   const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
