@@ -288,6 +288,21 @@ async function sendNewsAlerts(apiKey) {
   }
   return { eventsChecked, newsAlerts, preNewsSignals };
 }
+async function fetchLiveQuote(pair) {
+  if (["US30","US100","NAS100","US500"].includes(pair)) {
+    throw new Error("DIRECT INDEX DATA UNAVAILABLE · ETF proxy prices are not accepted.");
+  }
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
+  const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15&quote=1";
+  const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
+  const data = await response.json();
+  const price = num(data && data.price);
+  if (!response.ok || price === null || price <= 0) {
+    throw new Error(data.error || "No valid live quote for " + pair);
+  }
+  return { price, provider: data.provider || "Live quote", quoteTime: data.quoteTime || new Date().toISOString() };
+}
+
 async function fetchTradeMarket(pair, apiKey) {
   if (["US30","US100","NAS100","US500"].includes(pair)) {
     throw new Error("DIRECT INDEX DATA UNAVAILABLE · No index CFD feed is connected; ETF proxy prices are not accepted.");
@@ -791,6 +806,29 @@ module.exports = async function handler(req, res) {
         sourceSymbol: item.sourceSymbol, marketLabel: item.marketLabel,
         proxyNotice: item.proxyNotice
       });
+      // A scheduled alert is executable only when a current quote for the exact
+      // same instrument is available. Shift the ATR-derived SL/TP distances from
+      // the candle-close reference to the live quote without changing risk size.
+      if (analysis.signal && analysis.signal !== "NO TRADE") {
+        try {
+          const live = await fetchLiveQuote(pair);
+          const candleEntry = num(analysis.entry);
+          const stop = num(analysis.stopLoss), target = num(analysis.takeProfit);
+          if (candleEntry === null || stop === null || target === null) throw new Error("Signal levels are incomplete.");
+          const shift = live.price - candleEntry;
+          analysis.entry = live.price;
+          analysis.stopLoss = stop + shift;
+          analysis.takeProfit = target + shift;
+          analysis.quoteProvider = live.provider;
+          analysis.quoteTime = live.quoteTime;
+          analysis.candleEntryReference = candleEntry;
+        } catch (quoteError) {
+          errors.push({ pair, error: "LIVE QUOTE UNAVAILABLE · " + (quoteError.message || String(quoteError)) });
+          results[pair] = { signal: "DATA UNAVAILABLE", marketDataUnavailable: true, error: quoteError.message || String(quoteError) };
+          await redis.set("dagbo:scan:signal:" + pair, JSON.stringify({ signal: "NO TRADE", scannedAt: new Date().toISOString(), reason: "LIVE_QUOTE_UNAVAILABLE" }), { ex: 60 * 60 * 24 * 7 });
+          continue;
+        }
+      }
       results[pair] = analysis;
       const stateKey = "dagbo:scan:signal:" + pair;
       const previousRaw = await redis.get(stateKey);
@@ -799,8 +837,9 @@ module.exports = async function handler(req, res) {
         if (!previous || previous.signal !== analysis.signal) {
           const title = !previous || previous.signal === "NO TRADE" ? "🔔 NEW " + analysis.signal + " SIGNAL" :
             (previous.signal.includes("BUY") !== analysis.signal.includes("BUY") ? "🔄 SIGNAL DIRECTION CHANGED" : "📈 SIGNAL STRENGTH CHANGED");
-          const body = pair + " · " + analysis.signal + " · Entry " + analysis.entry.toFixed(5) +
+          const body = pair + " · " + analysis.signal + " · Live Entry " + analysis.entry.toFixed(5) +
             " · SL " + analysis.stopLoss.toFixed(5) + " · TP " + analysis.takeProfit.toFixed(5) +
+            " · Quote: " + (analysis.quoteProvider || "Live quote") + " at " + (analysis.quoteTime || "just now") +
             " · " + analysis.confidence + "% " + analysis.quality + " confluence quality (threshold " + analysis.threshold + ")." + (analysis.proxyNotice ? " DATA SOURCE: " + analysis.proxyNotice : "") + " Group score: " + analysis.buyScore + " BUY / " + analysis.sellScore + " SELL. Sources: " +
             analysis.evidence.slice(0, 3).join("; ") + ". Confirm on chart.";
           const delivery = await broadcast(title, body, "signal-" + pair);
