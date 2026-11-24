@@ -66,10 +66,10 @@ var technicalDirection=(trendGroupDir!=="WAIT"&&momentumDir===trendGroupDir)?tre
 methodReports.push(methodReport("Technical Analysis",technicalDirection,
   technicalDirection!=="WAIT"?"ACTIVE":"NEUTRAL",
   "EMA "+emaFast+"/"+emaSlow+", RSI("+rsiPeriod+") "+rv.toFixed(1)+", MACD and Bollinger/ATR checks."));
-var priceDirection=(patternGroupDir!=="WAIT"&&structureGroupDir===patternGroupDir)?patternGroupDir:"WAIT";
-var priceStatus=priceDirection!=="WAIT"?"ACTIVE":(patternGroupDir!=="WAIT"||structureGroupDir!=="WAIT")?"NEUTRAL":"NEUTRAL";
-methodReports.push(methodReport("Price Action",priceDirection,priceStatus,
-  priceDirection!=="WAIT"?"Pattern/candle evidence and independent structure/level evidence agree.":(patternGroupDir!=="WAIT"||structureGroupDir!=="WAIT")?"Pattern and structure evidence are incomplete or disagree; no directional confirmation.":"No confirmed pattern or structure break."));
+var priceDirection=patternGroupDir;
+var priceStatus=priceDirection!=="WAIT"?"ACTIVE":"NEUTRAL";
+methodReports.push(methodReport("Pure Price Action",priceDirection,priceStatus,
+  priceDirection!=="WAIT"?"A closed-candle chart pattern or candle pattern has confirmed a direction.":"No confirmed chart or candle pattern."));
 methodReports.push(methodReport("Volume Analysis",volumeDir,
   avg>0&&v!==null?"ACTIVE":"UNAVAILABLE",
   avg>0&&v!==null?"Latest volume is "+(v/avg).toFixed(2)+"x its 20-bar average.":"Provider did not supply usable volume; volume confirmation is unavailable.",
@@ -92,6 +92,8 @@ methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,"RES
 
 var requestedGroups=options&&Array.isArray(options.enabledGroups)?options.enabledGroups:null;
 if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.indexOf(g.name)>=0;});
+// Missing provider volume must not count as a failed vote or dilute confidence.
+if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";});
 if(!groups.length)return null;
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
