@@ -472,7 +472,7 @@
             buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
             confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold};
         }
-        var technicalDirection=String(final).replace(/^HIGH CONFIDENCE\\s+/,'');
+        var technicalDirection=String(final).replace(/^HIGH CONFIDENCE\s+/,'');
         if((technicalDirection!=='BUY'&&technicalDirection!=='SELL')||technicalDirection!==String(eventCandidate.direction).toUpperCase()){
           analysis.final='NO TRADE';analysis.direction='WAIT';
           analysis.evidence=(analysis.evidence||[]).concat(['Event/news direction and closed-candle technical reaction do not agree.']);
