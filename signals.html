@@ -818,7 +818,7 @@
           debugText + methodAuditHtml +
           '<div style="text-align:center;padding:16px 0">' +
             '<div class="dg-signal__word ' + cls + '" style="font-size:28px">NO TRADE</div>' +
-            '<div class="dg-muted" style="font-size:13px;margin-top:4px">'+(s.activeTradeOnPair?'An OPEN Journal trade already exists for this pair. No duplicate signal will be issued until it is closed.':'Market is quiet. Systems say WAIT.')+'</div>' +
+            '<div class="dg-muted" style="font-size:13px;margin-top:4px">'+escapeNewsText(s.activeTradeOnPair?'An OPEN Journal trade already exists for this pair. No duplicate signal will be issued until it is closed.':(s.strategy||'The strategy did not confirm a trade setup.'))+'</div>' +
           '</div>';
       } else {
         // Smart Decimal Logic: format each market with its appropriate price precision.
@@ -873,10 +873,36 @@
         '</section>';
     });
 
+    // Pair-by-pair scan diagnostics: make every enabled market's outcome visible,
+    // including data failures and valid NO TRADE decisions.
+    var diagnosticRows = '';
+    var diagnosticCounts = {signal:0,wait:0,closed:0,error:0,other:0};
+    sortedPairs.forEach(function(pair) {
+      var type = PAIR_TYPES[String(pair).toUpperCase()] || 'FX';
+      if (currentFilter !== 'ALL' && currentFilter !== type) return;
+      var item = signalsData[pair];
+      if (!item) {
+        diagnosticCounts.other++;
+        diagnosticRows += '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--dg-line)"><b>'+escapeNewsText(pair)+'</b><span class="dg-muted">Waiting for scan</span></div>';
+        return;
+      }
+      var status='NO TRADE', reason='No confirmed directional setup on the latest closed candles.';
+      if(item.error){status='DATA ERROR';reason=item.error;diagnosticCounts.error++;}
+      else if(item.marketClosed){status='CLOSED';reason=type==='INDEX'?'Direct index CFD price feed is not connected.':'Market session is closed.';diagnosticCounts.closed++;}
+      else if(item.sessionFiltered){status='SESSION FILTER';reason='Scalping runs only during its configured session.';diagnosticCounts.other++;}
+      else if(item.noMethods){status='NO DETECTORS';reason='This profile has no enabled detector groups.';diagnosticCounts.other++;}
+      else if(item.hedgingMode){status='HEDGE MONITOR';reason='Basket-level hedge analysis runs separately.';diagnosticCounts.other++;}
+      else if(String(item.final||'').indexOf('BUY')>=0||String(item.final||'').indexOf('SELL')>=0){status='SIGNAL';reason='Directional setup confirmed; executable levels are shown on its card.';diagnosticCounts.signal++;}
+      else if(item.lifecycleStatus==='EXPIRED'){status='EXPIRED';reason='The previous setup validity window ended.';diagnosticCounts.wait++;}
+      else if(item.lifecycleStatus==='NO_TRADE'){status='NO TRADE';reason='The setup did not remain confirmed at its checkpoint.';diagnosticCounts.wait++;}
+      else {reason=item.strategy||'Confluence or higher-timeframe confirmation was insufficient.';diagnosticCounts.wait++;}
+      diagnosticRows += '<div style="padding:8px 0;border-bottom:1px solid var(--dg-line)"><div style="display:flex;justify-content:space-between;gap:8px"><b>'+escapeNewsText(pair)+'</b><span style="font-size:10px;font-weight:800">'+escapeNewsText(status)+'</span></div><div class="dg-muted" style="font-size:11px;line-height:1.45;margin-top:3px">'+escapeNewsText(reason)+'</div></div>';
+    });
+    var diagnosticHtml='<section class="dg-card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:13px">SCAN DIAGNOSTICS</b><span class="dg-muted" style="font-size:10px">'+sortedPairs.length+' enabled markets</span></div><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:10px 0"><div style="background:var(--dg-fill);padding:8px;border-radius:8px;text-align:center"><b>'+diagnosticCounts.signal+'</b><div class="dg-muted" style="font-size:10px">Signals</div></div><div style="background:var(--dg-fill);padding:8px;border-radius:8px;text-align:center"><b>'+diagnosticCounts.wait+'</b><div class="dg-muted" style="font-size:10px">No trade</div></div><div style="background:var(--dg-fill);padding:8px;border-radius:8px;text-align:center"><b>'+diagnosticCounts.closed+'</b><div class="dg-muted" style="font-size:10px">Closed</div></div><div style="background:var(--dg-fill);padding:8px;border-radius:8px;text-align:center"><b>'+diagnosticCounts.error+'</b><div class="dg-muted" style="font-size:10px">Data errors</div></div></div>'+diagnosticRows+'</section>';
     if (listHtml === '') {
       listHtml = '<div class="dg-card" style="text-align:center;padding:32px 16px"><p class="dg-muted">No signals available. Waiting for market data...</p></div>';
     }
-    grid.innerHTML = listHtml;
+    grid.innerHTML = diagnosticHtml + listHtml;
     updateScalpStats();
     renderInsights();
   }
