@@ -58,7 +58,7 @@
 
   <section class="dg-card" style="margin:14px 0">
     <div class="dg-card__head"><h2 class="dg-card__title">BOSS1 · Eight-Method Analysis</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
-    <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">Every scan audits Technical, Fundamental, Sentiment, Price Action, Volume, Intermarket and Quantitative analysis. Only methods backed by verified data can confirm a direction. Missing feeds are shown as UNAVAILABLE, never guessed.</p>
+    <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">Every scan audits Technical, Pure Price Action, ICT/SMC, Volume, Fundamental, Sentiment, Quantitative and Multi-Timeframe analysis. Only methods backed by verified data can confirm a direction. Missing feeds are shown as UNAVAILABLE, never guessed.</p>
     <p class="dg-help" style="margin-top:8px">The current candle engine evaluates technical indicators, closed-candle price action, market structure and provider volume. Fundamental, positioning sentiment and synchronized cross-market feeds remain unavailable until connected. Quantitative z-score is a research diagnostic, not a machine-learning prediction or independent trade trigger.</p>
   </section>
 
@@ -468,7 +468,11 @@
         if(!eventValid){
           return {pair:pair,final:'NO TRADE',eventContextUnavailable:true,
             strategy:'Event mode is waiting for a fresh, verified, pair-matched event context. No headline-only direction is allowed.',
-            methodReports:analysis.methodReports||[],evidence:(analysis.evidence||[]).concat(['Event context unavailable or expired for this pair.']),
+            methodReports:(analysis.methodReports||[]).concat([{
+              name:'Multi-Timeframe Analysis',direction:'WAIT',status:'NOT RUN',
+              detail:'Not evaluated because a valid pair-matched event context is unavailable.',
+              source:'Closed higher-timeframe candles'
+            }]),evidence:(analysis.evidence||[]).concat(['Event context unavailable or expired for this pair.']),
             buyScore:analysis.buyScore,sellScore:analysis.sellScore,totalMethods:analysis.totalMethods,
             confidence:analysis.confidence,quality:analysis.quality,source:analysis.source,threshold:analysis.threshold};
         }
