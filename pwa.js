@@ -74,7 +74,19 @@
           body: JSON.stringify(subscription)
         }).then(function (res) {
           if (!res.ok) return res.json().then(function (d) { throw new Error(d.error || "Could not save subscription"); });
-          return subscription;
+          var settings = {};
+          try { settings = JSON.parse(localStorage.getItem("dagbo_settings") || "{}"); } catch (_) {}
+          var pairs = Array.isArray(settings.pairs) ? settings.pairs : [];
+          return fetch("/api/push?action=sync-pairs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subscription: subscription, pairs: pairs })
+          }).then(function (syncResponse) {
+            if (!syncResponse.ok) return syncResponse.json().then(function (data) {
+              throw new Error(data.error || "Could not sync your enabled markets with scheduled scanning");
+            });
+            return subscription;
+          });
         });
       });
   }
