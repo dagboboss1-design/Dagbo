@@ -327,8 +327,8 @@
   function candleNumber(c, key){return Number(c[key]);}
   function analyseAllMethods(candles, profile) {
     var engineProfile = profile === 'scalping' || profile === 'momentum' ? 'scalp' :
-      (profile === 'h4' || profile === 'trend-following' ? 'swing' :
-      (['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0 ? 'day' : profile));
+      (profile === 'trend-following' ? 'swing' :
+      (['mean-reversion','range','breakout'].indexOf(profile)>=0 ? 'day' : profile));
     var result = window.DagboConfluence.analyze(candles, '', engineProfile, {enabledGroups:groupsForActiveProfile()});
     if (!result) return null;
     return {
