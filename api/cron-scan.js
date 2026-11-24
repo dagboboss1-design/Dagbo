@@ -663,10 +663,19 @@ module.exports = async function handler(req, res) {
     try {
       const raw = await redis.get("dagbo:cron:scan:last");
       const lockState = await redis.get("dagbo:cron:scan:lock");
-      let lastScan = raw;
+      const pushRaw = await redis.get("dagbo:push:delivery:last");
+      const pushIds = await redis.smembers("dagbo:push:subscriptions");
+      const configuredPairs = await getConfiguredPairs();
+      let lastScan = raw, lastPushDelivery = pushRaw;
       if (typeof raw === "string") { try { lastScan = JSON.parse(raw); } catch (e) { lastScan = null; } }
+      if (typeof pushRaw === "string") { try { lastPushDelivery = JSON.parse(pushRaw); } catch (e) { lastPushDelivery = null; } }
       return res.status(200).json({
         success: true,
+        configuredPairCount: configuredPairs.length,
+        configuredPairs,
+        pushConfigured: vapidReady(),
+        pushDevices: pushIds.length,
+        lastPushDelivery,
         schedulerSecretConfigured: !!(process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET),
         redisConfigured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
         marketDataKeyConfigured: !!process.env.TWELVE_DATA_API_KEY,
