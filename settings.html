@@ -275,6 +275,11 @@
         if (e.target.checked) { if (state.pairs.indexOf(p) === -1) state.pairs.push(p); } 
         else { state.pairs = state.pairs.filter(function(x){ return x !== p; }); }
         save();
+        if (state.notify === true && window.DagboPWA && typeof window.DagboPWA.getSubscription === 'function') {
+          window.DagboPWA.getSubscription().catch(function(err) {
+            console.warn('DAGBO enabled-market sync failed:', err.message);
+          });
+        }
       });
       grid.appendChild(label);
     });
