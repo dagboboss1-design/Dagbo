@@ -23,9 +23,9 @@ const SYMBOLS = {
   BTCUSD: "BTC/USD", BTC: "BTC/USD", ETHUSD: "ETH/USD", ETH: "ETH/USD"
 };
 const DEFAULT_PAIRS = ["XAUUSD","EURUSD","GBPUSD","US30","BTCUSD"];
-// Keep scheduled scans to two instruments per run. The browser scanner and news monitor
-// share the same Basic-plan minute quota, so six simultaneous scheduled requests starved them.
-const MAX_PAIRS = 2;
+// Scan a bounded rotating batch on each scheduler run. Four concurrent pairs
+// cover a five-pair default watchlist within two cycles without flooding the provider.
+const MAX_PAIRS = 4;
 const MAX_HTF_PAIRS = 8;
 
 async function selectRotatingBatch(redisKey, pairs, limit) {
@@ -140,7 +140,7 @@ async function sendToDevice(deviceId, title, body, tag, url) {
   }
 }
 async function broadcast(title, body, tag) {
-  if (!vapidReady()) throw new Error("VAPID push keys are not configured");
+  if (!vapidReady()) return { sent: 0, failed: 0, devices: 0, error: "VAPID keys are not configured" };
   webpush.setVapidDetails(process.env.VAPID_SUBJECT, process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
   const ids = await redis.smembers("dagbo:push:subscriptions");
   let sent = 0, failed = 0;
@@ -159,7 +159,9 @@ async function broadcast(title, body, tag) {
       } else console.error("Push delivery failed:", err.message);
     }
   }
-  return { sent, failed, devices: ids.length };
+  const result = { sent, failed, devices: ids.length, at: new Date().toISOString(), tag: String(tag || "") };
+  await redis.set("dagbo:push:delivery:last", JSON.stringify(result), { ex: 60 * 60 * 24 * 7 });
+  return result;
 }
 async function fetchPreNewsCandles(pair, cutoffMs, apiKey) {
   // Reuse the same provider manager as the live Signals page. This keeps
@@ -790,7 +792,11 @@ module.exports = async function handler(req, res) {
             " · SL " + analysis.stopLoss.toFixed(5) + " · TP " + analysis.takeProfit.toFixed(5) +
             " · " + analysis.confidence + "% " + analysis.quality + " confluence quality (threshold " + analysis.threshold + ")." + (analysis.proxyNotice ? " DATA SOURCE: " + analysis.proxyNotice : "") + " Group score: " + analysis.buyScore + " BUY / " + analysis.sellScore + " SELL. Sources: " +
             analysis.evidence.slice(0, 3).join("; ") + ". Confirm on chart.";
-          await broadcast(title, body, "signal-" + pair);
+          const delivery = await broadcast(title, body, "signal-" + pair);
+          await redis.set("dagbo:push:delivery:" + pair, JSON.stringify({
+            signal: analysis.signal, candleTime: analysis.candleTime,
+            delivery, attemptedAt: new Date().toISOString()
+          }), { ex: 60 * 60 * 24 * 7 });
         }
       } else if (previous && previous.signal !== "NO TRADE") {
         await broadcast("ℹ️ SIGNAL NO LONGER ACTIVE", pair + " no longer meets the multi-method confirmation rule. Review any pending setup.", "signal-ended-" + pair);
