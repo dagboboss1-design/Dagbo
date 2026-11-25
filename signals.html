@@ -894,7 +894,8 @@
     var report = {
       name:'Sentiment Analysis',
       direction:sentiment.direction || 'WAIT',
-      status:sentiment.status || 'UNAVAILABLE',
+      status:sentiment.status === 'ACTIVE' || sentiment.status === 'NEUTRAL'
+        ? 'RESEARCH' : (sentiment.status || 'UNAVAILABLE'),
       detail:sentiment.detail || sentiment.error || 'No verified COT positioning data returned.',
       source:sentiment.source || 'FMP COT Analysis',
       asOf:sentiment.asOf || null
@@ -1024,7 +1025,7 @@
           var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'||status==='NOT RUN'?'var(--dg-text-2)':'#b7791f';
           return '<div style="padding:7px 8px;border-radius:8px;background:var(--dg-fill);min-width:0"><div style="font-size:11px;font-weight:800">'+escapeNewsText(m.name)+'</div><div style="font-size:10px;font-weight:800;color:'+color+';margin-top:3px">'+label+' · '+escapeNewsText(m.direction||'WAIT')+'</div><div style="font-size:10px;color:var(--dg-text-2);line-height:1.4;margin-top:3px">'+escapeNewsText(m.detail||'No detail available')+'</div></div>';
         }).join(''):'<div class="dg-muted" style="font-size:11px">Method audit unavailable for this result.</div>') +
-        '</div><div class="dg-help" style="margin-top:8px">Unavailable methods do not count as confirmation. Quantitative diagnostics are research-only and do not independently trigger trades.</div></div>';
+        '</div><div class="dg-help" style="margin-top:8px">Unavailable feeds never count as confirmation. Fundamental event surprises, weekly COT sentiment and quantitative diagnostics are research-only; they do not independently trigger entries. Multi-timeframe confirmation runs when a primary setup appears.</div></div>';
       var quota = getDailyRiskQuota();
       var quotaNotice = quota.exhausted ? '<div class="dg-pill dg-pill--sell" style="margin:0 0 9px;display:inline-flex">RISK QUOTA EXHAUSTED · SIGNAL ONLY</div>' : '';
       var cardInner = '';
