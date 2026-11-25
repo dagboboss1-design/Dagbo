@@ -1,5 +1,6 @@
 'use strict';
 
+const { validateMarketData } = require("../src/core/market-data-contract");
 const SYMBOLS = {
   XAUUSD:'XAU/USD', EURUSD:'EUR/USD', GBPUSD:'GBP/USD', USDJPY:'USD/JPY',
   GBPJPY:'GBP/JPY', AUDUSD:'AUD/USD', USDCHF:'USD/CHF', USDCAD:'USD/CAD',
@@ -38,12 +39,19 @@ module.exports = async function handler(req,res){
     if(!upstream.ok||data.status==='error'||!Array.isArray(data.values)) {
       return res.status(502).json({error:data.message||'Live candles are unavailable for this market',provider:'Twelve Data'});
     }
-    const candles=data.values.map(c=>({
-      time:Math.floor(Date.parse(String(c.datetime||'').replace(' ','T')+'Z')/1000),
+    const timeframe = interval === 'D' ? '1day' : interval;
+    const checked = validateMarketData({
+      pair, timeframe, provider: 'Twelve Data',
+      values: data.values.slice().sort((a,b) => Date.parse(a.datetime) - Date.parse(b.datetime))
+    }, { minimumCandles: 30 });
+    if (!checked.valid) return res.status(502).json({
+      error: 'Provider candles failed the shared market-data contract: ' + checked.errors.join('; '),
+      provider: 'Twelve Data', marketDataType: 'UNAVAILABLE'
+    });
+    const candles=checked.payload.values.map(c=>({
+      time:Math.floor(Date.parse(c.datetime.replace(' ','T')+'Z')/1000),
       open:Number(c.open),high:Number(c.high),low:Number(c.low),close:Number(c.close),volume:Number(c.volume||0)
-    })).filter(c=>Number.isFinite(c.time)&&[c.open,c.high,c.low,c.close].every(Number.isFinite)&&
-      c.open>0&&c.high>=Math.max(c.open,c.close)&&c.low<=Math.min(c.open,c.close)&&c.low>0)
-      .sort((a,b)=>a.time-b.time);
+    }));
     if(candles.length<30) return res.status(502).json({error:'Provider returned fewer than 30 valid chart candles.',provider:'Twelve Data'});
     return res.status(200).json({
       pair,interval,candles,source:'Twelve Data',sourceSymbol:SYMBOLS[pair],
