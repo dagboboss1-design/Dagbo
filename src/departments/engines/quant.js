@@ -22,7 +22,7 @@ export function registerQuantEngine(core, win = window, doc = document) {
     "refresh-hedge": async () => {
       const page = requirePage(win, ["higher-timeframe-hedging.html"]);
       if (!page.available) return page;
-      const button = doc.getElementById("refresh-hedge");
+      const button = doc.getElementById("refreshHedge");
       if (!button) throw new Error("Hedge analysis control is missing.");
       button.click();
       publish(core, "quant:hedge-refresh", { page: page.page });
