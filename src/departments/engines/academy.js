@@ -10,7 +10,7 @@ export function registerAcademyEngine(core, win = window, doc = document) {
       const headings = [...doc.querySelectorAll("main h2, main h3")].map(node => node.textContent.trim()).filter(Boolean);
       return { available: true, count: headings.length, titles: headings };
     },
-    search-lessons: async input => {
+    "search-lessons": async input => {
       const page = requirePage(win, ROUTES);
       if (!page.available) return page;
       const query = String(input && input.query || "").trim();
