@@ -3,9 +3,20 @@ const crypto = require("crypto");
 const runScanner = require("./cron-scan");
 const runNewsMonitor = require("./news-monitor");
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
+let redisClient;
+function getRedis() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) throw new Error("Upstash Redis is not configured");
+  if (!redisClient) redisClient = new Redis({ url, token });
+  return redisClient;
+}
+const redis = new Proxy({}, {
+  get(_target, property) {
+    const client = getRedis();
+    const value = client[property];
+    return typeof value === "function" ? value.bind(client) : value;
+  }
 });
 
 function authorized(req) {
@@ -65,6 +76,7 @@ module.exports = async function handler(req, res) {
   // Run both current workers from that one compatibility endpoint, while
   // preventing five near-simultaneous schedules from launching duplicate scans.
   const lockKey = "dagbo:cron:dispatcher:lock";
+  let ownsLock = false;
   try {
     const acquired = await redis.set(lockKey, String(Date.now()), { nx: true, ex: 240 });
     if (acquired !== "OK") {
@@ -74,6 +86,7 @@ module.exports = async function handler(req, res) {
         reason: "DAGBO scan and news monitor are already running."
       });
     }
+    ownsLock = true;
 
     const [scanner, news] = await Promise.all([
       invoke(runScanner, req),
@@ -100,8 +113,10 @@ module.exports = async function handler(req, res) {
       detail: String(error.message || error)
     });
   } finally {
-    try { await redis.del(lockKey); } catch (error) {
-      console.error("DAGBO cron dispatcher lock cleanup failed:", error.message);
+    if (ownsLock) {
+      try { await redis.del(lockKey); } catch (error) {
+        console.error("DAGBO cron dispatcher lock cleanup failed:", error.message);
+      }
     }
   }
 };

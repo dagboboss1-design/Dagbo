@@ -25,8 +25,11 @@ var k=slowKs[slowKs.length-1],tail=slowKs.slice(-3),d=tail.reduce(function(a,b){
 }
 function analyze(candles,pair,profile,options){
 profile=["scalp","day","intraday","swing","position","event","h4","contrarian"].indexOf(profile)>=0?profile:"intraday";
-var isScalp=profile==="scalp",isPosition=profile==="position",isH4=profile==="h4",isContrarian=profile==="contrarian",rsiPeriod=isScalp?7:14,emaFast=isPosition?50:20,emaSlow=isPosition?100:50;
-if(!Array.isArray(candles)||candles.length<(isScalp?30:60))return null;
+var isScalp=profile==="scalp",isPosition=profile==="position",isSwing=profile==="swing",isH4=profile==="h4",isContrarian=profile==="contrarian",rsiPeriod=isScalp?7:14,emaFast=isPosition?50:20,emaSlow=isPosition?100:50;
+// Position trading uses a 50/100 EMA regime; do not silently approximate EMA100
+// from a short intraday-sized history. Require enough closed daily/weekly bars.
+var minimumBars=isScalp?30:(isPosition?100:60);
+if(!Array.isArray(candles)||candles.length<minimumBars)return null;
 var cs=candles.map(function(x){return n(x.close)}),hs=candles.map(function(x){return n(x.high)}),ls=candles.map(function(x){return n(x.low)});
 if(cs.some(function(x){return x===null})||hs.some(function(x){return x===null})||ls.some(function(x){return x===null}))return null;
 var last=candles[candles.length-1],prev=candles[candles.length-2],close=cs[cs.length-1],open=n(last.open),high=hs[hs.length-1],low=ls[ls.length-1];if(open===null)return null;
@@ -37,8 +40,28 @@ var momentumDir=isScalp?((rv>=52&&stoch.k>=50&&stoch.k>=stoch.d-10)?"BUY":(rv<=4
 var bbPeriod=isScalp?12:20,recent=cs.slice(-bbPeriod),mean=recent.reduce(function(s,x){return s+x},0)/recent.length,sd=Math.sqrt(recent.reduce(function(s,x){return s+(x-mean)*(x-mean)},0)/recent.length),bbDir=close<mean-2*sd&&close>open?"BUY":close>mean+2*sd&&close<open?"SELL":"WAIT";
 var atrPeriod=14,tr=0;for(var i=cs.length-atrPeriod;i<cs.length;i++)tr+=Math.max(hs[i]-ls[i],Math.abs(hs[i]-cs[i-1]),Math.abs(ls[i]-cs[i-1]));var atr=tr/atrPeriod,atrPct=atr/Math.max(Math.abs(close),1e-9)*100,atrOk=atrPct>=(isScalp?0.008:0.004);
 var vols=candles.slice(-21,-1).map(function(x){return n(x.volume)}).filter(function(x){return x!==null&&x>0}),v=n(last.volume),avg=vols.length?vols.reduce(function(s,x){return s+x},0)/vols.length:0,volumeDir=avg>0&&v!==null&&v>=avg*1.2?(close>open?"BUY":close<open?"SELL":"WAIT"):"WAIT";
+// Volume is only an independent confluence vote when the caller confirms
+// that the provider supplies exchange-traded volume (e.g. Binance spot).
+var exchangeVolume=!!(options&&options.volumeIsExchange===true);
 var prior=candles.slice(-(isScalp?7:21),-1),sHigh=Math.max.apply(null,prior.map(function(x){return n(x.high)})),sLow=Math.min.apply(null,prior.map(function(x){return n(x.low)})),structureDir=close>sHigh?"BUY":close<sLow?"SELL":"WAIT";
-var sweepDir=high>sHigh&&close<sHigh?"SELL":low<sLow&&close>sLow?"BUY":"WAIT",twoBack=candles[candles.length-3],fvgDir=low>n(twoBack.high)?"BUY":high<n(twoBack.low)?"SELL":"WAIT";
+// ICT/SMC events can occur a few closed candles before the scan. Search a
+// short recent window for a confirmed liquidity sweep and three-candle FVG
+// instead of inspecting only the latest candle and missing valid structure.
+var sweepDir="WAIT",fvgDir="WAIT",smcStart=Math.max(2,candles.length-6);
+for(var si=smcStart;si<candles.length;si++){
+  var sweepBase=candles.slice(Math.max(0,si-21),si);
+  if(sweepBase.length>=5){
+    var sweepHigh=Math.max.apply(null,sweepBase.map(function(x){return n(x.high)}));
+    var sweepLow=Math.min.apply(null,sweepBase.map(function(x){return n(x.low)}));
+    var sweepClose=n(candles[si].close),sweepHighNow=n(candles[si].high),sweepLowNow=n(candles[si].low);
+    if(sweepHighNow>sweepHigh&&sweepClose<sweepHigh)sweepDir="SELL";
+    else if(sweepLowNow<sweepLow&&sweepClose>sweepLow)sweepDir="BUY";
+  }
+  var leftHigh=n(candles[si-2].high),leftLow=n(candles[si-2].low);
+  var gapLow=n(candles[si].low),gapHigh=n(candles[si].high);
+  if(gapLow>leftHigh)fvgDir="BUY";
+  else if(gapHigh<leftLow)fvgDir="SELL";
+}
 var structureVotes=[structureDir,sweepDir,fvgDir],structureBuys=structureVotes.filter(function(x){return x==="BUY"}).length,structureSells=structureVotes.filter(function(x){return x==="SELL"}).length,structureDirFinal=structureBuys>=2?"BUY":structureSells>=2?"SELL":"WAIT";
 var pattern=patternScan(candles,cs);
 var indicatorComboDir=(e20>e50&&rv>=55&&macd>0&&macd>=macdPrev)?"BUY":(e20<e50&&rv<=45&&macd<0&&macd<=macdPrev)?"SELL":"WAIT";
@@ -56,7 +79,7 @@ var patternGroupDir=pattern.direction!=="WAIT"&&candleDir!=="WAIT"?(pattern.dire
 var structureGroupDir=structureDirFinal!=="WAIT"&&levelDir!=="WAIT"?(structureDirFinal===levelDir?structureDirFinal:"WAIT"):(structureDirFinal!=="WAIT"?structureDirFinal:levelDir);
 var groups=[{name:"Trend",dir:trendGroupDir,detail:"EMA"+emaFast+"/"+emaSlow+" + MACD · indicator combo RSI("+rsiPeriod+") "+rv.toFixed(1)+" "+indicatorComboDir},{name:"Momentum",dir:momentumDir,detail:"RSI("+rsiPeriod+")"+(isScalp?" + Stochastic(5,3,3)":"")},{name:"Volatility",dir:bbDir,detail:"Bollinger Bands("+bbPeriod+",2) · ATR "+(atrOk?"active":"too quiet")},{name:"Volume",dir:volumeDir,detail:avg>0&&v!==null?(v/avg).toFixed(2)+"x average volume":"volume unavailable"},{name:"Chart pattern",dir:patternGroupDir,detail:"Chart: "+pattern.name+" · Candle: "+candleName},{name:"Market structure",dir:structureGroupDir,detail:"BOS "+structureDir+" · sweep "+sweepDir+" · FVG "+fvgDir+" · 20-bar level "+levelDir}];
 
-// Seven-method BOSS1 audit. Only methods backed by this scan's actual inputs
+// Eight-method BOSS1 audit. Only methods backed by this scan's actual inputs
 // may be marked ACTIVE; missing feeds are explicitly UNAVAILABLE.
 function methodReport(name,direction,status,detail,source){
   return {name:name,direction:direction||"WAIT",status:status,detail:detail,source:source||"OHLC candles"};
@@ -70,36 +93,49 @@ var priceDirection=patternGroupDir;
 var priceStatus=priceDirection!=="WAIT"?"ACTIVE":"NEUTRAL";
 methodReports.push(methodReport("Pure Price Action",priceDirection,priceStatus,
   priceDirection!=="WAIT"?"A closed-candle chart pattern or candle pattern has confirmed a direction.":"No confirmed chart or candle pattern."));
-methodReports.push(methodReport("Volume Analysis",volumeDir,
-  avg>0&&v!==null?"ACTIVE":"UNAVAILABLE",
-  avg>0&&v!==null?"Latest volume is "+(v/avg).toFixed(2)+"x its 20-bar average.":"Provider did not supply usable volume; volume confirmation is unavailable.",
-  "Provider volume"));
-methodReports.push(methodReport("Fundamental Analysis","WAIT","UNAVAILABLE",
-  "Verified GDP, CPI, NFP, rate decisions and economic-surprise data are not connected to this candle scan.","Economic data feed"));
-methodReports.push(methodReport("Sentiment Analysis","WAIT","UNAVAILABLE",
-  "Verified retail positioning or market-wide positioning data is not connected. Headlines alone are not treated as positioning.","Positioning data feed"));
+methodReports.push(methodReport("Volume Analysis",exchangeVolume?volumeDir:"WAIT",
+  avg>0&&v!==null?(exchangeVolume?(volumeDir==="BUY"||volumeDir==="SELL"?"ACTIVE":"NEUTRAL"):"RESEARCH"):"UNAVAILABLE",
+  avg>0&&v!==null?(exchangeVolume?"Latest exchange-traded volume is "+(v/avg).toFixed(2)+"x its 20-bar average. "+(volumeDir==="WAIT"?"Volume is available, but it has not confirmed a directional vote.":"Volume direction: "+volumeDir+"."):"Provider-reported volume is "+(v/avg).toFixed(2)+"x its 20-bar average, but this feed does not verify centralized traded volume; research context only."):"Provider did not supply usable volume; volume analysis is unavailable.",
+  exchangeVolume?"Verified exchange volume":"Unverified provider volume"));
+methodReports.push(methodReport("Fundamental Analysis","WAIT","PENDING",
+  "Economic-calendar context is attached by the Signals scanner after the shared calendar feed loads.","FCS primary / FMP backup"));
+methodReports.push(methodReport("Sentiment Analysis","WAIT","PENDING",
+  "Weekly futures positioning is attached by the Signals scanner; it is not treated as live retail sentiment or intraday order flow.","FMP COT positioning"));
 methodReports.push(methodReport("ICT / SMC",structureDirFinal,
   structureDirFinal!=="WAIT"?"ACTIVE":"NEUTRAL",
-  "BOS: "+structureDir+" · liquidity sweep: "+sweepDir+" · FVG: "+fvgDir+". A direction is reported only when at least two of these three structure checks agree.","Closed-candle structure data"));
+  "BOS: "+structureDir+" · recent liquidity sweep (last 5 closed candles): "+sweepDir+" · recent three-candle FVG: "+fvgDir+". A direction is reported only when at least two independent structure checks agree.","Closed-candle structure data"));
 var logReturns=[];
 for(var qi=Math.max(1,cs.length-21);qi<cs.length-1;qi++)logReturns.push(Math.log(cs[qi]/cs[qi-1]));
 var latestReturn=Math.log(cs[cs.length-1]/cs[cs.length-2]);
 var qMean=logReturns.length?logReturns.reduce(function(a,b){return a+b;},0)/logReturns.length:0;
 var qVariance=logReturns.length>1?logReturns.reduce(function(a,b){return a+(b-qMean)*(b-qMean);},0)/(logReturns.length-1):0;
 var qStd=Math.sqrt(qVariance),qZ=qStd>0?(latestReturn-qMean)/qStd:0;
-var quantDirection=logReturns.length>=20&&qZ>=1.5&&close>e20?"BUY":logReturns.length>=20&&qZ<=-1.5&&close<e20?"SELL":"WAIT";
-methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,"RESEARCH",
-  "Latest log return compared with the prior 20-return baseline: z-score "+qZ.toFixed(2)+". Requires 20 baseline returns; research-only, not machine learning, back-tested performance, or a trade vote.","Closed-candle statistical baseline"));
+var quantHasBaseline=logReturns.length>=20&&qStd>0;
+var quantDirection=quantHasBaseline&&qZ>=1.5&&close>e20?"BUY":quantHasBaseline&&qZ<=-1.5&&close<e20?"SELL":"WAIT";
+methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,quantHasBaseline?"RESEARCH":"UNAVAILABLE",
+  quantHasBaseline
+    ? "20-return z-score: "+qZ.toFixed(2)+" · current return "+(latestReturn*100).toFixed(3)+"% vs baseline mean "+(qMean*100).toFixed(3)+"%. "+(quantDirection==="WAIT"?"No statistically unusual directional move was detected.":"A directional return anomaly was detected; research-only, not machine learning, not back-tested performance, and not a trade vote.")
+    : "Insufficient valid return history or zero variance for a 20-return statistical baseline.",
+  "Closed-candle statistical baseline"));
 
 var requestedGroups=options&&Array.isArray(options.enabledGroups)?options.enabledGroups:null;
 if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.indexOf(g.name)>=0;});
 // Missing provider volume must not count as a failed vote or dilute confidence.
-if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";});
+if(avg<=0||v===null||!exchangeVolume)groups=groups.filter(function(g){return g.name!=="Volume";});
 if(!groups.length)return null;
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
-var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
-var threshold=profile==="scalp"?65:(profile==="swing"||profile==="position"||isH4)?75:70,
-minGroups=isScalp||isPosition||isH4||isContrarian?3:profile==="event"?2:4;
+// Confidence measures agreement among groups that actually produced a
+// directional vote. WAIT groups are neutral, not failed confirmations; the
+// independent minimum-group quorum below still controls how many votes are needed.
+var directionalVotes=active.BUY+active.SELL,maxScore=Math.max(1,directionalVotes*2),confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
+var threshold=profile==="scalp"?65:(isSwing||isPosition||isH4)?75:70,
+// Position mode has fewer independent price-only groups by design: macro,
+// carry and positioning feeds are reported separately as unavailable until
+// verified providers are wired in. Two agreeing technical groups are required.
+requiredGroups=isPosition?2:(isScalp||isH4||isContrarian?3:profile==="event"?2:4),
+// User-disabled detectors and providers without volume reduce the usable group
+// count. Scale the quorum to the actual available groups, but never below two.
+minGroups=Math.max(2,Math.min(requiredGroups,groups.length));
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
 var dir=atrOk&&lead!=="WAIT"&&leadConfidence>=threshold&&leadGroups>=minGroups?lead:"WAIT";

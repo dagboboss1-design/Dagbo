@@ -1,5 +1,5 @@
-const VERSION = "dagbo-v27";
-const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "strategy-profiles.html", "higher-timeframe-hedging.html", "replay.html", "market-heatmap.html", "learn.html", "settings.html", "dagbo.css", "strategy-profiles.js", "dagbo-confluence.js", "manifest.json", "icons/dagbo-orbit.svg", "pwa.js", "navigation.js"];
+const VERSION = "dagbo-v29";
+const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "strategy-profiles.html", "higher-timeframe-hedging.html", "replay.html", "market-heatmap.html", "learn.html", "settings.html", "dagbo.css", "strategy-profiles.js", "dagbo-confluence.js", "manifest.json", "icons/dagbo-orbit.svg", "pwa.js", "navigation.js", "src/departments/bootstrap.js", "src/departments/manifest.js", "src/departments/engine-kit.js", "src/departments/engines/trade.js", "src/departments/engines/intelligence.js", "src/departments/engines/quant.js", "src/departments/engines/journal.js", "src/departments/engines/ai.js", "src/departments/engines/academy.js", "src/core/department-core.js", "src/core/market-data-contract.js"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

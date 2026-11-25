@@ -2,11 +2,23 @@ const webpush = require("web-push");
 const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
 const confluence = require("../public/dagbo-confluence.js");
+const { validateMarketData } = require("../src/core/market-data-contract.js");
 const { fetchFcsCalendarEvents } = require("../lib/fcs-calendar");
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
+let redisClient;
+function getRedis() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) throw new Error("Upstash Redis is not configured");
+  if (!redisClient) redisClient = new Redis({ url, token });
+  return redisClient;
+}
+const redis = new Proxy({}, {
+  get(_target, property) {
+    const client = getRedis();
+    const value = client[property];
+    return typeof value === "function" ? value.bind(client) : value;
+  }
 });
 
 const SYMBOLS = {
@@ -494,6 +506,11 @@ async function getHtfCandles(pair, frame, apiKey) {
       throw new Error(data.message || "No " + frame.label + " candles");
     }
   }
+  if (sharedTf && pair !== "DXY") {
+    const checked = validateMarketData(data, { minimumCandles: 55 });
+    if (!checked.valid) throw new Error("Shared market-data contract failed for " + pair + " " + frame.label + ": " + checked.errors.join("; "));
+    data = { ...data, values: checked.payload.values };
+  }
   const frameMs = ({ "4h":14400000, "1day":86400000, "1week":604800000, "1month":2592000000 })[frame.key] || 0;
   const now = Date.now();
   const candles = data.values.map(c => ({
@@ -695,7 +712,7 @@ module.exports = async function handler(req, res) {
         lastPushDelivery,
         schedulerSecretConfigured: !!(process.env.DAGBO_CRON_SECRET || process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security || process.env.SIGNAL_PUSH_SECRET),
         redisConfigured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
-        marketDataKeyConfigured: !!process.env.TWELVE_DATA_API_KEY,
+        marketDataKeyConfigured: !!(process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_KEY || process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY),
         fcsAccessKeyConfigured: !!(process.env.FCS_API_KEY || process.env.FCS_ACCESS_KEY || process.env.FCS_API_ACCESS_KEY || process.env.FCSAPI_ACCESS_KEY),
         fmpKeyConfigured: !!(process.env.FMP_API_KEY || process.env.FINANCIAL_MODELING_PREP_API_KEY || process.env.FMP_ACCESS_KEY || process.env.FMP_KEY),
         scanRunning: !!lockState,
@@ -738,7 +755,7 @@ module.exports = async function handler(req, res) {
     // The scheduled scanner also uses the Twelve Data key for direct-only
     // context feeds (for example DXY/monthly history). The shared market-data
     // endpoint remains the primary provider/failover path for trade pairs.
-    const apiKey = process.env.TWELVE_DATA_API_KEY || "";
+    const apiKey = process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_KEY || process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY || "";
     const results = {}, errors = [];
     const configuredPairs = await getConfiguredPairs();
     const pairsToScan = await selectRotatingBatch("dagbo:scan:cursor:main", configuredPairs, MAX_PAIRS);

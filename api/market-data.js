@@ -1,8 +1,21 @@
+const { validateMarketData } = require("../src/core/market-data-contract");
+
+function assertMarketData(payload) {
+  const checked = validateMarketData(payload, { minimumCandles: 30 });
+  if (!checked.valid) throw new Error("Market-data contract rejected provider payload: " + checked.errors.join("; "));
+  return checked.payload;
+}
+
 const SYMBOLS = {
   XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY", GBPJPY: "GBP/JPY",
   AUDUSD: "AUD/USD", USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
-  EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK", DXY: "DXY"
+  EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK", DXY: "DXY",
+  EURCHF: "EUR/CHF", EURAUD: "EUR/AUD", EURCAD: "EUR/CAD", EURNZD: "EUR/NZD",
+  GBPCHF: "GBP/CHF", GBPAUD: "GBP/AUD", GBPCAD: "GBP/CAD", GBPNZD: "GBP/NZD",
+  AUDJPY: "AUD/JPY", AUDCHF: "AUD/CHF", AUDCAD: "AUD/CAD", AUDNZD: "AUD/NZD",
+  NZDJPY: "NZD/JPY", NZDCHF: "NZD/CHF", NZDCAD: "NZD/CAD",
+  CADJPY: "CAD/JPY", CADCHF: "CAD/CHF", CHFJPY: "CHF/JPY"
 };
 
 const BINANCE_SYMBOLS = {
@@ -70,14 +83,32 @@ async function writeCache(key, value) {
 }
 
 async function claimTwelveDataSlot() {
-  try {
-    const redis = redisClient();
-    if (redis) {
-      const count = await withTimeout(redis.incr('dagbo:market:twelve:minute'), 1200, 'Market quota check');
-      if (count === 1) await withTimeout(redis.expire('dagbo:market:twelve:minute', 60), 1200, 'Market quota expiry');
-      return count <= MAX_TWELVE_CALLS_PER_MINUTE;
+  const redis = redisClient();
+  if (redis) {
+    try {
+      // Increment + expiry must be atomic. Separate INCR/EXPIRE calls can race
+      // or leave a permanent counter if the function times out between them.
+      const count = await withTimeout(
+        redis.eval(
+          "local count = redis.call('INCR', KEYS[1]); if count == 1 then redis.call('EXPIRE', KEYS[1], 60); end; return count",
+          ["dagbo:market:twelve:minute"],
+          []
+        ),
+        1500,
+        'Market quota reservation'
+      );
+      return Number(count) <= MAX_TWELVE_CALLS_PER_MINUTE;
+    } catch (error) {
+      // Fail closed when the shared limiter is configured but unavailable.
+      // Falling back to per-instance memory would let serverless instances
+      // collectively exceed the provider's account-wide request allowance.
+      console.error("DAGBO shared market rate limiter unavailable:", error.message);
+      return false;
     }
-  } catch (error) { console.error("DAGBO market rate limiter:", error.message); }
+  }
+
+  // Local fallback is only for installations without Upstash configured.
+  // It is process-local and therefore not a global quota guarantee.
   const now = Date.now();
   if (now - memoryMinute.startedAt >= 60000) memoryMinute = { startedAt: now, count: 0 };
   memoryMinute.count += 1;
@@ -109,13 +140,15 @@ async function fetchFcsFallback(pair, tf) {
   const key = process.env.FCS_API_KEY || process.env.FCS_ACCESS_KEY || process.env.FCS_API_ACCESS_KEY || process.env.FCSAPI_ACCESS_KEY;
   const period = fcsPeriod(tf);
   if (!key || !period) return null;
-  const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","USDSEK"];
+  const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","USDSEK",
+    "EURCHF","EURAUD","EURCAD","EURNZD","GBPCHF","GBPAUD","GBPCAD","GBPNZD","AUDJPY","AUDCHF","AUDCAD","AUDNZD",
+    "NZDJPY","NZDCHF","NZDCAD","CADJPY","CADCHF","CHFJPY"];
   const commodities = ["XAUUSD","GOLD","XAGUSD","SILVER"];
   if (!fxPairs.includes(pair) && !commodities.includes(pair)) return null;
   const symbol = pair === "GOLD" ? "XAUUSD" : (pair === "XAGUSD" ? "SILVER" : pair);
   const type = commodities.includes(pair) ? "&type=commodity" : "";
   const url = "https://api-v4.fcsapi.com/forex/history?symbol=" + encodeURIComponent(symbol) +
-    "&period=" + encodeURIComponent(period) + "&length=100&is_chart=0" + type +
+    "&period=" + encodeURIComponent(period) + "&length=150&is_chart=0" + type +
     "&access_key=" + encodeURIComponent(key);
   const result = await fetchJsonWithTimeout(url, { headers: { "Accept":"application/json" } }, 3500);
   if (!result.response.ok || result.data.status === false || result.data.status === "error" ||
@@ -124,7 +157,7 @@ async function fetchFcsFallback(pair, tf) {
   }
   const values = normalizeFcsCandles(result.data);
   if (values.length < 30) throw new Error("FCS returned fewer than 30 valid candles.");
-  return { pair, timeframe:tf, provider:"FCS", providerExchange:"FCS", values };
+  return assertMarketData({ pair, timeframe:tf, provider:"FCS", providerExchange:"FCS", values });
 }
 async function fetchBackupCandles(pair, tf) {
   const failures = [];
@@ -212,7 +245,7 @@ module.exports = async function handler(req, res) {
     res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
     try {
       const url = "https://data-api.binance.vision/api/v3/klines?symbol=" +
-        encodeURIComponent(binanceSymbol) + "&interval=" + interval.binance + "&limit=100";
+        encodeURIComponent(binanceSymbol) + "&interval=" + interval.binance + "&limit=150";
       const result = await fetchJsonWithTimeout(url, { headers: { "Accept": "application/json" } }, 9000);
       const response = result.response;
       const rows = result.data;
@@ -231,11 +264,12 @@ module.exports = async function handler(req, res) {
       if (values.length < 30) {
         return res.status(502).json({ error: "Binance returned fewer than 30 candles.", provider: "Binance" });
       }
-      return res.status(200).json({
+      const payload = assertMarketData({
         pair: pair, symbol: binanceSymbol, timeframe: tf,
         provider: "Binance Spot · Public Market Data",
         providerExchange: "Binance", values: values
       });
+      return res.status(200).json(payload);
     } catch (error) {
       console.error("DAGBO Binance market data error:", error.message);
       const timedOut = error && error.name === "AbortError";
@@ -267,7 +301,7 @@ module.exports = async function handler(req, res) {
       try {
         const url = "https://api.twelvedata.com/time_series?symbol=" +
           encodeURIComponent(symbol) + "&interval=" + interval.twelve +
-          "&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+          "&outputsize=150&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
         const result = await fetchJsonWithTimeout(url, {}, 9000);
         const data = result.data;
         if (!result.response.ok || data.status === "error" || !Array.isArray(data.values)) {
@@ -275,12 +309,13 @@ module.exports = async function handler(req, res) {
         } else if (data.values.length < 30) {
           primaryFailure = "Twelve Data returned fewer than 30 candles";
         } else {
-          const payload = {
+          const payload = assertMarketData({
             pair, timeframe:tf, provider:"Twelve Data",
             providerKeySource:primaryKeySource,
             providerExchange:data.meta && data.meta.exchange ? data.meta.exchange : null,
-            values:data.values
-          };
+            // Twelve Data commonly returns newest-first; normalize all providers to oldest-first.
+            values:data.values.slice().sort((a, b) => Date.parse(a.datetime) - Date.parse(b.datetime))
+          });
           await writeCache(cacheKey, { savedAt:Date.now(), payload });
           res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
           return res.status(200).json({ ...payload, cache:"miss" });

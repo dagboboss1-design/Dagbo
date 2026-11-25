@@ -551,6 +551,12 @@
       renderList();
     } catch(e) { console.warn('Could not refresh Journal after a storage update:', e); }
   });
+  // Public page-local adapter used by the DAGBO JOURNAL department engine.
+  window.addEventListener('dagbo:journal-refresh', function() {
+    renderStats();
+    renderRiskGuardian();
+    renderList();
+  });
 })();
 </script>
 <script src="navigation.js" defer></script>

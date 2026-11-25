@@ -1,7 +1,16 @@
 (function(){
+  // Load the shared department runtime on every page that uses the global
+  // navigation. The loader is idempotent and leaves legacy page engines intact.
+  if (!document.getElementById("dagboDepartmentRuntime")) {
+    var runtime = document.createElement("script");
+    runtime.id = "dagboDepartmentRuntime";
+    runtime.type = "module";
+    runtime.src = new URL("src/departments/bootstrap.js", document.baseURI).href;
+    document.head.appendChild(runtime);
+  }
   if(document.getElementById('dagboSideMenu')) return;
   var items=[
-    ['⌂','Home','index.html'],['↗','Signals','signals.html'],['⌁','Chart','chart.html'],
+    ['⌂','Home','index.html'],['▦','Departments','departments.html'],['↗','Signals','signals.html'],['⌁','Chart','chart.html'],
     ['▤','Market News','news.html'],['◈','BOSS1','boss1.html'],['✳','AI Commander','ai.html'],
     ['▧','Journal','journal.html'],['◎','Trader Score','trader-score.html'],
     ['⌘','Strategy Lab','strategy-lab.html'],['◈','Trading Profiles','strategy-profiles.html'],['▣','Learn with Examples','learn.html'],['◉','Opportunity Intelligence','signal-insights.html'],
@@ -45,7 +54,7 @@
   /* DAGBO orbit loading mark: shown only while the page is loading. */
   if(document.readyState!=="complete"&&!document.getElementById("dagboOrbitLoader")){
     var loaderStyle=document.createElement("style");
-    loaderStyle.textContent="@keyframes dagboOrbitSpin{to{transform:rotate(360deg)}}#dagboOrbitLoader{position:fixed;inset:0;z-index:10050;background:#000;display:grid;place-items:center;opacity:1;transition:opacity .22s ease}#dagboOrbitLoader .orbit{width:68px;height:68px;border:1.5px solid #292a2d;border-radius:50%;position:relative;animation:dagboOrbitSpin 1.2s linear infinite}#dagboOrbitLoader .orbit:before{content:'';position:absolute;width:38px;height:38px;background:#fff;border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%)}#dagboOrbitLoader .orbit:after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;left:calc(50% + 26px);top:calc(50% + 9px);transform:translate(-50%,-50%)}@media(prefers-reduced-motion:reduce){#dagboOrbitLoader .orbit{animation:none}}";
+    loaderStyle.textContent="@keyframes dagboOrbitSpin{to{transform:rotate(360deg)}}#dagboOrbitLoader{position:fixed;inset:0;z-index:10050;background:#000;display:grid;place-items:center;opacity:1;transition:opacity .22s ease}#dagboOrbitLoader .orbit{width:68px;height:68px;border:1.5px solid #292a2d;border-radius:50%;position:relative;animation:dagboOrbitSpin 1.2s linear infinite}#dagboOrbitLoader .orbit:before{content:'';position:absolute;width:8px;height:8px;background:#fff;border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%)}#dagboOrbitLoader .orbit:after{content:'';position:absolute;width:7px;height:7px;background:#fff;border-radius:50%;left:calc(50% + 26px);top:calc(50% + 9px);transform:translate(-50%,-50%)}@media(prefers-reduced-motion:reduce){#dagboOrbitLoader .orbit{animation:none}}";
     document.head.appendChild(loaderStyle);
     var loader=document.createElement("div");loader.id="dagboOrbitLoader";loader.setAttribute("aria-label","Loading DAGBO");loader.innerHTML='<div class="orbit" role="img" aria-label="DAGBO loading"></div>';
     document.body.appendChild(loader);

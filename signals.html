@@ -59,7 +59,7 @@
   <section class="dg-card" style="margin:14px 0">
     <div class="dg-card__head"><h2 class="dg-card__title">BOSS1 · Eight-Method Analysis</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
     <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">Every scan audits Technical, Pure Price Action, ICT/SMC, Volume, Fundamental, Sentiment, Quantitative and Multi-Timeframe analysis. Only methods backed by verified data can confirm a direction. Missing feeds are shown as UNAVAILABLE, never guessed.</p>
-    <p class="dg-help" style="margin-top:8px">The current candle engine evaluates technical indicators, closed-candle price action, market structure and provider volume. Fundamental, positioning sentiment and synchronized cross-market feeds remain unavailable until connected. Quantitative z-score is a research diagnostic, not a machine-learning prediction or independent trade trigger.</p>
+    <p class="dg-help" style="margin-top:8px">The candle engine evaluates technical indicators, closed-candle price action, market structure and provider volume. Economic-calendar context and FMP weekly COT positioning are reported separately; neither is treated as a live order-flow signal. Quantitative z-score remains a research diagnostic, not a machine-learning prediction or independent trade trigger.</p>
   </section>
 
   <!-- PROFILE-DRIVEN SCANNER -->
@@ -148,17 +148,15 @@
   var PAIR_TYPES = {
     XAUUSD: 'GOLD', GOLD: 'GOLD', XAGUSD: 'GOLD', SILVER: 'GOLD',
     EURUSD: 'FX', GBPUSD: 'FX', USDJPY: 'FX', GBPJPY: 'FX', AUDUSD: 'FX', USDCHF: 'FX', USDCAD: 'FX', NZDUSD: 'FX', EURJPY: 'FX', EURGBP: 'FX',
+    EURCHF: 'FX', EURAUD: 'FX', EURCAD: 'FX', EURNZD: 'FX', GBPCHF: 'FX', GBPAUD: 'FX', GBPCAD: 'FX', GBPNZD: 'FX',
+    AUDJPY: 'FX', AUDCHF: 'FX', AUDCAD: 'FX', AUDNZD: 'FX', NZDJPY: 'FX', NZDCHF: 'FX', NZDCAD: 'FX',
+    CADJPY: 'FX', CADCHF: 'FX', CHFJPY: 'FX',
     US30: 'INDEX', US100: 'INDEX', NAS100: 'INDEX', US500: 'INDEX',
     BTCUSD: 'CRYPTO', BTCUSDT: 'CRYPTO', BTC: 'CRYPTO', ETHUSD: 'CRYPTO', ETHUSDT: 'CRYPTO', ETH: 'CRYPTO'
   };
 
-  var API_SYMBOLS = {
-    XAUUSD: 'XAU/USD', GOLD: 'XAU/USD', XAGUSD: 'XAG/USD', SILVER: 'XAG/USD',
-    EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', GBPJPY: 'GBP/JPY',
-    AUDUSD: 'AUD/USD', USDCHF: 'USD/CHF', USDCAD: 'USD/CAD', NZDUSD: 'NZD/USD', EURJPY: 'EUR/JPY', EURGBP: 'EUR/GBP',
-    US30: 'DIA', US100: 'QQQ', NAS100: 'QQQ', US500: 'SPY',
-    BTCUSD: 'BTC/USD', BTC: 'BTC/USD', ETHUSD: 'ETH/USD', ETH: 'ETH/USD'
-  };
+  // Provider symbol mapping is owned by /api/market-data. Keep the UI free
+  // of duplicate mappings so ETF symbols can never be mistaken for index CFDs.
 
   var currentFilter = 'ALL';
   var signalsData = {};
@@ -169,6 +167,11 @@
   var activeProfileConfig = profileApi ? profileApi.getProfile(activeTradingProfile) : null;
   var currentSignalTF = activeProfileConfig && activeProfileConfig.primaryTf || '15';
   var latestNewsCandidate = null;
+  var latestEconomicEvents = [];
+  var latestEconomicAvailable = false;
+  var latestEconomicSource = 'FCS primary / FMP backup';
+  var sentimentContextCache = {};
+  var higherTimeframeContextCache = {};
   var profilePreferenceStore = {};
   try { profilePreferenceStore=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}; } catch(e) {}
   var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
@@ -240,7 +243,7 @@
   function scannerProfileName(){return activeProfileConfig?activeProfileConfig.name:'Day Trading';}
   function groupsForActiveProfile(){
     var categoryMap={
-      'Trend':['Trend'],'Trend following':['Trend'],'Trend strength':['Trend'],'Macro trend':[],'Intermarket':[],
+      'Trend':['Trend'],'Trend following':['Trend'],'Trend strength':['Trend'],'Macro trend':['Trend'],'Intermarket':[],
       'Momentum':['Momentum','Volume'],'Trend pullback':['Trend','Momentum'],'Intraday value':['Momentum','Volatility','Volume'],'Value':['Momentum','Volatility'],
       'Retracement':['Trend','Momentum','Market structure'],'Trend flip':['Trend','Momentum','Market structure'],'Relative strength':[],'Carry':[],
       'Breakout':['Market structure','Volatility'],'Session range':['Market structure'],'Key levels':['Market structure'],'Structure':['Market structure'],
@@ -325,11 +328,28 @@
     return out;
   }
   function candleNumber(c, key){return Number(c[key]);}
-  function analyseAllMethods(candles, profile) {
+  // Display and executable levels use conventional precision for the exact instrument class.
+  // Crypto is kept at two decimals (not one); JPY FX uses three, other FX five.
+  function pricePrecision(pair){
+    var p=String(pair||'').toUpperCase();
+    if(p==='XAUUSD'||p==='GOLD'||p==='XAGUSD'||p==='SILVER')return 2;
+    if(p.indexOf('BTC')>=0||p.indexOf('ETH')>=0)return 2;
+    if(p.indexOf('JPY')>=0)return 3;
+    if(/^(EUR|GBP|USD|AUD|NZD|CAD|CHF)[A-Z]{3}$/.test(p))return 5;
+    return 2;
+  }
+  function roundTradePrice(value,pair){
+    var factor=Math.pow(10,pricePrecision(pair));
+    return Math.round((Number(value)+Number.EPSILON)*factor)/factor;
+  }
+  function analyseAllMethods(candles, profile, marketData) {
     var engineProfile = profile === 'scalping' || profile === 'momentum' ? 'scalp' :
       (profile === 'trend-following' ? 'swing' :
       (['mean-reversion','range','breakout'].indexOf(profile)>=0 ? 'day' : profile));
-    var result = window.DagboConfluence.analyze(candles, '', engineProfile, {enabledGroups:groupsForActiveProfile()});
+    var result = window.DagboConfluence.analyze(candles, '', engineProfile, {
+      enabledGroups:groupsForActiveProfile(),
+      volumeIsExchange:!!(marketData&&String(marketData.providerExchange||'').toLowerCase()==='binance')
+    });
     if (!result) return null;
     return {
       final: result.signal,
@@ -346,17 +366,39 @@
     };
   }
 
+  function getCachedHigherTimeframeContext(pair, profile, primaryTf) {
+    var key=[String(pair||'').toUpperCase(),String(profile||''),String(primaryTf||'')].join('|');
+    var cached=higherTimeframeContextCache[key];
+    if(cached&&Date.now()-cached.fetchedAt<5*60*1000)return Promise.resolve(cached.data);
+    return fetchHigherTimeframeContext(pair,profile,primaryTf).then(function(data){
+      higherTimeframeContextCache[key]={fetchedAt:Date.now(),data:data};
+      return data;
+    });
+  }
+
   // Higher-timeframe context runs only after a primary setup appears.
   // Scalping needs 15m + 1h agreement; intraday needs 1h + 4h;
   // swing/H4 needs daily context. Missing or mixed context fails closed.
   async function fetchHigherTimeframeContext(pair, profile, primaryTf) {
-    var contextTfs=[];
-    if(profile==='scalping'||profile==='momentum') contextTfs=['15','60'];
-    else if(profile==='day'||['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0) {
-      contextTfs=String(primaryTf)==='60'?['240','1day']:['60','240'];
-    } else if(profile==='swing'||profile==='trend-following'||profile==='h4') contextTfs=['1day'];
-    else if(profile==='position') contextTfs=[String(primaryTf)==='1week'?'1day':'1week'];
-    else return {checked:false,direction:'WAIT',label:'Not required',checks:[]};
+    var contextTfs=[],primary=String(primaryTf||'15');
+    // Select only genuinely higher timeframes than the active setup. This
+    // prevents a 1D/1W setup from being "confirmed" by the same or a lower TF.
+    if(profile==='scalping'||profile==='momentum') {
+      contextTfs=primary==='5'?['15','60']:primary==='15'?['60','240']:['60','240'];
+    } else if(profile==='day'||['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0) {
+      contextTfs=primary==='60'?['240','1day']:['60','240'];
+    } else if(profile==='swing'||profile==='trend-following') {
+      contextTfs=primary==='240'?['1day']:primary==='1day'?['1week']:[];
+    } else if(profile==='h4') {
+      contextTfs=['1day'];
+    } else if(profile==='position') {
+      // Daily entries use weekly macro direction; weekly entries retain daily
+      // timing context (explicitly labelled below as a lower-timeframe check).
+      contextTfs=[primary==='1week'?'1day':'1week'];
+    } else if(profile==='event') {
+      contextTfs=primary==='5'?['15','60']:primary==='15'?['60','240']:primary==='60'?['240','1day']:['60','240'];
+    } else return {checked:false,direction:'WAIT',label:'Not required',checks:[]};
+    if(!contextTfs.length) return {checked:false,direction:'WAIT',label:'No higher timeframe is configured above '+timeframeLabel(primary),checks:[]};
 
     var checks=[];
     for(var i=0;i<contextTfs.length;i++){
@@ -364,7 +406,7 @@
       var contextLabel=profile==='position'
         ? (contextTf==='1week'?'Weekly macro-trend confirmation':'Daily timing confirmation')
         : timeframeLabel(contextTf)+' confirmation';
-      var response=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(contextTf),{cache:'no-store',headers:{'Accept':'application/json'}});
+      var response=await fetchQueuedMarketData('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(contextTf),{cache:'no-store',headers:{'Accept':'application/json'}});
       var payload=await response.json();
       if(!response.ok||payload.error||payload.stale||!Array.isArray(payload.values)) throw new Error(payload.error||('No fresh '+contextLabel+' candles'));
       var duration=TF_MILLISECONDS[String(contextTf)]||86400000;
@@ -383,6 +425,42 @@
     return {checked:true,direction:aggregate,label:checks.map(function(x){return x.label;}).join(' + '),checks:checks};
   }
 
+  // One browser-wide queue serializes all Twelve Data-backed market-data calls
+  // (primary candles, higher-timeframe confirmation and live execution quotes).
+  // Six starts per rolling minute leaves headroom below the server's 7/minute cap.
+  var dagboMarketRequestQueue = Promise.resolve();
+  var dagboNextMarketRequestAt = 0;
+  function fetchQueuedMarketData(url, options) {
+    var requestOptions=Object.assign({},options||{});
+    // Queue wait is not network time. Start the abort clock only after a
+    // request receives its slot, otherwise later pairs can time out before
+    // their fetch even begins. Binance crypto is outside the Twelve Data
+    // quota and should not wait behind FX candle/quote requests.
+    var timeoutMs=Number(requestOptions.dagboTimeoutMs)||20000;
+    delete requestOptions.dagboTimeoutMs;
+    var match=String(url||'').match(/[?&]pair=([^&]+)/i);
+    var pair=match?decodeURIComponent(match[1]).toUpperCase():'';
+    var isCrypto=/^(BTC|BTCUSD|BTCUSDT|ETH|ETHUSD|ETHUSDT)$/.test(pair);
+    var run=async function(){
+      if(!isCrypto){
+        var wait=Math.max(0,dagboNextMarketRequestAt-Date.now());
+        if(wait)await new Promise(function(resolve){setTimeout(resolve,wait);});
+        dagboNextMarketRequestAt=Date.now()+10000;
+      }
+      var controller=typeof AbortController!=='undefined'?new AbortController():null;
+      var timer=controller?setTimeout(function(){controller.abort();},timeoutMs):null;
+      try{
+        var opts=Object.assign({},requestOptions);
+        if(controller)opts.signal=controller.signal;
+        return await fetch(url,opts);
+      }finally{if(timer)clearTimeout(timer);}
+    };
+    if(isCrypto)return run();
+    var queued=dagboMarketRequestQueue.then(run);
+    dagboMarketRequestQueue=queued.then(function(){},function(){});
+    return queued;
+  }
+
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
     // Hedging is basket-level intelligence, not a single-pair BUY/SELL strategy.
@@ -396,21 +474,17 @@
     try {
       // Bound every market-data request so a stalled provider cannot leave the
       // scanner waiting forever. A timeout is reported per pair, not as a page crash.
-      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 35000) : null;
       var res, data;
-      try {
-        res = await fetch(url, controller
-          ? { signal: controller.signal, cache: 'no-store', headers: { 'Accept': 'application/json' } }
-          : { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-        var contentType = res.headers && res.headers.get ? (res.headers.get('content-type') || '') : '';
-        if (contentType && contentType.indexOf('application/json') === -1) {
-          throw new Error('Market-data endpoint returned a non-JSON response (HTTP ' + res.status + ').');
-        }
-        data = await res.json();
-      } finally {
-        if (timeoutId) clearTimeout(timeoutId);
+      res = await fetchQueuedMarketData(url, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+        dagboTimeoutMs: 20000
+      });
+      var contentType = res.headers && res.headers.get ? (res.headers.get('content-type') || '') : '';
+      if (contentType && contentType.indexOf('application/json') === -1) {
+        throw new Error('Market-data endpoint returned a non-JSON response (HTTP ' + res.status + ').');
       }
+      data = await res.json();
       
       if (!res.ok || data.error || data.status === 'error') {
         var apiError = data.error || data.message || res.statusText || ('HTTP ' + res.status);
@@ -440,8 +514,10 @@
         }
         return timeOf(a) - timeOf(b);
       });
-      if (candles.length < 60) {
-        return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain; this strategy engine requires at least 60 closed candles.', errorStage: 'closed-candles' };
+      var requiredClosedBars = activeTradingProfile === 'position' ? 100 :
+        (activeTradingProfile === 'scalping' || activeTradingProfile === 'momentum' ? 30 : 60);
+      if (candles.length < requiredClosedBars) {
+        return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain; ' + scannerProfileName() + ' requires at least ' + requiredClosedBars + ' closed candles on this timeframe.', errorStage: 'closed-candles' };
       }
       // Reject malformed, non-positive or impossible OHLC candles before any
       // indicator, entry, stop or target calculation can run.
@@ -451,8 +527,10 @@
       });
       if (invalidCandle) return { pair: pair, error: 'Provider returned malformed OHLC candles. No trade levels were generated.', errorStage: 'invalid-candles' };
 
-      var analysis=analyseAllMethods(candles, activeTradingProfile);
+      var analysis=analyseAllMethods(candles, activeTradingProfile, data);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
+      addFundamentalMethodReport(analysis, pair);
+      await addSentimentMethodReport(analysis, pair);
       var timeframeContext={checked:false,direction:'WAIT',label:'Not required'};
       var final=analysis.final;
       // News & Event is not a generic 15m technical profile. It must have a
@@ -487,7 +565,7 @@
       // Missing or mixed context fails closed rather than guessing.
       if(final.indexOf('BUY')>=0||final.indexOf('SELL')>=0){
         try{
-          timeframeContext=await fetchHigherTimeframeContext(pair,activeTradingProfile,tf);
+          timeframeContext=await getCachedHigherTimeframeContext(pair,activeTradingProfile,tf);
           var primaryDirection=String(final).replace(/^HIGH CONFIDENCE\s+/,'');
           if(timeframeContext.checked&&timeframeContext.direction!==primaryDirection){
             analysis.final='NO TRADE';analysis.direction='WAIT';
@@ -511,7 +589,7 @@
         : (timeframeContext.error ? 'UNAVAILABLE' : 'NOT RUN');
       var mtfDetail = timeframeContext.checked
         ? mtfChecks.map(function(x){return x.label + ': ' + x.direction;}).join(' · ')
-        : (timeframeContext.error || 'Not evaluated because the primary candle engine did not produce a directional setup.');
+        : (timeframeContext.error || timeframeContext.label || 'Not evaluated because the primary candle engine did not produce a directional setup.');
       analysis.methodReports.push({
         name:'Multi-Timeframe Analysis',
         direction:timeframeContext.checked ? timeframeContext.direction : 'WAIT',
@@ -554,10 +632,14 @@
         }
       }
       var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
-      var quoteResponse=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(tf)+'&quote=1',{cache:'no-store',headers:{'Accept':'application/json'}});
+      var quoteResponse=await fetchQueuedMarketData('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(tf)+'&quote=1',{cache:'no-store',headers:{'Accept':'application/json'}});
       var liveQuote=await quoteResponse.json();
-      if(!quoteResponse.ok||!Number.isFinite(Number(liveQuote.price))||Number(liveQuote.price)<=0){
-        return {pair:pair,error:liveQuote.error||'Live executable quote is unavailable. No entry, SL or TP issued.',errorStage:'live-quote'};
+      var quoteStamp=Date.parse(liveQuote.quoteTime||'');
+      var quoteAge=Date.now()-quoteStamp;
+      if(!quoteResponse.ok||!Number.isFinite(Number(liveQuote.price))||Number(liveQuote.price)<=0||
+          String(liveQuote.pair||'').toUpperCase()!==String(pair).toUpperCase()||
+          liveQuote.marketDataType!=='DIRECT'||!Number.isFinite(quoteStamp)||quoteAge<0||quoteAge>30000){
+        return {pair:pair,error:liveQuote.error||'Live executable quote is missing, mismatched or older than 30 seconds. No entry, SL or TP issued.',errorStage:'live-quote'};
       }
       var entry=Number(liveQuote.price);
       var atrSum=0;
@@ -579,16 +661,27 @@
       else if(analysis.confidence>=80&&activeEvidence>=4) rr=Math.max(rr,4);
       else if(analysis.confidence>=75&&activeEvidence>=3) rr=Math.max(rr,3);
       var tp1Dist=slDist*rr,tp2Dist=slDist*Math.min(7,rr+1);
-      var sl=isBuy?entry-slDist:entry+slDist,tp1=isBuy?entry+tp1Dist:entry-tp1Dist,tp2=isBuy?entry+tp2Dist:entry-tp2Dist;
+      // Round all executable levels to the instrument's supported display precision
+      // before validation, so rounding can never collapse TP1/TP2 or invert a stop.
+      var sl=roundTradePrice(isBuy?entry-slDist:entry+slDist,pair);
+      var tp1=roundTradePrice(isBuy?entry+tp1Dist:entry-tp1Dist,pair);
+      var tp2=roundTradePrice(isBuy?entry+tp2Dist:entry-tp2Dist,pair);
+      entry=roundTradePrice(entry,pair);
       if (!isFinite(entry) || entry<=0 || !isFinite(atr) || atr<=0 ||
           ![sl,tp1,tp2].every(Number.isFinite) ||
           (isBuy && !(sl<entry && tp1>entry && tp2>tp1)) ||
           (isSell && !(sl>entry && tp1<entry && tp2<tp1))) {
         return { pair: pair, error: 'Calculated trade levels failed price and risk validation. No executable signal issued.', errorStage: 'invalid-levels' };
       }
+      // Report the realized risk/reward after price rounding, not only the target multiplier.
+      var actualRisk=Math.abs(entry-sl),actualReward=Math.abs(tp1-entry);
+      var actualRR=actualRisk>0?actualReward/actualRisk:NaN;
+      if(!Number.isFinite(actualRR)||actualRR<=0){
+        return {pair:pair,error:'Rounded trade levels do not produce a valid risk/reward ratio.',errorStage:'invalid-levels'};
+      }
       var lastC=candles[candles.length-1];
       return {
-        pair:pair,final:final,entry:entry,currentPrice:entry,quoteProvider:liveQuote.provider||'Live quote',quoteTime:liveQuote.quoteTime||null,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,timeframeContext:timeframeContext,
+        pair:pair,final:final,entry:entry,currentPrice:entry,quoteProvider:liveQuote.provider||'Live quote',quoteTime:liveQuote.quoteTime||null,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+actualRR.toFixed(1),rrMultiple:actualRR,timeframeContext:timeframeContext,
         provider:data.provider||'Market data',marketDataType:'DIRECT',sourceSymbol:data.sourceSymbol||null,marketLabel:data.marketLabel||null,proxyNotice:null,
         s1:analysis.emaTrend,s2:analysis.candleName,s3:analysis.structure,
         strategy:analysis.evidence.length?analysis.evidence.join(' · '):'No method produced directional evidence',
@@ -712,6 +805,154 @@
     });
   }
 
+  // Fetch verified economic-calendar context once per scan cycle. This is
+  // displayed as fundamental research, never converted into a trade vote by
+  // headline text or an unvalidated actual-vs-forecast assumption.
+  async function loadEconomicContext() {
+    try {
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 7000) : null;
+      var response;
+      try {
+        response = await fetch('/api/calendar', controller
+          ? { cache: 'no-store', signal: controller.signal, headers: { 'Accept':'application/json' } }
+          : { cache: 'no-store', headers: { 'Accept':'application/json' } });
+      } finally { if (timeoutId) clearTimeout(timeoutId); }
+      var data = await response.json();
+      if (!response.ok || !data.success || !Array.isArray(data.events)) throw new Error(data.error || 'Economic calendar unavailable');
+      latestEconomicEvents = data.events;
+      latestEconomicAvailable = true;
+      latestEconomicSource = data.source || 'FCS primary / FMP backup';
+    } catch (error) {
+      latestEconomicEvents = [];
+      latestEconomicAvailable = false;
+      latestEconomicSource = 'UNAVAILABLE: ' + String(error.message || error);
+      console.warn('DAGBO fundamental context unavailable:', error);
+    }
+  }
+  function addFundamentalMethodReport(analysis, pair) {
+    if (!analysis) return;
+    var p = String(pair || '').toUpperCase();
+    var currencies = p === 'GOLD' || p === 'XAUUSD' || p === 'BTCUSD' || p === 'ETHUSD' ||
+      p === 'DXY' || /^(US30|US100|NAS100|US500)$/.test(p)
+      ? ['USD'] : (p.length === 6 ? [p.slice(0,3), p.slice(3,6)] : []);
+    var now = Date.now();
+    var relevant = latestEconomicEvents.filter(function(event) {
+      var currency = String(event.currency || 'GLOBAL').toUpperCase();
+      var time = Date.parse(event.date || '');
+      return Number.isFinite(time) && time >= now - 2*60*60*1000 && time <= now + 24*60*60*1000 &&
+        (currency === 'GLOBAL' || currencies.indexOf(currency) >= 0);
+    }).sort(function(a,b){return Date.parse(a.date)-Date.parse(b.date);}).slice(0,3);
+    function numericValue(value) {
+      var match = String(value == null ? '' : value).replace(/,/g,'').match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)/);
+      return match ? Number(match[0]) : null;
+    }
+    function indicatorPolarity(name) {
+      var label=String(name||'').toLowerCase();
+      if (/unemployment|jobless claims|initial claims|continuing claims|claimant count/.test(label)) return -1;
+      if (/gross domestic product|\bgdp\b|non.?farm payroll|employment change|employment situation|retail sales|purchasing managers|\bpmi\b|industrial production|consumer confidence|business confidence|business activity/.test(label)) return 1;
+      return 0;
+    }
+    var currencyScores={}, classifiedEvents=[];
+    relevant.forEach(function(event) {
+      var currency=String(event.currency||'GLOBAL').toUpperCase();
+      var eventTime=Date.parse(event.date||'');
+      var actual=numericValue(event.actual), forecast=numericValue(event.forecast);
+      var polarity=indicatorPolarity(event.name||event.eventCode);
+      if (eventTime>now || currency==='GLOBAL' || !polarity || actual===null || forecast===null || !currency) return;
+      var delta=actual-forecast;
+      var contribution=delta===0?0:(delta>0?1:-1)*polarity;
+      var impact=String(event.impact||'').toLowerCase();
+      var weight=impact==='high'?2:impact==='medium'?1:0;
+      if (!weight || !contribution) return;
+      currencyScores[currency]=(currencyScores[currency]||0)+contribution*weight;
+      classifiedEvents.push({currency:currency,name:String(event.name||'Economic event'),contribution:contribution*weight,delta:delta,unit:String(event.unit||'')});
+    });
+    var biasDirection='WAIT',biasDetail='';
+    if (p.length===6) {
+      var base=p.slice(0,3), quote=p.slice(3,6);
+      var baseScore=currencyScores[base]||0, quoteScore=currencyScores[quote]||0;
+      var spread=baseScore-quoteScore;
+      if (spread>=2) biasDirection='BUY';
+      else if (spread<=-2) biasDirection='SELL';
+      biasDetail='Currency-surprise differential (research only): '+base+' '+(baseScore>0?'+':'')+baseScore+' vs '+quote+' '+(quoteScore>0?'+':'')+quoteScore+' · pair bias '+biasDirection+'.';
+    } else if (classifiedEvents.length) {
+      biasDetail='Currency-surprise events were detected, but this market is not an FX currency pair; no pair direction is inferred.';
+    }
+    function describeEvent(event) {
+      var actual=String(event.actual||'').trim(), forecast=String(event.forecast||'').trim();
+      var actualNumber=numericValue(actual), forecastNumber=numericValue(forecast);
+      var comparison='';
+      if (actual && forecast && actualNumber!==null && forecastNumber!==null) {
+        var delta=actualNumber-forecastNumber;
+        var unit=String(event.unit||'');
+        var polarity=indicatorPolarity(event.name||event.eventCode);
+        var effect=polarity && delta!==0 ? (delta*polarity>0?' · surprise supports currency':' · surprise weighs on currency') : '';
+        comparison=' · raw surprise '+(delta>0?'+':'')+delta.toFixed(3).replace(/\.?0+$/,'')+
+          (unit?' '+unit:'')+(delta===0?' in line':delta>0?' above forecast':' below forecast')+effect;
+      } else if (!actual) comparison=' · actual pending';
+      else comparison=' · forecast comparison unavailable';
+      return String(event.currency||'GLOBAL')+' '+String(event.impact||'Unknown impact')+' · '+
+        String(event.name||'Economic event')+' · actual '+(actual||'pending')+' / forecast '+(forecast||'not supplied')+comparison;
+    }
+    var available=latestEconomicAvailable;
+    var detail=relevant.length?relevant.map(describeEvent).join(' | '):
+      available?'Economic calendar feed connected. No matching medium/high-impact event in the last 2 hours or next 24 hours for this market.':latestEconomicSource;
+    if (biasDetail) detail += (detail?' | ':'')+biasDetail;
+    var report={
+      name:'Fundamental Analysis',direction:biasDirection,
+      status:available?'RESEARCH':'UNAVAILABLE',
+      detail:detail,
+      source:latestEconomicSource
+    };
+    analysis.methodReports=Array.isArray(analysis.methodReports)?analysis.methodReports:[];
+    analysis.methodReports=analysis.methodReports.filter(function(m){return m.name!=='Fundamental Analysis';});
+    analysis.methodReports.push(report);
+  }
+
+  // COT positioning is weekly context. Cache each pair in-page so repeated
+  // scans do not repeatedly spend FMP calls; unavailable data stays unavailable.
+  async function loadSentimentContext(pair) {
+    var key = String(pair || '').toUpperCase();
+    var cached = sentimentContextCache[key];
+    if (cached && Date.now() - cached.fetchedAt < 30*60*1000) return cached.data;
+    try {
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timeoutId = controller ? setTimeout(function(){controller.abort();},8000) : null;
+      var response;
+      try {
+        response = await fetch('/api/market-sentiment?pair='+encodeURIComponent(key),
+          controller ? {cache:'no-store',signal:controller.signal,headers:{'Accept':'application/json'}}
+            : {cache:'no-store',headers:{'Accept':'application/json'}});
+      } finally { if(timeoutId) clearTimeout(timeoutId); }
+      var data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'COT positioning unavailable');
+      sentimentContextCache[key] = {fetchedAt:Date.now(),data:data};
+      return data;
+    } catch(error) {
+      var unavailable = {success:false,pair:key,status:'UNAVAILABLE',direction:'WAIT',
+        source:'FMP COT Analysis',detail:String(error.message || error)};
+      sentimentContextCache[key] = {fetchedAt:Date.now(),data:unavailable};
+      return unavailable;
+    }
+  }
+  async function addSentimentMethodReport(analysis,pair) {
+    if (!analysis) return;
+    var sentiment = await loadSentimentContext(pair);
+    var report = {
+      name:'Sentiment Analysis',
+      direction:sentiment.direction || 'WAIT',
+      status:sentiment.status === 'ACTIVE' || sentiment.status === 'NEUTRAL'
+        ? 'RESEARCH' : (sentiment.status || 'UNAVAILABLE'),
+      detail:sentiment.detail || sentiment.error || 'No verified COT positioning data returned.',
+      source:sentiment.source || 'FMP COT Analysis',
+      asOf:sentiment.asOf || null
+    };
+    analysis.methodReports = Array.isArray(analysis.methodReports)?analysis.methodReports:[];
+    analysis.methodReports = analysis.methodReports.filter(function(m){return m.name!=='Sentiment Analysis';});
+    analysis.methodReports.push(report);
+  }
+
   // Fetch the latest short-lived news context from the server.
   async function loadNewsSignalContext() {
     var panel = document.getElementById('newsSignalContext');
@@ -800,13 +1041,6 @@
       if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
       if (s.noMethods) { listHtml += '<section class="dg-card"><strong>'+escapeNewsText(s.pair)+' · NO ACTIVE STRATEGIES</strong><div class="dg-muted" style="margin-top:6px">Enable at least one strategy in the selected Trading Profile to run this scan.</div></section>'; return; }
       if (s.marketClosed) { var closedNote=PAIR_TYPES[String(s.pair||'').toUpperCase()] === 'INDEX' ? 'Direct index CFD pricing is not connected. DAGBO will not substitute an ETF price or issue an index signal.' : 'No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.'; listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+escapeNewsText(s.pair)+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">'+closedNote+'</div></section>'; return; }
-      if(s.lifecycleStatus==='EXPIRED'||s.lifecycleStatus==='NO_TRADE'){
-        var cycle=cycleFor(s.pair,currentSignalTF);
-        var statusTitle=s.lifecycleStatus==='EXPIRED'?'SIGNAL EXPIRED':'NO TRADE';
-        var nextText=cycle?'Next fresh scan: '+new Date(cycle.anchor+tfDuration(currentSignalTF)*scanFactor(currentSignalTF)).toLocaleString():'Waiting for next scan';
-        listHtml+='<section class="dg-card" style="border:1px solid var(--dg-line)"><div class="dg-card__head"><h2 class="dg-card__title">'+escapeNewsText(s.pair)+'</h2><span class="dg-pill dg-pill--wait">'+statusTitle+'</span></div><div class="dg-muted" style="font-size:13px;margin-top:7px">'+(s.lifecycleStatus==='EXPIRED'?'The signal validity window has ended. Do not enter using the old levels.':'No active trade setup is available. Wait for the scheduled fresh scan.')+'</div><div class="dg-help" style="margin-top:7px">'+escapeNewsText(nextText)+'</div></section>';
-        return;
-      }
       var isBuy = s.final.includes('BUY');
       var isSell = s.final.includes('SELL');
       var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
@@ -828,11 +1062,18 @@
       var methodAuditHtml = '<div style="margin-top:12px;padding:11px;border:1px solid var(--dg-line);border-radius:11px"><b style="font-size:12px">BOSS1 · EIGHT-METHOD AUDIT</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px">' +
         (Array.isArray(s.methodReports)?s.methodReports.map(function(m){
           var status=String(m.status||'UNAVAILABLE');
-          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='RESEARCH'?'RESEARCH ONLY':status==='NOT RUN'?'NOT RUN':'UNAVAILABLE';
-          var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'?'var(--dg-text-2)':'#b7791f';
+          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='RESEARCH'?'RESEARCH ONLY':status==='NOT RUN'?'NOT RUN':status==='STALE'?'STALE':status==='PENDING'?'PENDING':status==='ERROR'?'ERROR':'UNAVAILABLE';
+          var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'||status==='NOT RUN'?'var(--dg-text-2)':'#b7791f';
           return '<div style="padding:7px 8px;border-radius:8px;background:var(--dg-fill);min-width:0"><div style="font-size:11px;font-weight:800">'+escapeNewsText(m.name)+'</div><div style="font-size:10px;font-weight:800;color:'+color+';margin-top:3px">'+label+' · '+escapeNewsText(m.direction||'WAIT')+'</div><div style="font-size:10px;color:var(--dg-text-2);line-height:1.4;margin-top:3px">'+escapeNewsText(m.detail||'No detail available')+'</div></div>';
         }).join(''):'<div class="dg-muted" style="font-size:11px">Method audit unavailable for this result.</div>') +
-        '</div><div class="dg-help" style="margin-top:8px">Unavailable methods do not count as confirmation. Quantitative diagnostics are research-only and do not independently trigger trades.</div></div>';
+        '</div><div class="dg-help" style="margin-top:8px">Unavailable feeds never count as confirmation. Fundamental event surprises, weekly COT sentiment and quantitative diagnostics are research-only; they do not independently trigger entries. Multi-timeframe confirmation runs when a primary setup appears.</div></div>';
+      if(s.lifecycleStatus==='EXPIRED'||s.lifecycleStatus==='NO_TRADE'){
+        var cycle=cycleFor(s.pair,currentSignalTF);
+        var statusTitle=s.lifecycleStatus==='EXPIRED'?'SIGNAL EXPIRED':'NO TRADE';
+        var nextText=cycle?'Next fresh scan: '+new Date(cycle.anchor+tfDuration(currentSignalTF)*scanFactor(currentSignalTF)).toLocaleString():'Waiting for next scan';
+        listHtml+='<section class="dg-card" style="border:1px solid var(--dg-line)"><div class="dg-card__head"><h2 class="dg-card__title">'+escapeNewsText(s.pair)+'</h2><span class="dg-pill dg-pill--wait">'+statusTitle+'</span></div><div class="dg-muted" style="font-size:13px;margin-top:7px">'+(s.lifecycleStatus==='EXPIRED'?'The signal validity window has ended. Do not enter using the old levels.':'No active trade setup is available. Wait for the scheduled fresh scan.')+'</div><div class="dg-help" style="margin-top:7px">'+escapeNewsText(nextText)+'</div>'+ (Array.isArray(s.methodReports)&&s.methodReports.length?methodAuditHtml:'') +'</section>';
+        return;
+      }
       var quota = getDailyRiskQuota();
       var quotaNotice = quota.exhausted ? '<div class="dg-pill dg-pill--sell" style="margin:0 0 9px;display:inline-flex">RISK QUOTA EXHAUSTED · SIGNAL ONLY</div>' : '';
       var cardInner = '';
@@ -844,14 +1085,8 @@
             '<div class="dg-muted" style="font-size:13px;margin-top:4px">'+escapeNewsText(s.activeTradeOnPair?'An OPEN Journal trade already exists for this pair. No duplicate signal will be issued until it is closed.':(s.strategy||'The strategy did not confirm a trade setup.'))+'</div>' +
           '</div>';
       } else {
-        // Smart Decimal Logic: format each market with its appropriate price precision.
-        var dp = 2;
-        var pUpper = String(s.pair || '').toUpperCase();
-        if (pUpper.includes('JPY')) dp = 3;
-        else if (pUpper === 'XAUUSD' || pUpper === 'GOLD') dp = 2;
-        else if (pUpper.includes('BTC') || pUpper.includes('ETH')) dp = 1;
-        else if (pUpper.includes('US30') || pUpper.includes('US100') || pUpper.includes('NAS') || pUpper.includes('US500')) dp = 1;
-        else if (pUpper.includes('USD') || pUpper.includes('EUR') || pUpper.includes('GBP') || pUpper.includes('CHF') || pUpper.includes('CAD') || pUpper.includes('AUD') || pUpper.includes('NZD')) dp = 5;
+        // Keep card formatting identical to the precision used by level validation.
+        var dp = pricePrecision(s.pair);
 
         var fEntry = Number(s.entry).toFixed(dp);
         var fSl = Number(s.sl).toFixed(dp);
@@ -1150,29 +1385,17 @@
 
       // Event mode requires a current, pair-matched news/event context before
       // it can evaluate a directional setup. Other profiles keep this optional.
-      if(activeTradingProfile==='event') await loadNewsSignalContext();
-      else loadNewsSignalContext();
+      await Promise.all([loadEconomicContext(), loadNewsSignalContext()].concat(openPairs.map(loadSentimentContext)));
 
-      // Respect the shared Twelve Data Basic-tier request budget.
-      // The API endpoint allows at most six uncached Twelve Data calls per
-      // rolling minute. Parallel requests previously caused later FX/Gold
-      // symbols to be rejected as quota-busy and then showed DATA ERROR.
-      // Queue pair requests at a safe interval; cached pairs return quickly
-      // and do not consume a new provider request.
+      // All market-data requests are paced by fetchQueuedMarketData, including
+      // primary candles, higher-timeframe confirmations and live execution quotes.
+      // Do not add a second pair-level delay here: it would waste time after a
+      // completed pair without improving the shared provider quota guarantee.
       var completedPairs = 0;
       var results = [];
-      var lastMarketRequestAt = 0;
       for (var pairIndex = 0; pairIndex < openPairs.length; pairIndex++) {
         if(thisScan!==scanGeneration)return;
         var pair = openPairs[pairIndex];
-        var waitMs = Math.max(0, 10200 - (Date.now() - lastMarketRequestAt));
-        if (waitMs > 0) {
-          if (loading) loading.innerText = 'Respecting live-data API limits · ' +
-            completedPairs + '/' + openPairs.length + ' markets checked...';
-          await new Promise(function(resolve) { setTimeout(resolve, waitMs); });
-        }
-        if(thisScan!==scanGeneration)return;
-        lastMarketRequestAt = Date.now();
         var pairResult;
         try {
           var pairData = await fetchPairData(pair, currentSignalTF);
