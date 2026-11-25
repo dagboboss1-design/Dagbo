@@ -112,7 +112,7 @@ test("chart endpoint fails over to FCS when Twelve Data is unavailable", async (
   };
   try {
     const res = responseStub();
-    await handler(request("EURUSD"), res);
+    await handler(request("GBPUSD"), res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.source, "FCS");
     assert.equal(res.body.failover, true);
