@@ -17,7 +17,7 @@
   <section class="dept-intro">
     <div class="dg-muted" style="font-size:10px;letter-spacing:1.3px;font-weight:800">ONE APP · SIX DEPARTMENTS</div>
     <h1>Choose your workspace.</h1>
-    <p>DAGBO stays one application. Each department has a defined responsibility and its own migration, validation and health checks. Your existing tools remain available while the architecture is upgraded.</p>
+    <p>DAGBO stays one application. Each department now has its own engine module, public service boundary and health checks. Departments communicate through DAGBO CORE instead of calling one another's private logic.</p>
   </section>
   <section class="dept-grid" aria-label="DAGBO departments">
     <article class="dept-card"><div class="num">01 / EXECUTION</div><h2>DAGBO TRADE</h2><p>Signal board, live opportunities, charting, alerts and trade execution.</p><div class="dept-links"><a href="signals.html">Signals</a><a href="chart.html">Chart</a><a href="alerts.html">Alerts</a></div><div class="dept-status" data-dept-status="trade">Checking department health…</div></article>
@@ -27,7 +27,7 @@
     <article class="dept-card"><div class="num">05 / ASSISTANCE</div><h2>DAGBO AI</h2><p>AI assistant and BOSS1 analysis experience.</p><div class="dept-links"><a href="ai.html">AI assistant</a><a href="boss1.html">BOSS1</a></div><div class="dept-status" data-dept-status="ai">Checking department health…</div></article>
     <article class="dept-card"><div class="num">06 / EDUCATION</div><h2>DAGBO ACADEMY</h2><p>Trading lessons, concepts, examples and structured learning.</p><div class="dept-links"><a href="learn.html">Open academy</a></div><div class="dept-status" data-dept-status="academy">Checking department health…</div></article>
   </section>
-  <section class="dept-core"><h2>DAGBO CORE</h2><p>Shared infrastructure for market data, normalized prices, settings, user access, notifications, security and department health. A failure in one department must not take down the others. Departments will only be marked operational after their real engines and data checks are migrated and tested.</p></section>
+  <section class="dept-core"><h2>DAGBO CORE</h2><p>Shared infrastructure for validated market data, settings, access, notifications, security and health. Each department owns its public services; cross-department communication uses namespaced CORE events. A department failure is isolated from the others.</p></section>
 </main>
 <script src="navigation.js"></script>
 <!-- DAGBO CORE is loaded by the shared navigation runtime. -->
@@ -38,7 +38,7 @@
     (detail.departments||[]).forEach(function(dept){
       var node=document.querySelector('[data-dept-status="'+dept.id+'"]');
       if(!node)return;
-      var label=dept.state==='ready'?'Operational':dept.state==='degraded'?'Degraded':dept.state==='unavailable'?'Unavailable':'Engine integration pending';
+      var label=dept.state==='ready'?'Operational':dept.state==='degraded'?'Degraded':dept.state==='unavailable'?'Unavailable':'Engine boundary pending';
       node.textContent=label+' · '+(dept.checks||[]).length+' health checks';
     });
   }
