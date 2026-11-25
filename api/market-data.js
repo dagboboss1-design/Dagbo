@@ -70,14 +70,32 @@ async function writeCache(key, value) {
 }
 
 async function claimTwelveDataSlot() {
-  try {
-    const redis = redisClient();
-    if (redis) {
-      const count = await withTimeout(redis.incr('dagbo:market:twelve:minute'), 1200, 'Market quota check');
-      if (count === 1) await withTimeout(redis.expire('dagbo:market:twelve:minute', 60), 1200, 'Market quota expiry');
-      return count <= MAX_TWELVE_CALLS_PER_MINUTE;
+  const redis = redisClient();
+  if (redis) {
+    try {
+      // Increment + expiry must be atomic. Separate INCR/EXPIRE calls can race
+      // or leave a permanent counter if the function times out between them.
+      const count = await withTimeout(
+        redis.eval(
+          "local count = redis.call('INCR', KEYS[1]); if count == 1 then redis.call('EXPIRE', KEYS[1], 60); end; return count",
+          ["dagbo:market:twelve:minute"],
+          []
+        ),
+        1500,
+        'Market quota reservation'
+      );
+      return Number(count) <= MAX_TWELVE_CALLS_PER_MINUTE;
+    } catch (error) {
+      // Fail closed when the shared limiter is configured but unavailable.
+      // Falling back to per-instance memory would let serverless instances
+      // collectively exceed the provider's account-wide request allowance.
+      console.error("DAGBO shared market rate limiter unavailable:", error.message);
+      return false;
     }
-  } catch (error) { console.error("DAGBO market rate limiter:", error.message); }
+  }
+
+  // Local fallback is only for installations without Upstash configured.
+  // It is process-local and therefore not a global quota guarantee.
   const now = Date.now();
   if (now - memoryMinute.startedAt >= 60000) memoryMinute = { startedAt: now, count: 0 };
   memoryMinute.count += 1;
