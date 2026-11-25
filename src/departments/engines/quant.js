@@ -10,7 +10,7 @@ export function registerQuantEngine(core, win = window, doc = document) {
       }
       return { available: true, profiles: win.DagboStrategyProfiles.getProfiles() };
     },
-    refreshHigherTimeframe: async () => {
+    refresh-higher-timeframe: async () => {
       const page = requirePage(win, ["higher-timeframe-hedging.html"]);
       if (!page.available) return page;
       const button = doc.getElementById("refreshH4");
@@ -19,10 +19,10 @@ export function registerQuantEngine(core, win = window, doc = document) {
       publish(core, "quant:higher-timeframe-refresh", { page: page.page });
       return { available: true, refreshed: true };
     },
-    refreshHedge: async () => {
+    refresh-hedge: async () => {
       const page = requirePage(win, ["higher-timeframe-hedging.html"]);
       if (!page.available) return page;
-      const button = doc.getElementById("refreshHedge");
+      const button = doc.getElementById("refresh-hedge");
       if (!button) throw new Error("Hedge analysis control is missing.");
       button.click();
       publish(core, "quant:hedge-refresh", { page: page.page });
