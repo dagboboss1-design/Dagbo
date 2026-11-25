@@ -47,11 +47,17 @@ test("all six departments register independent, namespaced service boundaries", 
     assert.equal(status.boundary, "isolated");
     assert.ok(core.get(id).state === "ready");
   }
-  for (const [id] of definitions) {
-    const owned = ["status", "refreshSignals", "signalSnapshots", "chartStatus", "executeTrade",
-      "refresh", "marketContext", "profiles", "refreshHigherTimeframe", "refreshHedge",
-      "performance", "trades", "ask", "openLesson", "lessons", "searchLessons"];
-    assert.ok(owned.some(service => core.get(id).state === "ready"));
+  const probes = {
+    trade: ["signalSnapshots", {}],
+    intelligence: ["marketContext", {}],
+    quant: ["profiles", {}],
+    journal: ["trades", {}],
+    ai: ["status", {}],
+    academy: ["status", {}]
+  };
+  for (const [id, [service, input]] of Object.entries(probes)) {
+    const result = await core.invoke(id, service, input);
+    assert.ok(result && typeof result === "object", id + " must expose its own public service");
   }
   assert.equal(core.list().length, 6);
   assert.equal(core.healthSummary().ready, 6);
