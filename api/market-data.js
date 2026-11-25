@@ -10,7 +10,12 @@ const SYMBOLS = {
   XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY", GBPJPY: "GBP/JPY",
   AUDUSD: "AUD/USD", USDCHF: "USD/CHF", USDCAD: "USD/CAD", NZDUSD: "NZD/USD",
-  EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK", DXY: "DXY"
+  EURJPY: "EUR/JPY", EURGBP: "EUR/GBP", USDSEK: "USD/SEK", DXY: "DXY",
+  EURCHF: "EUR/CHF", EURAUD: "EUR/AUD", EURCAD: "EUR/CAD", EURNZD: "EUR/NZD",
+  GBPCHF: "GBP/CHF", GBPAUD: "GBP/AUD", GBPCAD: "GBP/CAD", GBPNZD: "GBP/NZD",
+  AUDJPY: "AUD/JPY", AUDCHF: "AUD/CHF", AUDCAD: "AUD/CAD", AUDNZD: "AUD/NZD",
+  NZDJPY: "NZD/JPY", NZDCHF: "NZD/CHF", NZDCAD: "NZD/CAD",
+  CADJPY: "CAD/JPY", CADCHF: "CAD/CHF", CHFJPY: "CHF/JPY"
 };
 
 const BINANCE_SYMBOLS = {
@@ -135,7 +140,9 @@ async function fetchFcsFallback(pair, tf) {
   const key = process.env.FCS_API_KEY || process.env.FCS_ACCESS_KEY || process.env.FCS_API_ACCESS_KEY || process.env.FCSAPI_ACCESS_KEY;
   const period = fcsPeriod(tf);
   if (!key || !period) return null;
-  const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","USDSEK"];
+  const fxPairs = ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD","USDCHF","USDCAD","NZDUSD","EURJPY","EURGBP","USDSEK",
+    "EURCHF","EURAUD","EURCAD","EURNZD","GBPCHF","GBPAUD","GBPCAD","GBPNZD","AUDJPY","AUDCHF","AUDCAD","AUDNZD",
+    "NZDJPY","NZDCHF","NZDCAD","CADJPY","CADCHF","CHFJPY"];
   const commodities = ["XAUUSD","GOLD","XAGUSD","SILVER"];
   if (!fxPairs.includes(pair) && !commodities.includes(pair)) return null;
   const symbol = pair === "GOLD" ? "XAUUSD" : (pair === "XAGUSD" ? "SILVER" : pair);
