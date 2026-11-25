@@ -20,15 +20,30 @@
     <p>DAGBO stays one application. Each department has a defined responsibility and its own migration, validation and health checks. Your existing tools remain available while the architecture is upgraded.</p>
   </section>
   <section class="dept-grid" aria-label="DAGBO departments">
-    <article class="dept-card"><div class="num">01 / EXECUTION</div><h2>DAGBO TRADE</h2><p>Signal board, live opportunities, charting, alerts and trade execution.</p><div class="dept-links"><a href="signals.html">Signals</a><a href="chart.html">Chart</a><a href="alerts.html">Alerts</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
-    <article class="dept-card"><div class="num">02 / MARKET CONTEXT</div><h2>DAGBO INTELLIGENCE</h2><p>News, economic calendar, market heatmap and fundamental context.</p><div class="dept-links"><a href="news.html">News</a><a href="market-heatmap.html">Heatmap</a><a href="signal-insights.html">Insights</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
-    <article class="dept-card"><div class="num">03 / RESEARCH</div><h2>DAGBO QUANT</h2><p>Trading profiles, strategy research, scanners and higher-timeframe studies.</p><div class="dept-links"><a href="strategy-lab.html">Strategy lab</a><a href="strategy-profiles.html">Profiles</a><a href="higher-timeframe-hedging.html">H4 analysis</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
-    <article class="dept-card"><div class="num">04 / PERFORMANCE</div><h2>DAGBO JOURNAL</h2><p>Trade records, risk tracking, replay and performance review.</p><div class="dept-links"><a href="journal.html">Journal</a><a href="trader-score.html">Trader score</a><a href="replay.html">Replay</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
-    <article class="dept-card"><div class="num">05 / ASSISTANCE</div><h2>DAGBO AI</h2><p>AI assistant and BOSS1 analysis experience.</p><div class="dept-links"><a href="ai.html">AI assistant</a><a href="boss1.html">BOSS1</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
-    <article class="dept-card"><div class="num">06 / EDUCATION</div><h2>DAGBO ACADEMY</h2><p>Trading lessons, concepts, examples and structured learning.</p><div class="dept-links"><a href="learn.html">Open academy</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
+    <article class="dept-card"><div class="num">01 / EXECUTION</div><h2>DAGBO TRADE</h2><p>Signal board, live opportunities, charting, alerts and trade execution.</p><div class="dept-links"><a href="signals.html">Signals</a><a href="chart.html">Chart</a><a href="alerts.html">Alerts</a></div><div class="dept-status" data-dept-status="trade">Checking department health…</div></article>
+    <article class="dept-card"><div class="num">02 / MARKET CONTEXT</div><h2>DAGBO INTELLIGENCE</h2><p>News, economic calendar, market heatmap and fundamental context.</p><div class="dept-links"><a href="news.html">News</a><a href="market-heatmap.html">Heatmap</a><a href="signal-insights.html">Insights</a></div><div class="dept-status" data-dept-status="intelligence">Checking department health…</div></article>
+    <article class="dept-card"><div class="num">03 / RESEARCH</div><h2>DAGBO QUANT</h2><p>Trading profiles, strategy research, scanners and higher-timeframe studies.</p><div class="dept-links"><a href="strategy-lab.html">Strategy lab</a><a href="strategy-profiles.html">Profiles</a><a href="higher-timeframe-hedging.html">H4 analysis</a></div><div class="dept-status" data-dept-status="quant">Checking department health…</div></article>
+    <article class="dept-card"><div class="num">04 / PERFORMANCE</div><h2>DAGBO JOURNAL</h2><p>Trade records, risk tracking, replay and performance review.</p><div class="dept-links"><a href="journal.html">Journal</a><a href="trader-score.html">Trader score</a><a href="replay.html">Replay</a></div><div class="dept-status" data-dept-status="journal">Checking department health…</div></article>
+    <article class="dept-card"><div class="num">05 / ASSISTANCE</div><h2>DAGBO AI</h2><p>AI assistant and BOSS1 analysis experience.</p><div class="dept-links"><a href="ai.html">AI assistant</a><a href="boss1.html">BOSS1</a></div><div class="dept-status" data-dept-status="ai">Checking department health…</div></article>
+    <article class="dept-card"><div class="num">06 / EDUCATION</div><h2>DAGBO ACADEMY</h2><p>Trading lessons, concepts, examples and structured learning.</p><div class="dept-links"><a href="learn.html">Open academy</a></div><div class="dept-status" data-dept-status="academy">Checking department health…</div></article>
   </section>
   <section class="dept-core"><h2>DAGBO CORE</h2><p>Shared infrastructure for market data, normalized prices, settings, user access, notifications, security and department health. A failure in one department must not take down the others. Departments will only be marked operational after their real engines and data checks are migrated and tested.</p></section>
 </main>
 <script src="navigation.js"></script>
 <!-- DAGBO CORE is loaded by the shared navigation runtime. -->
+<script>
+(function(){
+  function render(event){
+    var detail=event&&event.detail||{};
+    (detail.departments||[]).forEach(function(dept){
+      var node=document.querySelector('[data-dept-status="'+dept.id+'"]');
+      if(!node)return;
+      var label=dept.state==='ready'?'Operational':dept.state==='degraded'?'Degraded':dept.state==='unavailable'?'Unavailable':'Engine integration pending';
+      node.textContent=label+' · '+(dept.checks||[]).length+' health checks';
+    });
+  }
+  window.addEventListener('dagbo:departments-ready',render,{once:true});
+  if(window.DAGBO_CORE) render({detail:{departments:window.DAGBO_CORE.list()}});
+})();
+</script>
 </body></html>
