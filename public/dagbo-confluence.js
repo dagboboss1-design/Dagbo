@@ -97,10 +97,10 @@ methodReports.push(methodReport("Volume Analysis",exchangeVolume?volumeDir:"WAIT
   avg>0&&v!==null?(exchangeVolume?"ACTIVE":"RESEARCH"):"UNAVAILABLE",
   avg>0&&v!==null?(exchangeVolume?"Latest exchange-traded volume is "+(v/avg).toFixed(2)+"x its 20-bar average.":"Provider-reported volume is "+(v/avg).toFixed(2)+"x its 20-bar average, but this feed does not verify centralized traded volume; research context only."):"Provider did not supply usable volume; volume analysis is unavailable.",
   exchangeVolume?"Verified exchange volume":"Unverified provider volume"));
-methodReports.push(methodReport("Fundamental Analysis","WAIT","UNAVAILABLE",
-  "Verified GDP, CPI, NFP, rate decisions and economic-surprise data are not connected to this candle scan.","Economic data feed"));
-methodReports.push(methodReport("Sentiment Analysis","WAIT","UNAVAILABLE",
-  "Verified retail positioning or market-wide positioning data is not connected. Headlines alone are not treated as positioning.","Positioning data feed"));
+methodReports.push(methodReport("Fundamental Analysis","WAIT","PENDING",
+  "Economic-calendar context is attached by the Signals scanner after the shared calendar feed loads.","FCS primary / FMP backup"));
+methodReports.push(methodReport("Sentiment Analysis","WAIT","PENDING",
+  "Weekly futures positioning is attached by the Signals scanner; it is not treated as live retail sentiment or intraday order flow.","FMP COT positioning"));
 methodReports.push(methodReport("ICT / SMC",structureDirFinal,
   structureDirFinal!=="WAIT"?"ACTIVE":"NEUTRAL",
   "BOS: "+structureDir+" · recent liquidity sweep (last 5 closed candles): "+sweepDir+" · recent three-candle FVG: "+fvgDir+". A direction is reported only when at least two independent structure checks agree.","Closed-candle structure data"));
@@ -110,9 +110,13 @@ var latestReturn=Math.log(cs[cs.length-1]/cs[cs.length-2]);
 var qMean=logReturns.length?logReturns.reduce(function(a,b){return a+b;},0)/logReturns.length:0;
 var qVariance=logReturns.length>1?logReturns.reduce(function(a,b){return a+(b-qMean)*(b-qMean);},0)/(logReturns.length-1):0;
 var qStd=Math.sqrt(qVariance),qZ=qStd>0?(latestReturn-qMean)/qStd:0;
-var quantDirection=logReturns.length>=20&&qZ>=1.5&&close>e20?"BUY":logReturns.length>=20&&qZ<=-1.5&&close<e20?"SELL":"WAIT";
-methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,"RESEARCH",
-  "Latest log return compared with the prior 20-return baseline: z-score "+qZ.toFixed(2)+". Requires 20 baseline returns; research-only, not machine learning, back-tested performance, or a trade vote.","Closed-candle statistical baseline"));
+var quantHasBaseline=logReturns.length>=20&&qStd>0;
+var quantDirection=quantHasBaseline&&qZ>=1.5&&close>e20?"BUY":quantHasBaseline&&qZ<=-1.5&&close<e20?"SELL":"WAIT";
+methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,quantHasBaseline?"RESEARCH":"UNAVAILABLE",
+  quantHasBaseline
+    ? "20-return z-score: "+qZ.toFixed(2)+" · current return "+(latestReturn*100).toFixed(3)+"% vs baseline mean "+(qMean*100).toFixed(3)+"%. "+(quantDirection==="WAIT"?"No statistically unusual directional move was detected.":"A directional return anomaly was detected; research-only, not machine learning, not back-tested performance, and not a trade vote.")
+    : "Insufficient valid return history or zero variance for a 20-return statistical baseline.",
+  "Closed-candle statistical baseline"));
 
 var requestedGroups=options&&Array.isArray(options.enabledGroups)?options.enabledGroups:null;
 if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.indexOf(g.name)>=0;});
