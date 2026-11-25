@@ -440,8 +440,10 @@
         }
         return timeOf(a) - timeOf(b);
       });
-      if (candles.length < 60) {
-        return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain; this strategy engine requires at least 60 closed candles.', errorStage: 'closed-candles' };
+      var requiredClosedBars = activeTradingProfile === 'position' ? 100 :
+        (activeTradingProfile === 'scalping' || activeTradingProfile === 'momentum' ? 30 : 60);
+      if (candles.length < requiredClosedBars) {
+        return { pair: pair, error: 'Only ' + candles.length + ' closed candles remain; ' + scannerProfileName() + ' requires at least ' + requiredClosedBars + ' closed candles on this timeframe.', errorStage: 'closed-candles' };
       }
       // Reject malformed, non-positive or impossible OHLC candles before any
       // indicator, entry, stop or target calculation can run.
