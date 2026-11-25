@@ -169,6 +169,8 @@
   var activeProfileConfig = profileApi ? profileApi.getProfile(activeTradingProfile) : null;
   var currentSignalTF = activeProfileConfig && activeProfileConfig.primaryTf || '15';
   var latestNewsCandidate = null;
+  var latestEconomicEvents = [];
+  var latestEconomicSource = 'FCS primary / FMP backup';
   var profilePreferenceStore = {};
   try { profilePreferenceStore=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}; } catch(e) {}
   var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
@@ -455,6 +457,7 @@
 
       var analysis=analyseAllMethods(candles, activeTradingProfile);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
+      addFundamentalMethodReport(analysis, pair);
       var timeframeContext={checked:false,direction:'WAIT',label:'Not required'};
       var final=analysis.final;
       // News & Event is not a generic 15m technical profile. It must have a
@@ -712,6 +715,53 @@
     return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
       return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
     });
+  }
+
+  // Fetch verified economic-calendar context once per scan cycle. This is
+  // displayed as fundamental research, never converted into a trade vote by
+  // headline text or an unvalidated actual-vs-forecast assumption.
+  async function loadEconomicContext() {
+    try {
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 7000) : null;
+      var response;
+      try {
+        response = await fetch('/api/calendar', controller
+          ? { cache: 'no-store', signal: controller.signal, headers: { 'Accept':'application/json' } }
+          : { cache: 'no-store', headers: { 'Accept':'application/json' } });
+      } finally { if (timeoutId) clearTimeout(timeoutId); }
+      var data = await response.json();
+      if (!response.ok || !data.success || !Array.isArray(data.events)) throw new Error(data.error || 'Economic calendar unavailable');
+      latestEconomicEvents = data.events;
+      latestEconomicSource = data.source || 'FCS primary / FMP backup';
+    } catch (error) {
+      latestEconomicEvents = [];
+      latestEconomicSource = 'UNAVAILABLE: ' + String(error.message || error);
+      console.warn('DAGBO fundamental context unavailable:', error);
+    }
+  }
+  function addFundamentalMethodReport(analysis, pair) {
+    if (!analysis) return;
+    var p = String(pair || '').toUpperCase();
+    var currencies = p === 'GOLD' || p === 'XAUUSD' || p === 'BTCUSD' || p === 'ETHUSD'
+      ? ['USD'] : (p.length === 6 ? [p.slice(0,3), p.slice(3,6)] : []);
+    var now = Date.now();
+    var relevant = latestEconomicEvents.filter(function(event) {
+      var currency = String(event.currency || 'GLOBAL').toUpperCase();
+      var time = Date.parse(event.date || '');
+      return Number.isFinite(time) && time >= now - 2*60*60*1000 && time <= now + 24*60*60*1000 &&
+        (currency === 'GLOBAL' || currencies.indexOf(currency) >= 0);
+    }).sort(function(a,b){return Date.parse(a.date)-Date.parse(b.date);}).slice(0,3);
+    var report = {
+      name:'Fundamental Analysis', direction:'WAIT', status:relevant.length?'RESEARCH':'UNAVAILABLE',
+      detail:relevant.length
+        ? relevant.map(function(e){return String(e.currency||'GLOBAL')+' '+String(e.impact||'')+' · '+String(e.name||'Economic event')+' · actual '+(e.actual||'pending')+' / forecast '+(e.forecast||'not supplied');}).join(' | ')
+        : (latestEconomicEvents.length ? 'No high-impact calendar event matched this market in the current 24-hour research window.' : latestEconomicSource),
+      source:latestEconomicSource
+    };
+    analysis.methodReports = Array.isArray(analysis.methodReports)?analysis.methodReports:[];
+    analysis.methodReports = analysis.methodReports.filter(function(m){return m.name!=='Fundamental Analysis';});
+    analysis.methodReports.push(report);
   }
 
   // Fetch the latest short-lived news context from the server.
@@ -1152,8 +1202,7 @@
 
       // Event mode requires a current, pair-matched news/event context before
       // it can evaluate a directional setup. Other profiles keep this optional.
-      if(activeTradingProfile==='event') await loadNewsSignalContext();
-      else loadNewsSignalContext();
+      await Promise.all([loadEconomicContext(), loadNewsSignalContext()]);
 
       // Respect the shared Twelve Data Basic-tier request budget.
       // The API endpoint allows at most six uncached Twelve Data calls per
