@@ -20,6 +20,6 @@ for (const department of DEPARTMENTS) {
 if (typeof window !== "undefined") {
   window.DAGBO_CORE = dagboCore;
   window.dispatchEvent(new CustomEvent("dagbo:departments-ready", {
-    detail: { departments: dagboCore.list(), coreVersion: 2 }
+    detail: { departments: dagboCore.list(), health: dagboCore.healthSummary(), coreVersion: 2 }
   }));
 }
