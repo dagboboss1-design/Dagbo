@@ -799,37 +799,66 @@
       var match = String(value == null ? '' : value).replace(/,/g,'').match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)/);
       return match ? Number(match[0]) : null;
     }
-    function describeEvent(event) {
-      var actual = String(event.actual || '').trim();
-      var forecast = String(event.forecast || '').trim();
-      var actualNumber = numericValue(actual), forecastNumber = numericValue(forecast);
-      var comparison = '';
-      if (actual && forecast && actualNumber !== null && forecastNumber !== null) {
-        var delta = actualNumber - forecastNumber;
-        var unit = String(event.unit || '');
-        comparison = ' · raw surprise ' + (delta > 0 ? '+' : '') + delta.toFixed(3).replace(/\.?0+$/,'') +
-          (unit ? ' ' + unit : '') + (delta === 0 ? ' in line' : delta > 0 ? ' above forecast' : ' below forecast') +
-          ' (not a bullish/bearish verdict)';
-      } else if (!actual) comparison = ' · actual pending';
-      else comparison = ' · forecast comparison unavailable';
-      return String(event.currency || 'GLOBAL') + ' ' + String(event.impact || 'Unknown impact') +
-        ' · ' + String(event.name || 'Economic event') + ' · actual ' + (actual || 'pending') +
-        ' / forecast ' + (forecast || 'not supplied') + comparison;
+    function indicatorPolarity(name) {
+      var label=String(name||'').toLowerCase();
+      if (/unemployment|jobless claims|initial claims|continuing claims|claimant count/.test(label)) return -1;
+      if (/gross domestic product|\bgdp\b|non.?farm payroll|employment change|employment situation|retail sales|purchasing managers|\bpmi\b|industrial production|consumer confidence|business confidence|business activity/.test(label)) return 1;
+      return 0;
     }
-    var available = latestEconomicAvailable;
-    var detail = relevant.length
-      ? relevant.map(describeEvent).join(' | ')
-      : available
-        ? 'Economic calendar feed connected. No matching medium/high-impact event in the last 2 hours or next 24 hours for this market.'
-        : latestEconomicSource;
-    var report = {
-      name:'Fundamental Analysis', direction:'WAIT',
-      status:available ? 'RESEARCH' : 'UNAVAILABLE',
+    var currencyScores={}, classifiedEvents=[];
+    relevant.forEach(function(event) {
+      var currency=String(event.currency||'GLOBAL').toUpperCase();
+      var eventTime=Date.parse(event.date||'');
+      var actual=numericValue(event.actual), forecast=numericValue(event.forecast);
+      var polarity=indicatorPolarity(event.name||event.eventCode);
+      if (eventTime>now || currency==='GLOBAL' || !polarity || actual===null || forecast===null || !currency) return;
+      var delta=actual-forecast;
+      var contribution=delta===0?0:(delta>0?1:-1)*polarity;
+      var impact=String(event.impact||'').toLowerCase();
+      var weight=impact==='high'?2:impact==='medium'?1:0;
+      if (!weight || !contribution) return;
+      currencyScores[currency]=(currencyScores[currency]||0)+contribution*weight;
+      classifiedEvents.push({currency:currency,name:String(event.name||'Economic event'),contribution:contribution*weight,delta:delta,unit:String(event.unit||'')});
+    });
+    var biasDirection='WAIT',biasDetail='';
+    if (p.length===6) {
+      var base=p.slice(0,3), quote=p.slice(3,6);
+      var baseScore=currencyScores[base]||0, quoteScore=currencyScores[quote]||0;
+      var spread=baseScore-quoteScore;
+      if (spread>=2) biasDirection='BUY';
+      else if (spread<=-2) biasDirection='SELL';
+      biasDetail='Currency-surprise differential (research only): '+base+' '+(baseScore>0?'+':'')+baseScore+' vs '+quote+' '+(quoteScore>0?'+':'')+quoteScore+' · pair bias '+biasDirection+'.';
+    } else if (classifiedEvents.length) {
+      biasDetail='Currency-surprise events were detected, but this market is not an FX currency pair; no pair direction is inferred.';
+    }
+    function describeEvent(event) {
+      var actual=String(event.actual||'').trim(), forecast=String(event.forecast||'').trim();
+      var actualNumber=numericValue(actual), forecastNumber=numericValue(forecast);
+      var comparison='';
+      if (actual && forecast && actualNumber!==null && forecastNumber!==null) {
+        var delta=actualNumber-forecastNumber;
+        var unit=String(event.unit||'');
+        var polarity=indicatorPolarity(event.name||event.eventCode);
+        var effect=polarity && delta!==0 ? (delta*polarity>0?' · surprise supports currency':' · surprise weighs on currency') : '';
+        comparison=' · raw surprise '+(delta>0?'+':'')+delta.toFixed(3).replace(/\.?0+$/,'')+
+          (unit?' '+unit:'')+(delta===0?' in line':delta>0?' above forecast':' below forecast')+effect;
+      } else if (!actual) comparison=' · actual pending';
+      else comparison=' · forecast comparison unavailable';
+      return String(event.currency||'GLOBAL')+' '+String(event.impact||'Unknown impact')+' · '+
+        String(event.name||'Economic event')+' · actual '+(actual||'pending')+' / forecast '+(forecast||'not supplied')+comparison;
+    }
+    var available=latestEconomicAvailable;
+    var detail=relevant.length?relevant.map(describeEvent).join(' | '):
+      available?'Economic calendar feed connected. No matching medium/high-impact event in the last 2 hours or next 24 hours for this market.':latestEconomicSource;
+    if (biasDetail) detail += (detail?' | ':'')+biasDetail;
+    var report={
+      name:'Fundamental Analysis',direction:biasDirection,
+      status:available?'RESEARCH':'UNAVAILABLE',
       detail:detail,
       source:latestEconomicSource
     };
-    analysis.methodReports = Array.isArray(analysis.methodReports)?analysis.methodReports:[];
-    analysis.methodReports = analysis.methodReports.filter(function(m){return m.name!=='Fundamental Analysis';});
+    analysis.methodReports=Array.isArray(analysis.methodReports)?analysis.methodReports:[];
+    analysis.methodReports=analysis.methodReports.filter(function(m){return m.name!=='Fundamental Analysis';});
     analysis.methodReports.push(report);
   }
 
