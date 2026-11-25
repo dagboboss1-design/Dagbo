@@ -325,6 +325,20 @@
     return out;
   }
   function candleNumber(c, key){return Number(c[key]);}
+  // Display and executable levels use conventional precision for the exact instrument class.
+  // Crypto is kept at two decimals (not one); JPY FX uses three, other FX five.
+  function pricePrecision(pair){
+    var p=String(pair||'').toUpperCase();
+    if(p==='XAUUSD'||p==='GOLD'||p==='XAGUSD'||p==='SILVER')return 2;
+    if(p.indexOf('BTC')>=0||p.indexOf('ETH')>=0)return 2;
+    if(p.indexOf('JPY')>=0)return 3;
+    if(/^(EUR|GBP|USD|AUD|NZD|CAD|CHF)[A-Z]{3}$/.test(p))return 5;
+    return 2;
+  }
+  function roundTradePrice(value,pair){
+    var factor=Math.pow(10,pricePrecision(pair));
+    return Math.round((Number(value)+Number.EPSILON)*factor)/factor;
+  }
   function analyseAllMethods(candles, profile, marketData) {
     var engineProfile = profile === 'scalping' || profile === 'momentum' ? 'scalp' :
       (profile === 'trend-following' ? 'swing' :
@@ -601,8 +615,12 @@
       var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
       var quoteResponse=await fetchQueuedMarketData('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(tf)+'&quote=1',{cache:'no-store',headers:{'Accept':'application/json'}});
       var liveQuote=await quoteResponse.json();
-      if(!quoteResponse.ok||!Number.isFinite(Number(liveQuote.price))||Number(liveQuote.price)<=0){
-        return {pair:pair,error:liveQuote.error||'Live executable quote is unavailable. No entry, SL or TP issued.',errorStage:'live-quote'};
+      var quoteStamp=Date.parse(liveQuote.quoteTime||'');
+      var quoteAge=Date.now()-quoteStamp;
+      if(!quoteResponse.ok||!Number.isFinite(Number(liveQuote.price))||Number(liveQuote.price)<=0||
+          String(liveQuote.pair||'').toUpperCase()!==String(pair).toUpperCase()||
+          liveQuote.marketDataType!=='DIRECT'||!Number.isFinite(quoteStamp)||quoteAge<0||quoteAge>30000){
+        return {pair:pair,error:liveQuote.error||'Live executable quote is missing, mismatched or older than 30 seconds. No entry, SL or TP issued.',errorStage:'live-quote'};
       }
       var entry=Number(liveQuote.price);
       var atrSum=0;
@@ -624,7 +642,12 @@
       else if(analysis.confidence>=80&&activeEvidence>=4) rr=Math.max(rr,4);
       else if(analysis.confidence>=75&&activeEvidence>=3) rr=Math.max(rr,3);
       var tp1Dist=slDist*rr,tp2Dist=slDist*Math.min(7,rr+1);
-      var sl=isBuy?entry-slDist:entry+slDist,tp1=isBuy?entry+tp1Dist:entry-tp1Dist,tp2=isBuy?entry+tp2Dist:entry-tp2Dist;
+      // Round all executable levels to the instrument's supported display precision
+      // before validation, so rounding can never collapse TP1/TP2 or invert a stop.
+      var sl=roundTradePrice(isBuy?entry-slDist:entry+slDist,pair);
+      var tp1=roundTradePrice(isBuy?entry+tp1Dist:entry-tp1Dist,pair);
+      var tp2=roundTradePrice(isBuy?entry+tp2Dist:entry-tp2Dist,pair);
+      entry=roundTradePrice(entry,pair);
       if (!isFinite(entry) || entry<=0 || !isFinite(atr) || atr<=0 ||
           ![sl,tp1,tp2].every(Number.isFinite) ||
           (isBuy && !(sl<entry && tp1>entry && tp2>tp1)) ||
@@ -1037,14 +1060,8 @@
             '<div class="dg-muted" style="font-size:13px;margin-top:4px">'+escapeNewsText(s.activeTradeOnPair?'An OPEN Journal trade already exists for this pair. No duplicate signal will be issued until it is closed.':(s.strategy||'The strategy did not confirm a trade setup.'))+'</div>' +
           '</div>';
       } else {
-        // Smart Decimal Logic: format each market with its appropriate price precision.
-        var dp = 2;
-        var pUpper = String(s.pair || '').toUpperCase();
-        if (pUpper.includes('JPY')) dp = 3;
-        else if (pUpper === 'XAUUSD' || pUpper === 'GOLD') dp = 2;
-        else if (pUpper.includes('BTC') || pUpper.includes('ETH')) dp = 1;
-        else if (pUpper.includes('US30') || pUpper.includes('US100') || pUpper.includes('NAS') || pUpper.includes('US500')) dp = 1;
-        else if (pUpper.includes('USD') || pUpper.includes('EUR') || pUpper.includes('GBP') || pUpper.includes('CHF') || pUpper.includes('CAD') || pUpper.includes('AUD') || pUpper.includes('NZD')) dp = 5;
+        // Keep card formatting identical to the precision used by level validation.
+        var dp = pricePrecision(s.pair);
 
         var fEntry = Number(s.entry).toFixed(dp);
         var fSl = Number(s.sl).toFixed(dp);
