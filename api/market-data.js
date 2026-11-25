@@ -212,7 +212,7 @@ module.exports = async function handler(req, res) {
     res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
     try {
       const url = "https://data-api.binance.vision/api/v3/klines?symbol=" +
-        encodeURIComponent(binanceSymbol) + "&interval=" + interval.binance + "&limit=100";
+        encodeURIComponent(binanceSymbol) + "&interval=" + interval.binance + "&limit=150";
       const result = await fetchJsonWithTimeout(url, { headers: { "Accept": "application/json" } }, 9000);
       const response = result.response;
       const rows = result.data;
