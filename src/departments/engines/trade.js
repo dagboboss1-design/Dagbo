@@ -25,7 +25,7 @@ export function registerTradeEngine(core, win = window, doc = document) {
     "execute-trade": async input => {
       const page = requirePage(win, ["signals.html"]);
       if (!page.available) return page;
-      if (typeof win.execute-trade !== "function") throw new Error("Trade execution is not available.");
+      if (typeof win.executeTrade !== "function") throw new Error("Trade execution is not available.");
       return win.execute-trade(input);
     }
   }, [{ name: "trade-page-adapters", run: async () => ROUTES.length === 3 }]);
