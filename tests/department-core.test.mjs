@@ -78,3 +78,18 @@ test("runs health checks and records degraded dependencies without hiding failur
   assert.equal(result.checks[1].state, "unavailable");
   assert.match(result.checks[1].detail, /provider timeout/);
 });
+
+
+test("summarizes all department health states", () => {
+  const core = createDepartmentCore();
+  core.register({ id: "trade" });
+  core.register({ id: "journal" });
+  assert.deepEqual(core.healthSummary(), {
+    total: 2, ready: 0, degraded: 0, unavailable: 0, notIntegrated: 2, overall: "degraded"
+  });
+  core.updateHealth("trade", "ready", [{ name: "runtime", state: "ready" }]);
+  core.updateHealth("journal", "unavailable", [{ name: "storage", state: "unavailable" }]);
+  assert.equal(core.healthSummary().overall, "unavailable");
+  assert.equal(core.healthSummary().ready, 1);
+  assert.equal(core.healthSummary().unavailable, 1);
+});
