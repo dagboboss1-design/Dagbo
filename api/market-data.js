@@ -1,3 +1,11 @@
+const { validateMarketData } = require("../src/core/market-data-contract");
+
+function assertMarketData(payload) {
+  const checked = validateMarketData(payload, { minimumCandles: 30 });
+  if (!checked.valid) throw new Error("Market-data contract rejected provider payload: " + checked.errors.join("; "));
+  return checked.payload;
+}
+
 const SYMBOLS = {
   XAUUSD: "XAU/USD", GOLD: "XAU/USD", XAGUSD: "XAG/USD", SILVER: "XAG/USD",
   EURUSD: "EUR/USD", GBPUSD: "GBP/USD", USDJPY: "USD/JPY", GBPJPY: "GBP/JPY",
@@ -142,7 +150,7 @@ async function fetchFcsFallback(pair, tf) {
   }
   const values = normalizeFcsCandles(result.data);
   if (values.length < 30) throw new Error("FCS returned fewer than 30 valid candles.");
-  return { pair, timeframe:tf, provider:"FCS", providerExchange:"FCS", values };
+  return assertMarketData({ pair, timeframe:tf, provider:"FCS", providerExchange:"FCS", values });
 }
 async function fetchBackupCandles(pair, tf) {
   const failures = [];
@@ -249,11 +257,12 @@ module.exports = async function handler(req, res) {
       if (values.length < 30) {
         return res.status(502).json({ error: "Binance returned fewer than 30 candles.", provider: "Binance" });
       }
-      return res.status(200).json({
+      const payload = assertMarketData({
         pair: pair, symbol: binanceSymbol, timeframe: tf,
         provider: "Binance Spot · Public Market Data",
         providerExchange: "Binance", values: values
       });
+      return res.status(200).json(payload);
     } catch (error) {
       console.error("DAGBO Binance market data error:", error.message);
       const timedOut = error && error.name === "AbortError";
@@ -293,12 +302,12 @@ module.exports = async function handler(req, res) {
         } else if (data.values.length < 30) {
           primaryFailure = "Twelve Data returned fewer than 30 candles";
         } else {
-          const payload = {
+          const payload = assertMarketData({
             pair, timeframe:tf, provider:"Twelve Data",
             providerKeySource:primaryKeySource,
             providerExchange:data.meta && data.meta.exchange ? data.meta.exchange : null,
             values:data.values
-          };
+          });
           await writeCache(cacheKey, { savedAt:Date.now(), payload });
           res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
           return res.status(200).json({ ...payload, cache:"miss" });
