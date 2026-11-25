@@ -306,7 +306,8 @@ module.exports = async function handler(req, res) {
             pair, timeframe:tf, provider:"Twelve Data",
             providerKeySource:primaryKeySource,
             providerExchange:data.meta && data.meta.exchange ? data.meta.exchange : null,
-            values:data.values
+            // Twelve Data commonly returns newest-first; normalize all providers to oldest-first.
+            values:data.values.slice().sort((a, b) => Date.parse(a.datetime) - Date.parse(b.datetime))
           });
           await writeCache(cacheKey, { savedAt:Date.now(), payload });
           res.setHeader("Cache-Control", "s-maxage=15, stale-while-revalidate=30");
