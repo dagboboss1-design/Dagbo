@@ -10,7 +10,7 @@ export function registerQuantEngine(core, win = window, doc = document) {
       }
       return { available: true, profiles: win.DagboStrategyProfiles.getProfiles() };
     },
-    refresh-higher-timeframe: async () => {
+    "refresh-higher-timeframe": async () => {
       const page = requirePage(win, ["higher-timeframe-hedging.html"]);
       if (!page.available) return page;
       const button = doc.getElementById("refreshH4");
@@ -19,7 +19,7 @@ export function registerQuantEngine(core, win = window, doc = document) {
       publish(core, "quant:higher-timeframe-refresh", { page: page.page });
       return { available: true, refreshed: true };
     },
-    refresh-hedge: async () => {
+    "refresh-hedge": async () => {
       const page = requirePage(win, ["higher-timeframe-hedging.html"]);
       if (!page.available) return page;
       const button = doc.getElementById("refresh-hedge");
