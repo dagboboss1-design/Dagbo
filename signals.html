@@ -437,7 +437,7 @@
       // Bound every market-data request so a stalled provider cannot leave the
       // scanner waiting forever. A timeout is reported per pair, not as a page crash.
       var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 35000) : null;
+      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 180000) : null;
       var res, data;
       try {
         res = await fetchQueuedMarketData(url, controller
