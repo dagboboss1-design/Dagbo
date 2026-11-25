@@ -2,6 +2,7 @@ const webpush = require("web-push");
 const { Redis } = require("@upstash/redis");
 const crypto = require("crypto");
 const confluence = require("../public/dagbo-confluence.js");
+const { validateMarketData } = require("../src/core/market-data-contract.js");
 const { fetchFcsCalendarEvents } = require("../lib/fcs-calendar");
 
 const redis = new Redis({
@@ -493,6 +494,11 @@ async function getHtfCandles(pair, frame, apiKey) {
     if (!response.ok || data.status === "error" || !Array.isArray(data.values)) {
       throw new Error(data.message || "No " + frame.label + " candles");
     }
+  }
+  if (sharedTf && pair !== "DXY") {
+    const checked = validateMarketData(data, { minimumCandles: 55 });
+    if (!checked.valid) throw new Error("Shared market-data contract failed for " + pair + " " + frame.label + ": " + checked.errors.join("; "));
+    data = { ...data, values: checked.payload.values };
   }
   const frameMs = ({ "4h":14400000, "1day":86400000, "1week":604800000, "1month":2592000000 })[frame.key] || 0;
   const now = Date.now();
