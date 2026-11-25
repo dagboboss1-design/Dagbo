@@ -16,7 +16,7 @@ export function registerAIEngine(core, win = window, doc = document) {
       publish(core, "ai:message-submitted", { length: message.length });
       return { available: true, submitted: true };
     },
-    openLesson: async input => {
+    open-lesson: async input => {
       const page = requirePage(win, ROUTES);
       if (!page.available) return page;
       const query = String(input && input.query || "").trim();
