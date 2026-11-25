@@ -1285,27 +1285,15 @@
       // it can evaluate a directional setup. Other profiles keep this optional.
       await Promise.all([loadEconomicContext(), loadNewsSignalContext()].concat(openPairs.map(loadSentimentContext)));
 
-      // Respect the shared Twelve Data Basic-tier request budget.
-      // The API endpoint allows at most seven uncached Twelve Data calls per
-      // 60-second quota window. This pair-level delay does not reserve capacity
-      // for the extra higher-timeframe and live-quote requests. Parallel requests previously caused later FX/Gold
-      // symbols to be rejected as quota-busy and then showed DATA ERROR.
-      // Queue pair requests at a safe interval; cached pairs return quickly
-      // and do not consume a new provider request.
+      // All market-data requests are paced by fetchQueuedMarketData, including
+      // primary candles, higher-timeframe confirmations and live execution quotes.
+      // Do not add a second pair-level delay here: it would waste time after a
+      // completed pair without improving the shared provider quota guarantee.
       var completedPairs = 0;
       var results = [];
-      var lastMarketRequestAt = 0;
       for (var pairIndex = 0; pairIndex < openPairs.length; pairIndex++) {
         if(thisScan!==scanGeneration)return;
         var pair = openPairs[pairIndex];
-        var waitMs = Math.max(0, 10200 - (Date.now() - lastMarketRequestAt));
-        if (waitMs > 0) {
-          if (loading) loading.innerText = 'Respecting live-data API limits · ' +
-            completedPairs + '/' + openPairs.length + ' markets checked...';
-          await new Promise(function(resolve) { setTimeout(resolve, waitMs); });
-        }
-        if(thisScan!==scanGeneration)return;
-        lastMarketRequestAt = Date.now();
         var pairResult;
         try {
           var pairData = await fetchPairData(pair, currentSignalTF);
