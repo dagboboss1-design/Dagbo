@@ -329,11 +329,14 @@
     return out;
   }
   function candleNumber(c, key){return Number(c[key]);}
-  function analyseAllMethods(candles, profile) {
+  function analyseAllMethods(candles, profile, marketData) {
     var engineProfile = profile === 'scalping' || profile === 'momentum' ? 'scalp' :
       (profile === 'trend-following' ? 'swing' :
       (['mean-reversion','range','breakout'].indexOf(profile)>=0 ? 'day' : profile));
-    var result = window.DagboConfluence.analyze(candles, '', engineProfile, {enabledGroups:groupsForActiveProfile()});
+    var result = window.DagboConfluence.analyze(candles, '', engineProfile, {
+      enabledGroups:groupsForActiveProfile(),
+      volumeIsExchange:!!(marketData&&String(marketData.providerExchange||'').toLowerCase()==='binance')
+    });
     if (!result) return null;
     return {
       final: result.signal,
@@ -468,7 +471,7 @@
       });
       if (invalidCandle) return { pair: pair, error: 'Provider returned malformed OHLC candles. No trade levels were generated.', errorStage: 'invalid-candles' };
 
-      var analysis=analyseAllMethods(candles, activeTradingProfile);
+      var analysis=analyseAllMethods(candles, activeTradingProfile, data);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
       addFundamentalMethodReport(analysis, pair);
       await addSentimentMethodReport(analysis, pair);
