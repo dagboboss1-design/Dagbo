@@ -59,7 +59,7 @@ module.exports=async function handler(req,res) {
     }
     const score=details.reduce((sum,item)=>sum+item.netScore,0)/details.length;
     const direction=score>=8?"BUY":score<=-8?"SELL":"WAIT";
-    return res.status(200).json({success:true,pair,status:direction==="WAIT"?"NEUTRAL":"ACTIVE",direction,score:Number(score.toFixed(2)),source:"FMP Commitment of Traders · weekly futures positioning",asOf:details.map(x=>x.date).sort().at(-1),details,detail:details.map(x=>x.label+": "+x.marketSentiment+" ("+x.netScore.toFixed(1)+" net positioning score)").join(" · ")});
+    return res.status(200).json({success:true,pair,status:direction==="WAIT"?"NEUTRAL":"ACTIVE",direction,score:Number(score.toFixed(2)),source:"FMP Commitment of Traders · weekly futures positioning",asOf:details.map(x=>x.date).sort()[details.length-1],details,detail:details.map(x=>x.label+": "+x.marketSentiment+" ("+x.netScore.toFixed(1)+" net positioning score)").join(" · ")});
   } catch(error) {
     console.error("DAGBO FMP COT positioning error:",error.message);
     return res.status(502).json({success:false,pair,status:"UNAVAILABLE",direction:"WAIT",source:"FMP COT Analysis",error:"FMP COT positioning is unavailable: "+String(error.message||error)});
