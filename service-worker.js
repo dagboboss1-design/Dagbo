@@ -1,5 +1,5 @@
-const VERSION = "dagbo-v27";
-const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "strategy-profiles.html", "higher-timeframe-hedging.html", "replay.html", "market-heatmap.html", "learn.html", "settings.html", "dagbo.css", "strategy-profiles.js", "dagbo-confluence.js", "manifest.json", "icons/dagbo-orbit.svg", "pwa.js", "navigation.js"];
+const VERSION = "dagbo-v28";
+const PRECACHE = ["./", "index.html", "boss1.html", "signals.html", "signal-insights.html", "chart.html", "news.html", "ai.html", "journal.html", "alerts.html", "trader-score.html", "strategy-lab.html", "strategy-profiles.html", "higher-timeframe-hedging.html", "replay.html", "market-heatmap.html", "learn.html", "settings.html", "dagbo.css", "strategy-profiles.js", "dagbo-confluence.js", "manifest.json", "icons/dagbo-orbit.svg", "pwa.js", "navigation.js", "src/departments/bootstrap.js", "src/departments/manifest.js", "src/core/department-core.js"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
