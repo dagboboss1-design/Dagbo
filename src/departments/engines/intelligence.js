@@ -15,7 +15,7 @@ export function registerIntelligenceEngine(core, win = window, doc = document) {
       publish(core, "intelligence:refresh-requested", { page: page.page, refreshed });
       return { available: true, refreshed };
     },
-    marketContext: async () => ({
+    market-context: async () => ({
       signalSnapshots: readJson(win.localStorage, "dagbo_signal_tf_snapshots", {}),
       newsContext: readJson(win.localStorage, "dagbo_news_signal_context", {}),
       lastRefresh: readJson(win.localStorage, "dagbo_news_last_refresh", null)
