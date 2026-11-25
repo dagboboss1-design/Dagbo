@@ -1,4 +1,13 @@
 (function(){
+  // Load the shared department runtime on every page that uses the global
+  // navigation. The loader is idempotent and leaves legacy page engines intact.
+  if (!document.getElementById("dagboDepartmentRuntime")) {
+    var runtime = document.createElement("script");
+    runtime.id = "dagboDepartmentRuntime";
+    runtime.type = "module";
+    runtime.src = new URL("src/departments/bootstrap.js", document.baseURI).href;
+    document.head.appendChild(runtime);
+  }
   if(document.getElementById('dagboSideMenu')) return;
   var items=[
     ['⌂','Home','index.html'],['▦','Departments','departments.html'],['↗','Signals','signals.html'],['⌁','Chart','chart.html'],
