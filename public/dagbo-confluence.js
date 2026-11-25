@@ -105,7 +105,10 @@ var threshold=profile==="scalp"?65:(isSwing||isPosition||isH4)?75:70,
 // Position mode has fewer independent price-only groups by design: macro,
 // carry and positioning feeds are reported separately as unavailable until
 // verified providers are wired in. Two agreeing technical groups are required.
-minGroups=isPosition?2:(isScalp||isH4||isContrarian?3:profile==="event"?2:4);
+requiredGroups=isPosition?2:(isScalp||isH4||isContrarian?3:profile==="event"?2:4),
+// User-disabled detectors and providers without volume reduce the usable group
+// count. Scale the quorum to the actual available groups, but never below two.
+minGroups=Math.max(2,Math.min(requiredGroups,groups.length));
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
 var dir=atrOk&&lead!=="WAIT"&&leadConfidence>=threshold&&leadGroups>=minGroups?lead:"WAIT";
