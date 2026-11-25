@@ -367,14 +367,25 @@
   // Scalping needs 15m + 1h agreement; intraday needs 1h + 4h;
   // swing/H4 needs daily context. Missing or mixed context fails closed.
   async function fetchHigherTimeframeContext(pair, profile, primaryTf) {
-    var contextTfs=[];
-    if(profile==='scalping'||profile==='momentum') contextTfs=['15','60'];
-    else if(profile==='day'||['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0) {
-      contextTfs=String(primaryTf)==='60'?['240','1day']:['60','240'];
-    } else if(profile==='swing'||profile==='trend-following'||profile==='h4') contextTfs=['1day'];
-    else if(profile==='position') contextTfs=[String(primaryTf)==='1week'?'1day':'1week'];
-    else if(profile==='event') contextTfs=['60','240'];
-    else return {checked:false,direction:'WAIT',label:'Not required',checks:[]};
+    var contextTfs=[],primary=String(primaryTf||'15');
+    // Select only genuinely higher timeframes than the active setup. This
+    // prevents a 1D/1W setup from being "confirmed" by the same or a lower TF.
+    if(profile==='scalping'||profile==='momentum') {
+      contextTfs=primary==='5'?['15','60']:primary==='15'?['60','240']:['60','240'];
+    } else if(profile==='day'||['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0) {
+      contextTfs=primary==='60'?['240','1day']:['60','240'];
+    } else if(profile==='swing'||profile==='trend-following') {
+      contextTfs=primary==='240'?['1day']:primary==='1day'?['1week']:[];
+    } else if(profile==='h4') {
+      contextTfs=['1day'];
+    } else if(profile==='position') {
+      // Daily entries use weekly macro direction; weekly entries retain daily
+      // timing context (explicitly labelled below as a lower-timeframe check).
+      contextTfs=[primary==='1week'?'1day':'1week'];
+    } else if(profile==='event') {
+      contextTfs=primary==='5'?['15','60']:primary==='15'?['60','240']:primary==='60'?['240','1day']:['60','240'];
+    } else return {checked:false,direction:'WAIT',label:'Not required',checks:[]};
+    if(!contextTfs.length) return {checked:false,direction:'WAIT',label:'No higher timeframe is configured above '+timeframeLabel(primary),checks:[]};
 
     var checks=[];
     for(var i=0;i<contextTfs.length;i++){
