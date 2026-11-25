@@ -544,7 +544,7 @@
         : (timeframeContext.error ? 'UNAVAILABLE' : 'NOT RUN');
       var mtfDetail = timeframeContext.checked
         ? mtfChecks.map(function(x){return x.label + ': ' + x.direction;}).join(' · ')
-        : (timeframeContext.error || 'Not evaluated because the primary candle engine did not produce a directional setup.');
+        : (timeframeContext.error || timeframeContext.label || 'Not evaluated because the primary candle engine did not produce a directional setup.');
       analysis.methodReports.push({
         name:'Multi-Timeframe Analysis',
         direction:timeframeContext.checked ? timeframeContext.direction : 'WAIT',
