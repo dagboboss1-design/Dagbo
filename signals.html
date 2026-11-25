@@ -165,6 +165,7 @@
   var currentSignalTF = activeProfileConfig && activeProfileConfig.primaryTf || '15';
   var latestNewsCandidate = null;
   var latestEconomicEvents = [];
+  var latestEconomicAvailable = false;
   var latestEconomicSource = 'FCS primary / FMP backup';
   var sentimentContextCache = {};
   var higherTimeframeContextCache = {};
@@ -772,9 +773,11 @@
       var data = await response.json();
       if (!response.ok || !data.success || !Array.isArray(data.events)) throw new Error(data.error || 'Economic calendar unavailable');
       latestEconomicEvents = data.events;
+      latestEconomicAvailable = true;
       latestEconomicSource = data.source || 'FCS primary / FMP backup';
     } catch (error) {
       latestEconomicEvents = [];
+      latestEconomicAvailable = false;
       latestEconomicSource = 'UNAVAILABLE: ' + String(error.message || error);
       console.warn('DAGBO fundamental context unavailable:', error);
     }
@@ -782,7 +785,8 @@
   function addFundamentalMethodReport(analysis, pair) {
     if (!analysis) return;
     var p = String(pair || '').toUpperCase();
-    var currencies = p === 'GOLD' || p === 'XAUUSD' || p === 'BTCUSD' || p === 'ETHUSD'
+    var currencies = p === 'GOLD' || p === 'XAUUSD' || p === 'BTCUSD' || p === 'ETHUSD' ||
+      p === 'DXY' || /^(US30|US100|NAS100|US500)$/.test(p)
       ? ['USD'] : (p.length === 6 ? [p.slice(0,3), p.slice(3,6)] : []);
     var now = Date.now();
     var relevant = latestEconomicEvents.filter(function(event) {
@@ -791,11 +795,37 @@
       return Number.isFinite(time) && time >= now - 2*60*60*1000 && time <= now + 24*60*60*1000 &&
         (currency === 'GLOBAL' || currencies.indexOf(currency) >= 0);
     }).sort(function(a,b){return Date.parse(a.date)-Date.parse(b.date);}).slice(0,3);
+    function numericValue(value) {
+      var match = String(value == null ? '' : value).replace(/,/g,'').match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)/);
+      return match ? Number(match[0]) : null;
+    }
+    function describeEvent(event) {
+      var actual = String(event.actual || '').trim();
+      var forecast = String(event.forecast || '').trim();
+      var actualNumber = numericValue(actual), forecastNumber = numericValue(forecast);
+      var comparison = '';
+      if (actual && forecast && actualNumber !== null && forecastNumber !== null) {
+        var delta = actualNumber - forecastNumber;
+        var unit = String(event.unit || '');
+        comparison = ' · raw surprise ' + (delta > 0 ? '+' : '') + delta.toFixed(3).replace(/\.?0+$/,'') +
+          (unit ? ' ' + unit : '') + (delta === 0 ? ' in line' : delta > 0 ? ' above forecast' : ' below forecast') +
+          ' (not a bullish/bearish verdict)';
+      } else if (!actual) comparison = ' · actual pending';
+      else comparison = ' · forecast comparison unavailable';
+      return String(event.currency || 'GLOBAL') + ' ' + String(event.impact || 'Unknown impact') +
+        ' · ' + String(event.name || 'Economic event') + ' · actual ' + (actual || 'pending') +
+        ' / forecast ' + (forecast || 'not supplied') + comparison;
+    }
+    var available = latestEconomicAvailable;
+    var detail = relevant.length
+      ? relevant.map(describeEvent).join(' | ')
+      : available
+        ? 'Economic calendar feed connected. No matching medium/high-impact event in the last 2 hours or next 24 hours for this market.'
+        : latestEconomicSource;
     var report = {
-      name:'Fundamental Analysis', direction:'WAIT', status:relevant.length?'RESEARCH':'UNAVAILABLE',
-      detail:relevant.length
-        ? relevant.map(function(e){return String(e.currency||'GLOBAL')+' '+String(e.impact||'')+' · '+String(e.name||'Economic event')+' · actual '+(e.actual||'pending')+' / forecast '+(e.forecast||'not supplied');}).join(' | ')
-        : (latestEconomicEvents.length ? 'No high-impact calendar event matched this market in the current 24-hour research window.' : latestEconomicSource),
+      name:'Fundamental Analysis', direction:'WAIT',
+      status:available ? 'RESEARCH' : 'UNAVAILABLE',
+      detail:detail,
       source:latestEconomicSource
     };
     analysis.methodReports = Array.isArray(analysis.methodReports)?analysis.methodReports:[];
@@ -961,8 +991,8 @@
       var methodAuditHtml = '<div style="margin-top:12px;padding:11px;border:1px solid var(--dg-line);border-radius:11px"><b style="font-size:12px">BOSS1 · EIGHT-METHOD AUDIT</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px">' +
         (Array.isArray(s.methodReports)?s.methodReports.map(function(m){
           var status=String(m.status||'UNAVAILABLE');
-          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='RESEARCH'?'RESEARCH ONLY':status==='NOT RUN'?'NOT RUN':'UNAVAILABLE';
-          var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'?'var(--dg-text-2)':'#b7791f';
+          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='RESEARCH'?'RESEARCH ONLY':status==='NOT RUN'?'NOT RUN':status==='STALE'?'STALE':status==='PENDING'?'PENDING':status==='ERROR'?'ERROR':'UNAVAILABLE';
+          var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'||status==='NOT RUN'?'var(--dg-text-2)':'#b7791f';
           return '<div style="padding:7px 8px;border-radius:8px;background:var(--dg-fill);min-width:0"><div style="font-size:11px;font-weight:800">'+escapeNewsText(m.name)+'</div><div style="font-size:10px;font-weight:800;color:'+color+';margin-top:3px">'+label+' · '+escapeNewsText(m.direction||'WAIT')+'</div><div style="font-size:10px;color:var(--dg-text-2);line-height:1.4;margin-top:3px">'+escapeNewsText(m.detail||'No detail available')+'</div></div>';
         }).join(''):'<div class="dg-muted" style="font-size:11px">Method audit unavailable for this result.</div>') +
         '</div><div class="dg-help" style="margin-top:8px">Unavailable methods do not count as confirmation. Quantitative diagnostics are research-only and do not independently trigger trades.</div></div>';
