@@ -59,7 +59,7 @@ var patternGroupDir=pattern.direction!=="WAIT"&&candleDir!=="WAIT"?(pattern.dire
 var structureGroupDir=structureDirFinal!=="WAIT"&&levelDir!=="WAIT"?(structureDirFinal===levelDir?structureDirFinal:"WAIT"):(structureDirFinal!=="WAIT"?structureDirFinal:levelDir);
 var groups=[{name:"Trend",dir:trendGroupDir,detail:"EMA"+emaFast+"/"+emaSlow+" + MACD · indicator combo RSI("+rsiPeriod+") "+rv.toFixed(1)+" "+indicatorComboDir},{name:"Momentum",dir:momentumDir,detail:"RSI("+rsiPeriod+")"+(isScalp?" + Stochastic(5,3,3)":"")},{name:"Volatility",dir:bbDir,detail:"Bollinger Bands("+bbPeriod+",2) · ATR "+(atrOk?"active":"too quiet")},{name:"Volume",dir:volumeDir,detail:avg>0&&v!==null?(v/avg).toFixed(2)+"x average volume":"volume unavailable"},{name:"Chart pattern",dir:patternGroupDir,detail:"Chart: "+pattern.name+" · Candle: "+candleName},{name:"Market structure",dir:structureGroupDir,detail:"BOS "+structureDir+" · sweep "+sweepDir+" · FVG "+fvgDir+" · 20-bar level "+levelDir}];
 
-// Seven-method BOSS1 audit. Only methods backed by this scan's actual inputs
+// Eight-method BOSS1 audit. Only methods backed by this scan's actual inputs
 // may be marked ACTIVE; missing feeds are explicitly UNAVAILABLE.
 function methodReport(name,direction,status,detail,source){
   return {name:name,direction:direction||"WAIT",status:status,detail:detail,source:source||"OHLC candles"};
