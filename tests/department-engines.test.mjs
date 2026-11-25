@@ -48,8 +48,8 @@ test("all six departments register independent, namespaced service boundaries", 
     assert.ok(core.get(id).state === "ready");
   }
   const probes = {
-    trade: ["signalSnapshots", {}],
-    intelligence: ["marketContext", {}],
+    trade: ["signal-snapshots", {}],
+    intelligence: ["market-context", {}],
     quant: ["profiles", {}],
     journal: ["trades", {}],
     ai: ["status", {}],
@@ -71,7 +71,7 @@ test("department services refuse to operate another department's page", async ()
     const register = await loadEngine(path, name);
     await register(core, env.win, env.doc);
   }
-  const trade = await core.invoke("trade", "refreshSignals", {});
+  const trade = await core.invoke("trade", "refresh-signals", {});
   const ai = await core.invoke("ai", "ask", { message: "Explain risk management" });
   assert.equal(trade.available, false);
   assert.equal(trade.page, "journal.html");
