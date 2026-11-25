@@ -94,8 +94,8 @@ var priceStatus=priceDirection!=="WAIT"?"ACTIVE":"NEUTRAL";
 methodReports.push(methodReport("Pure Price Action",priceDirection,priceStatus,
   priceDirection!=="WAIT"?"A closed-candle chart pattern or candle pattern has confirmed a direction.":"No confirmed chart or candle pattern."));
 methodReports.push(methodReport("Volume Analysis",exchangeVolume?volumeDir:"WAIT",
-  avg>0&&v!==null?(exchangeVolume?"ACTIVE":"RESEARCH"):"UNAVAILABLE",
-  avg>0&&v!==null?(exchangeVolume?"Latest exchange-traded volume is "+(v/avg).toFixed(2)+"x its 20-bar average.":"Provider-reported volume is "+(v/avg).toFixed(2)+"x its 20-bar average, but this feed does not verify centralized traded volume; research context only."):"Provider did not supply usable volume; volume analysis is unavailable.",
+  avg>0&&v!==null?(exchangeVolume?(volumeDir==="BUY"||volumeDir==="SELL"?"ACTIVE":"NEUTRAL"):"RESEARCH"):"UNAVAILABLE",
+  avg>0&&v!==null?(exchangeVolume?"Latest exchange-traded volume is "+(v/avg).toFixed(2)+"x its 20-bar average. "+(volumeDir==="WAIT"?"Volume is available, but it has not confirmed a directional vote.":"Volume direction: "+volumeDir+"."):"Provider-reported volume is "+(v/avg).toFixed(2)+"x its 20-bar average, but this feed does not verify centralized traded volume; research context only."):"Provider did not supply usable volume; volume analysis is unavailable.",
   exchangeVolume?"Verified exchange volume":"Unverified provider volume"));
 methodReports.push(methodReport("Fundamental Analysis","WAIT","PENDING",
   "Economic-calendar context is attached by the Signals scanner after the shared calendar feed loads.","FCS primary / FMP backup"));
