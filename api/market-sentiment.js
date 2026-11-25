@@ -6,15 +6,15 @@ const FMP_BASE = "https://financialmodelingprep.com/stable/commitment-of-traders
 const CONTRACTS = {
   XAUUSD: [{ symbol:"GC", sign:1, label:"COMEX Gold" }],
   GOLD: [{ symbol:"GC", sign:1, label:"COMEX Gold" }],
-  EURUSD: [{ symbol:"6E", sign:1, label:"Euro FX" }],
-  GBPUSD: [{ symbol:"6B", sign:1, label:"British Pound" }],
-  USDJPY: [{ symbol:"6J", sign:-1, label:"Japanese Yen (inverse USD quote)" }],
-  GBPJPY: [{ symbol:"6B", sign:1, label:"British Pound" }, { symbol:"6J", sign:-1, label:"Japanese Yen (inverse quote)" }],
-  EURJPY: [{ symbol:"6E", sign:1, label:"Euro FX" }, { symbol:"6J", sign:-1, label:"Japanese Yen (inverse quote)" }],
-  AUDUSD: [{ symbol:"6A", sign:1, label:"Australian Dollar" }],
-  USDCAD: [{ symbol:"6C", sign:-1, label:"Canadian Dollar (inverse USD quote)" }],
-  USDCHF: [{ symbol:"6S", sign:-1, label:"Swiss Franc (inverse USD quote)" }],
-  NZDUSD: [{ symbol:"6N", sign:1, label:"New Zealand Dollar" }]
+  EURUSD: [{ symbol:"EC", sign:1, label:"Euro FX" }],
+  GBPUSD: [{ symbol:"BP", sign:1, label:"British Pound" }],
+  USDJPY: [{ symbol:"JY", sign:-1, label:"Japanese Yen (inverse USD quote)" }],
+  GBPJPY: [{ symbol:"BP", sign:1, label:"British Pound" }, { symbol:"JY", sign:-1, label:"Japanese Yen (inverse quote)" }],
+  EURJPY: [{ symbol:"EC", sign:1, label:"Euro FX" }, { symbol:"JY", sign:-1, label:"Japanese Yen (inverse quote)" }],
+  AUDUSD: [{ symbol:"AD", sign:1, label:"Australian Dollar" }],
+  USDCAD: [{ symbol:"CD", sign:-1, label:"Canadian Dollar (inverse USD quote)" }],
+  USDCHF: [{ symbol:"SF", sign:-1, label:"Swiss Franc (inverse USD quote)" }],
+  NZDUSD: [{ symbol:"NE", sign:1, label:"New Zealand Dollar" }]
 };
 function isoDate(date) { return date.toISOString().slice(0,10); }
 function number(value) { const n=Number(value); return Number.isFinite(n)?n:null; }
