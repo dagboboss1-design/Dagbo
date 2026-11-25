@@ -40,8 +40,28 @@ var momentumDir=isScalp?((rv>=52&&stoch.k>=50&&stoch.k>=stoch.d-10)?"BUY":(rv<=4
 var bbPeriod=isScalp?12:20,recent=cs.slice(-bbPeriod),mean=recent.reduce(function(s,x){return s+x},0)/recent.length,sd=Math.sqrt(recent.reduce(function(s,x){return s+(x-mean)*(x-mean)},0)/recent.length),bbDir=close<mean-2*sd&&close>open?"BUY":close>mean+2*sd&&close<open?"SELL":"WAIT";
 var atrPeriod=14,tr=0;for(var i=cs.length-atrPeriod;i<cs.length;i++)tr+=Math.max(hs[i]-ls[i],Math.abs(hs[i]-cs[i-1]),Math.abs(ls[i]-cs[i-1]));var atr=tr/atrPeriod,atrPct=atr/Math.max(Math.abs(close),1e-9)*100,atrOk=atrPct>=(isScalp?0.008:0.004);
 var vols=candles.slice(-21,-1).map(function(x){return n(x.volume)}).filter(function(x){return x!==null&&x>0}),v=n(last.volume),avg=vols.length?vols.reduce(function(s,x){return s+x},0)/vols.length:0,volumeDir=avg>0&&v!==null&&v>=avg*1.2?(close>open?"BUY":close<open?"SELL":"WAIT"):"WAIT";
+// Volume is only an independent confluence vote when the caller confirms
+// that the provider supplies exchange-traded volume (e.g. Binance spot).
+var exchangeVolume=!!(options&&options.volumeIsExchange===true);
 var prior=candles.slice(-(isScalp?7:21),-1),sHigh=Math.max.apply(null,prior.map(function(x){return n(x.high)})),sLow=Math.min.apply(null,prior.map(function(x){return n(x.low)})),structureDir=close>sHigh?"BUY":close<sLow?"SELL":"WAIT";
-var sweepDir=high>sHigh&&close<sHigh?"SELL":low<sLow&&close>sLow?"BUY":"WAIT",twoBack=candles[candles.length-3],fvgDir=low>n(twoBack.high)?"BUY":high<n(twoBack.low)?"SELL":"WAIT";
+// ICT/SMC events can occur a few closed candles before the scan. Search a
+// short recent window for a confirmed liquidity sweep and three-candle FVG
+// instead of inspecting only the latest candle and missing valid structure.
+var sweepDir="WAIT",fvgDir="WAIT",smcStart=Math.max(2,candles.length-6);
+for(var si=smcStart;si<candles.length;si++){
+  var sweepBase=candles.slice(Math.max(0,si-21),si);
+  if(sweepBase.length>=5){
+    var sweepHigh=Math.max.apply(null,sweepBase.map(function(x){return n(x.high)}));
+    var sweepLow=Math.min.apply(null,sweepBase.map(function(x){return n(x.low)}));
+    var sweepClose=n(candles[si].close),sweepHighNow=n(candles[si].high),sweepLowNow=n(candles[si].low);
+    if(sweepHighNow>sweepHigh&&sweepClose<sweepHigh)sweepDir="SELL";
+    else if(sweepLowNow<sweepLow&&sweepClose>sweepLow)sweepDir="BUY";
+  }
+  var leftHigh=n(candles[si-2].high),leftLow=n(candles[si-2].low);
+  var gapLow=n(candles[si].low),gapHigh=n(candles[si].high);
+  if(gapLow>leftHigh)fvgDir="BUY";
+  else if(gapHigh<leftLow)fvgDir="SELL";
+}
 var structureVotes=[structureDir,sweepDir,fvgDir],structureBuys=structureVotes.filter(function(x){return x==="BUY"}).length,structureSells=structureVotes.filter(function(x){return x==="SELL"}).length,structureDirFinal=structureBuys>=2?"BUY":structureSells>=2?"SELL":"WAIT";
 var pattern=patternScan(candles,cs);
 var indicatorComboDir=(e20>e50&&rv>=55&&macd>0&&macd>=macdPrev)?"BUY":(e20<e50&&rv<=45&&macd<0&&macd<=macdPrev)?"SELL":"WAIT";
@@ -73,17 +93,17 @@ var priceDirection=patternGroupDir;
 var priceStatus=priceDirection!=="WAIT"?"ACTIVE":"NEUTRAL";
 methodReports.push(methodReport("Pure Price Action",priceDirection,priceStatus,
   priceDirection!=="WAIT"?"A closed-candle chart pattern or candle pattern has confirmed a direction.":"No confirmed chart or candle pattern."));
-methodReports.push(methodReport("Volume Analysis",volumeDir,
-  avg>0&&v!==null?"ACTIVE":"UNAVAILABLE",
-  avg>0&&v!==null?"Latest volume is "+(v/avg).toFixed(2)+"x its 20-bar average.":"Provider did not supply usable volume; volume confirmation is unavailable.",
-  "Provider volume"));
+methodReports.push(methodReport("Volume Analysis",exchangeVolume?volumeDir:"WAIT",
+  avg>0&&v!==null?(exchangeVolume?"ACTIVE":"RESEARCH"):"UNAVAILABLE",
+  avg>0&&v!==null?(exchangeVolume?"Latest exchange-traded volume is "+(v/avg).toFixed(2)+"x its 20-bar average.":"Provider-reported volume is "+(v/avg).toFixed(2)+"x its 20-bar average, but this feed does not verify centralized traded volume; research context only."):"Provider did not supply usable volume; volume analysis is unavailable.",
+  exchangeVolume?"Verified exchange volume":"Unverified provider volume"));
 methodReports.push(methodReport("Fundamental Analysis","WAIT","UNAVAILABLE",
   "Verified GDP, CPI, NFP, rate decisions and economic-surprise data are not connected to this candle scan.","Economic data feed"));
 methodReports.push(methodReport("Sentiment Analysis","WAIT","UNAVAILABLE",
   "Verified retail positioning or market-wide positioning data is not connected. Headlines alone are not treated as positioning.","Positioning data feed"));
 methodReports.push(methodReport("ICT / SMC",structureDirFinal,
   structureDirFinal!=="WAIT"?"ACTIVE":"NEUTRAL",
-  "BOS: "+structureDir+" · liquidity sweep: "+sweepDir+" · FVG: "+fvgDir+". A direction is reported only when at least two of these three structure checks agree.","Closed-candle structure data"));
+  "BOS: "+structureDir+" · recent liquidity sweep (last 5 closed candles): "+sweepDir+" · recent three-candle FVG: "+fvgDir+". A direction is reported only when at least two independent structure checks agree.","Closed-candle structure data"));
 var logReturns=[];
 for(var qi=Math.max(1,cs.length-21);qi<cs.length-1;qi++)logReturns.push(Math.log(cs[qi]/cs[qi-1]));
 var latestReturn=Math.log(cs[cs.length-1]/cs[cs.length-2]);
@@ -97,7 +117,7 @@ methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,"RES
 var requestedGroups=options&&Array.isArray(options.enabledGroups)?options.enabledGroups:null;
 if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.indexOf(g.name)>=0;});
 // Missing provider volume must not count as a failed vote or dilute confidence.
-if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";});
+if(avg<=0||v===null||!exchangeVolume)groups=groups.filter(function(g){return g.name!=="Volume";});
 if(!groups.length)return null;
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
