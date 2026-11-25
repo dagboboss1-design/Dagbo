@@ -152,13 +152,8 @@
     BTCUSD: 'CRYPTO', BTCUSDT: 'CRYPTO', BTC: 'CRYPTO', ETHUSD: 'CRYPTO', ETHUSDT: 'CRYPTO', ETH: 'CRYPTO'
   };
 
-  var API_SYMBOLS = {
-    XAUUSD: 'XAU/USD', GOLD: 'XAU/USD', XAGUSD: 'XAG/USD', SILVER: 'XAG/USD',
-    EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', GBPJPY: 'GBP/JPY',
-    AUDUSD: 'AUD/USD', USDCHF: 'USD/CHF', USDCAD: 'USD/CAD', NZDUSD: 'NZD/USD', EURJPY: 'EUR/JPY', EURGBP: 'EUR/GBP',
-    US30: 'DIA', US100: 'QQQ', NAS100: 'QQQ', US500: 'SPY',
-    BTCUSD: 'BTC/USD', BTC: 'BTC/USD', ETHUSD: 'ETH/USD', ETH: 'ETH/USD'
-  };
+  // Provider symbol mapping is owned by /api/market-data. Keep the UI free
+  // of duplicate mappings so ETF symbols can never be mistaken for index CFDs.
 
   var currentFilter = 'ALL';
   var signalsData = {};
@@ -1275,8 +1270,9 @@
       await Promise.all([loadEconomicContext(), loadNewsSignalContext()].concat(openPairs.map(loadSentimentContext)));
 
       // Respect the shared Twelve Data Basic-tier request budget.
-      // The API endpoint allows at most six uncached Twelve Data calls per
-      // rolling minute. Parallel requests previously caused later FX/Gold
+      // The API endpoint allows at most seven uncached Twelve Data calls per
+      // 60-second quota window. This pair-level delay does not reserve capacity
+      // for the extra higher-timeframe and live-quote requests. Parallel requests previously caused later FX/Gold
       // symbols to be rejected as quota-busy and then showed DATA ERROR.
       // Queue pair requests at a safe interval; cached pairs return quickly
       // and do not consume a new provider request.
