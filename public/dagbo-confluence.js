@@ -120,7 +120,10 @@ if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.index
 if(avg<=0||v===null||!exchangeVolume)groups=groups.filter(function(g){return g.name!=="Volume";});
 if(!groups.length)return null;
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
-var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
+// Confidence measures agreement among groups that actually produced a
+// directional vote. WAIT groups are neutral, not failed confirmations; the
+// independent minimum-group quorum below still controls how many votes are needed.
+var directionalVotes=active.BUY+active.SELL,maxScore=Math.max(1,directionalVotes*2),confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
 var threshold=profile==="scalp"?65:(isSwing||isPosition||isH4)?75:70,
 // Position mode has fewer independent price-only groups by design: macro,
 // carry and positioning feeds are reported separately as unavailable until
