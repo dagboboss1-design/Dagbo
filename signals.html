@@ -171,6 +171,7 @@
   var latestNewsCandidate = null;
   var latestEconomicEvents = [];
   var latestEconomicSource = 'FCS primary / FMP backup';
+  var sentimentContextCache = {};
   var profilePreferenceStore = {};
   try { profilePreferenceStore=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}; } catch(e) {}
   var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
@@ -458,6 +459,7 @@
       var analysis=analyseAllMethods(candles, activeTradingProfile);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
       addFundamentalMethodReport(analysis, pair);
+      await addSentimentMethodReport(analysis, pair);
       var timeframeContext={checked:false,direction:'WAIT',label:'Not required'};
       var final=analysis.final;
       // News & Event is not a generic 15m technical profile. It must have a
@@ -761,6 +763,42 @@
     };
     analysis.methodReports = Array.isArray(analysis.methodReports)?analysis.methodReports:[];
     analysis.methodReports = analysis.methodReports.filter(function(m){return m.name!=='Fundamental Analysis';});
+    analysis.methodReports.push(report);
+  }
+
+  // COT positioning is weekly context. Cache each pair in-page so repeated
+  // scans do not repeatedly spend FMP calls; unavailable data stays unavailable.
+  async function loadSentimentContext(pair) {
+    var key = String(pair || '').toUpperCase();
+    var cached = sentimentContextCache[key];
+    if (cached && Date.now() - cached.fetchedAt < 30*60*1000) return cached.data;
+    try {
+      var response = await fetch('/api/market-sentiment?pair='+encodeURIComponent(key),
+        {cache:'no-store',headers:{'Accept':'application/json'}});
+      var data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'COT positioning unavailable');
+      sentimentContextCache[key] = {fetchedAt:Date.now(),data:data};
+      return data;
+    } catch(error) {
+      var unavailable = {success:false,pair:key,status:'UNAVAILABLE',direction:'WAIT',
+        source:'FMP COT Analysis',detail:String(error.message || error)};
+      sentimentContextCache[key] = {fetchedAt:Date.now(),data:unavailable};
+      return unavailable;
+    }
+  }
+  async function addSentimentMethodReport(analysis,pair) {
+    if (!analysis) return;
+    var sentiment = await loadSentimentContext(pair);
+    var report = {
+      name:'Sentiment Analysis',
+      direction:sentiment.direction || 'WAIT',
+      status:sentiment.status || 'UNAVAILABLE',
+      detail:sentiment.detail || sentiment.error || 'No verified COT positioning data returned.',
+      source:sentiment.source || 'FMP COT Analysis',
+      asOf:sentiment.asOf || null
+    };
+    analysis.methodReports = Array.isArray(analysis.methodReports)?analysis.methodReports:[];
+    analysis.methodReports = analysis.methodReports.filter(function(m){return m.name!=='Sentiment Analysis';});
     analysis.methodReports.push(report);
   }
 
