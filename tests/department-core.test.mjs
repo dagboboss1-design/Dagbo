@@ -24,6 +24,7 @@ test("rejects invalid and duplicate department identifiers", () => {
 
 test("publishes namespaced events and supports unsubscribe", () => {
   const core = createDepartmentCore();
+  core.register({ id: "trade", routes: ["signals.html"] });
   const received = [];
   const unsubscribe = core.subscribe("trade:signal", payload => received.push(payload));
   core.publish("trade:signal", { symbol: "XAUUSD" });
@@ -52,4 +53,28 @@ test("updates health without allowing unknown departments", () => {
   assert.equal(updated.checks[0].state, "unavailable");
   assert.equal(core.get("trade").state, "degraded");
   assert.throws(() => core.updateHealth("missing", "ready"), /Unknown department/);
+});
+
+
+test("enforces exclusive route ownership and department service isolation", async () => {
+  const core = createDepartmentCore();
+  core.register({ id: "trade", routes: ["signals.html"] });
+  core.register({ id: "journal", routes: ["journal.html"] });
+  assert.throws(() => core.register({ id: "other", routes: ["signals.html"] }), /already belongs/);
+  core.registerService("trade", "scan", async input => ({ pair: input.pair, owner: "trade" }));
+  assert.deepEqual(await core.invoke("trade", "scan", { pair: "XAUUSD" }), { pair: "XAUUSD", owner: "trade" });
+  await assert.rejects(() => core.invoke("journal", "scan", {}), /Unknown service/);
+});
+
+test("runs health checks and records degraded dependencies without hiding failures", async () => {
+  const core = createDepartmentCore();
+  core.register({ id: "trade" });
+  const result = await core.runHealthChecks("trade", [
+    { name: "runtime", run: async () => true },
+    { name: "market-data", run: async () => { throw new Error("provider timeout"); } }
+  ]);
+  assert.equal(result.state, "degraded");
+  assert.equal(result.checks[0].state, "ready");
+  assert.equal(result.checks[1].state, "unavailable");
+  assert.match(result.checks[1].detail, /provider timeout/);
 });
