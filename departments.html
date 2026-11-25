@@ -38,7 +38,7 @@
     (detail.departments||[]).forEach(function(dept){
       var node=document.querySelector('[data-dept-status="'+dept.id+'"]');
       if(!node)return;
-      var label=dept.state==='ready'?'Operational':dept.state==='degraded'?'Degraded':dept.state==='unavailable'?'Unavailable':'Engine boundary pending';
+      var label=dept.state==='ready'?'Engine registered':dept.state==='degraded'?'Degraded':dept.state==='unavailable'?'Unavailable':'Engine boundary pending';
       node.textContent=label+' · '+(dept.checks||[]).length+' health checks';
     });
   }
