@@ -1022,13 +1022,6 @@
       if (s.sessionFiltered) { listHtml += '<section class="dg-card" style="border:1px solid var(--dg-line)"><strong>'+s.pair+' · SCALP SESSION FILTER</strong><div class="dg-muted" style="margin-top:6px">The 5m Scalp Profile scans 9:00 AM–6:00 PM Nigeria time (WAT). Switch to 15m Intraday outside this window.</div></section>'; return; }
       if (s.noMethods) { listHtml += '<section class="dg-card"><strong>'+escapeNewsText(s.pair)+' · NO ACTIVE STRATEGIES</strong><div class="dg-muted" style="margin-top:6px">Enable at least one strategy in the selected Trading Profile to run this scan.</div></section>'; return; }
       if (s.marketClosed) { var closedNote=PAIR_TYPES[String(s.pair||'').toUpperCase()] === 'INDEX' ? 'Direct index CFD pricing is not connected. DAGBO will not substitute an ETF price or issue an index signal.' : 'No fresh signal or notification is generated while this market is closed. Historical candles are not live entries.'; listHtml += '<section class="dg-card" style="border:1px solid #d69e2e"><strong>'+escapeNewsText(s.pair)+' · MARKET CLOSED</strong><div class="dg-muted" style="margin-top:6px">'+closedNote+'</div></section>'; return; }
-      if(s.lifecycleStatus==='EXPIRED'||s.lifecycleStatus==='NO_TRADE'){
-        var cycle=cycleFor(s.pair,currentSignalTF);
-        var statusTitle=s.lifecycleStatus==='EXPIRED'?'SIGNAL EXPIRED':'NO TRADE';
-        var nextText=cycle?'Next fresh scan: '+new Date(cycle.anchor+tfDuration(currentSignalTF)*scanFactor(currentSignalTF)).toLocaleString():'Waiting for next scan';
-        listHtml+='<section class="dg-card" style="border:1px solid var(--dg-line)"><div class="dg-card__head"><h2 class="dg-card__title">'+escapeNewsText(s.pair)+'</h2><span class="dg-pill dg-pill--wait">'+statusTitle+'</span></div><div class="dg-muted" style="font-size:13px;margin-top:7px">'+(s.lifecycleStatus==='EXPIRED'?'The signal validity window has ended. Do not enter using the old levels.':'No active trade setup is available. Wait for the scheduled fresh scan.')+'</div><div class="dg-help" style="margin-top:7px">'+escapeNewsText(nextText)+'</div></section>';
-        return;
-      }
       var isBuy = s.final.includes('BUY');
       var isSell = s.final.includes('SELL');
       var cls = isBuy ? 'dg-signal__word--buy' : (isSell ? 'dg-signal__word--sell' : 'dg-signal__word--wait');
@@ -1055,6 +1048,13 @@
           return '<div style="padding:7px 8px;border-radius:8px;background:var(--dg-fill);min-width:0"><div style="font-size:11px;font-weight:800">'+escapeNewsText(m.name)+'</div><div style="font-size:10px;font-weight:800;color:'+color+';margin-top:3px">'+label+' · '+escapeNewsText(m.direction||'WAIT')+'</div><div style="font-size:10px;color:var(--dg-text-2);line-height:1.4;margin-top:3px">'+escapeNewsText(m.detail||'No detail available')+'</div></div>';
         }).join(''):'<div class="dg-muted" style="font-size:11px">Method audit unavailable for this result.</div>') +
         '</div><div class="dg-help" style="margin-top:8px">Unavailable feeds never count as confirmation. Fundamental event surprises, weekly COT sentiment and quantitative diagnostics are research-only; they do not independently trigger entries. Multi-timeframe confirmation runs when a primary setup appears.</div></div>';
+      if(s.lifecycleStatus==='EXPIRED'||s.lifecycleStatus==='NO_TRADE'){
+        var cycle=cycleFor(s.pair,currentSignalTF);
+        var statusTitle=s.lifecycleStatus==='EXPIRED'?'SIGNAL EXPIRED':'NO TRADE';
+        var nextText=cycle?'Next fresh scan: '+new Date(cycle.anchor+tfDuration(currentSignalTF)*scanFactor(currentSignalTF)).toLocaleString():'Waiting for next scan';
+        listHtml+='<section class="dg-card" style="border:1px solid var(--dg-line)"><div class="dg-card__head"><h2 class="dg-card__title">'+escapeNewsText(s.pair)+'</h2><span class="dg-pill dg-pill--wait">'+statusTitle+'</span></div><div class="dg-muted" style="font-size:13px;margin-top:7px">'+(s.lifecycleStatus==='EXPIRED'?'The signal validity window has ended. Do not enter using the old levels.':'No active trade setup is available. Wait for the scheduled fresh scan.')+'</div><div class="dg-help" style="margin-top:7px">'+escapeNewsText(nextText)+'</div>'+ (Array.isArray(s.methodReports)&&s.methodReports.length?methodAuditHtml:'') +'</section>';
+        return;
+      }
       var quota = getDailyRiskQuota();
       var quotaNotice = quota.exhausted ? '<div class="dg-pill dg-pill--sell" style="margin:0 0 9px;display:inline-flex">RISK QUOTA EXHAUSTED · SIGNAL ONLY</div>' : '';
       var cardInner = '';
