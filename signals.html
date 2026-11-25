@@ -773,8 +773,14 @@
     var cached = sentimentContextCache[key];
     if (cached && Date.now() - cached.fetchedAt < 30*60*1000) return cached.data;
     try {
-      var response = await fetch('/api/market-sentiment?pair='+encodeURIComponent(key),
-        {cache:'no-store',headers:{'Accept':'application/json'}});
+      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      var timeoutId = controller ? setTimeout(function(){controller.abort();},8000) : null;
+      var response;
+      try {
+        response = await fetch('/api/market-sentiment?pair='+encodeURIComponent(key),
+          controller ? {cache:'no-store',signal:controller.signal,headers:{'Accept':'application/json'}}
+            : {cache:'no-store',headers:{'Accept':'application/json'}});
+      } finally { if(timeoutId) clearTimeout(timeoutId); }
       var data = await response.json();
       if (!response.ok || !data.success) throw new Error(data.error || 'COT positioning unavailable');
       sentimentContextCache[key] = {fetchedAt:Date.now(),data:data};
@@ -1240,7 +1246,7 @@
 
       // Event mode requires a current, pair-matched news/event context before
       // it can evaluate a directional setup. Other profiles keep this optional.
-      await Promise.all([loadEconomicContext(), loadNewsSignalContext()]);
+      await Promise.all([loadEconomicContext(), loadNewsSignalContext()].concat(openPairs.map(loadSentimentContext)));
 
       // Respect the shared Twelve Data Basic-tier request budget.
       // The API endpoint allows at most six uncached Twelve Data calls per
