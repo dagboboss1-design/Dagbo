@@ -90,6 +90,16 @@ export function createDepartmentCore() {
 
   function list() { return [...departments.values()]; }
   function get(id) { return departments.get(id) || null; }
+  function healthSummary() {
+    const items = list();
+    const counts = { total: items.length, ready: 0, degraded: 0, unavailable: 0, notIntegrated: 0 };
+    for (const item of items) {
+      if (item.state === "not-integrated") counts.notIntegrated++;
+      else counts[item.state]++;
+    }
+    return Object.freeze({ ...counts, overall: counts.unavailable ? "unavailable" :
+      counts.degraded || counts.notIntegrated ? "degraded" : "ready" });
+  }
   function ownerOf(route) { return routeOwners.get(String(route || "").replace(/^\//, "")) || null; }
   function subscribe(eventName, listener) {
     if (typeof listener !== "function") throw new TypeError("Listener must be a function.");
@@ -108,5 +118,5 @@ export function createDepartmentCore() {
     if (!departments.has(owner) && owner !== "core") throw new Error("Unknown event owner: " + owner);
     emit(eventName, Object.freeze({ ...payload, emittedAt: new Date().toISOString() }));
   }
-  return Object.freeze({ register, registerService, invoke, runHealthChecks, updateHealth, list, get, ownerOf, subscribe, publish });
+  return Object.freeze({ register, registerService, invoke, runHealthChecks, updateHealth, list, get, healthSummary, ownerOf, subscribe, publish });
 }
