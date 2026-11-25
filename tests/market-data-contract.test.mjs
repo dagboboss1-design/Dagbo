@@ -18,7 +18,7 @@ test("accepts complete, ordered provider candles and returns canonical direct-da
 });
 
 test("rejects malformed OHLC, duplicate timestamps, missing provider and thin history", () => {
-  assert.equal(normalizeCandle({ datetime: "2026-01-01 00:00:00", open: 2, high: 1, low: 0.5, close: 1 }).length, undefined);
+  assert.equal(normalizeCandle({ datetime: "2026-01-01 00:00:00", open: 2, high: 1, low: 0.5, close: 1 }), null);
   const malformed = candles.map(row => ({ ...row }));
   malformed[4].high = "1.0000";
   assert.equal(validateMarketData({ pair: "EURUSD", timeframe: "15", provider: "Twelve Data", values: malformed }).valid, false);
