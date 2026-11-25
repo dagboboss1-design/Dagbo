@@ -13,7 +13,7 @@ DAGBO remains one application with one navigation experience and shared settings
 - **DAGBO AI** — AI assistant and BOSS1.
 - **DAGBO ACADEMY** — Trading education and worked examples.
 
-**DAGBO CORE** provides shared infrastructure; it is not a separate department.
+**DAGBO CORE** provides shared infrastructure; it is not a separate department. Each of the six departments now has its own engine module under `src/departments/engines/`, a namespaced service interface, and health checks. Department modules invoke only their own page adapters; cross-department communication uses CORE's public service/event boundary.
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for ownership rules, migration sequence and current status.
 
@@ -35,7 +35,7 @@ Run the automated CORE tests with:
 npm test
 ```
 
-The department-core GitHub Actions workflow runs this check on pushes to the architecture branch and on pull requests targeting `main`.
+The department-core GitHub Actions workflow runs CORE and all six department-engine boundary tests on pushes to the architecture branch and on pull requests targeting `main`.
 
 ## Safe rollout
 
