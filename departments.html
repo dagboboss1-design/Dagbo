@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000"><title>Departments · DAGBO SIGNAL</title>
+<link rel="manifest" href="manifest.json"><link rel="icon" href="icons/dagbo-orbit.svg"><link rel="stylesheet" href="dagbo.css">
+<script>(function(){try{var s=JSON.parse(localStorage.getItem('dagbo_settings'))||{};document.documentElement.setAttribute('data-theme',s.theme==='dark'?'dark':'light')}catch(e){}})();</script>
+<style>
+.dept-page{max-width:760px;padding-bottom:60px}.dept-intro{margin:24px 0}.dept-intro h1{font-size:34px;letter-spacing:-1.2px;margin:8px 0}.dept-intro p{color:var(--dg-text-2);font-size:13px;line-height:1.65}
+.dept-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.dept-card{border:1px solid var(--dg-line);border-radius:14px;padding:15px;min-width:0}.dept-card .num{font-size:10px;color:var(--dg-text-3);letter-spacing:1px}.dept-card h2{font-size:14px;margin:10px 0 5px}.dept-card p{font-size:11px;color:var(--dg-text-2);line-height:1.55;min-height:50px;margin:0}.dept-links{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}.dept-links a{font-size:10px;color:var(--dg-text);border:1px solid var(--dg-line);border-radius:20px;padding:6px 9px;text-decoration:none}.dept-status{margin-top:12px;font-size:9px;letter-spacing:.5px;color:var(--dg-text-3);text-transform:uppercase}.dept-core{margin-top:18px;padding:16px;border:1px solid var(--dg-line);border-radius:14px}.dept-core h2{font-size:14px;margin:0 0 7px}.dept-core p{font-size:11px;color:var(--dg-text-2);line-height:1.6;margin:0}
+@media(max-width:390px){.dept-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main class="dg-page dept-page">
+  <div class="dg-top"><div class="dg-brand">◈ DAGBO SIGNAL</div><div class="dg-badge">WORKSPACE</div></div>
+  <section class="dept-intro">
+    <div class="dg-muted" style="font-size:10px;letter-spacing:1.3px;font-weight:800">ONE APP · SIX DEPARTMENTS</div>
+    <h1>Choose your workspace.</h1>
+    <p>DAGBO stays one application. Each department has a defined responsibility and its own migration, validation and health checks. Your existing tools remain available while the architecture is upgraded.</p>
+  </section>
+  <section class="dept-grid" aria-label="DAGBO departments">
+    <article class="dept-card"><div class="num">01 / EXECUTION</div><h2>DAGBO TRADE</h2><p>Signal board, live opportunities, charting, alerts and trade execution.</p><div class="dept-links"><a href="signals.html">Signals</a><a href="chart.html">Chart</a><a href="alerts.html">Alerts</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
+    <article class="dept-card"><div class="num">02 / MARKET CONTEXT</div><h2>DAGBO INTELLIGENCE</h2><p>News, economic calendar, market heatmap and fundamental context.</p><div class="dept-links"><a href="news.html">News</a><a href="market-heatmap.html">Heatmap</a><a href="signal-insights.html">Insights</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
+    <article class="dept-card"><div class="num">03 / RESEARCH</div><h2>DAGBO QUANT</h2><p>Trading profiles, strategy research, scanners and higher-timeframe studies.</p><div class="dept-links"><a href="strategy-lab.html">Strategy lab</a><a href="strategy-profiles.html">Profiles</a><a href="higher-timeframe-hedging.html">H4 analysis</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
+    <article class="dept-card"><div class="num">04 / PERFORMANCE</div><h2>DAGBO JOURNAL</h2><p>Trade records, risk tracking, replay and performance review.</p><div class="dept-links"><a href="journal.html">Journal</a><a href="trader-score.html">Trader score</a><a href="replay.html">Replay</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
+    <article class="dept-card"><div class="num">05 / ASSISTANCE</div><h2>DAGBO AI</h2><p>AI assistant and BOSS1 analysis experience.</p><div class="dept-links"><a href="ai.html">AI assistant</a><a href="boss1.html">BOSS1</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
+    <article class="dept-card"><div class="num">06 / EDUCATION</div><h2>DAGBO ACADEMY</h2><p>Trading lessons, concepts, examples and structured learning.</p><div class="dept-links"><a href="learn.html">Open academy</a></div><div class="dept-status">Existing workspace · migration pending</div></article>
+  </section>
+  <section class="dept-core"><h2>DAGBO CORE</h2><p>Shared infrastructure for market data, normalized prices, settings, user access, notifications, security and department health. A failure in one department must not take down the others. Departments will only be marked operational after their real engines and data checks are migrated and tested.</p></section>
+</main>
+<script src="navigation.js"></script>
+<script type="module" src="src/departments/bootstrap.js"></script>
+</body></html>
