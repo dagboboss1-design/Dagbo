@@ -80,3 +80,18 @@ test("department services refuse to operate another department's page", async ()
   const journal = await core.invoke("journal", "trades", {});
   assert.deepEqual(journal, []);
 });
+
+
+test("DAGBO TRADE execute-trade adapter forwards the validated input to the page action", async () => {
+  const core = createDepartmentCore();
+  core.register({ id: "trade" });
+  const env = mockEnvironment("signals.html");
+  let received = null;
+  env.win.executeTrade = async input => { received = input; return { created: true, id: "trade-1" }; };
+  const register = await loadEngine("src/departments/engines/trade.js", "registerTradeEngine");
+  await register(core, env.win, env.doc);
+  const input = { pair: "EURUSD", direction: "BUY", entry: 1.1, stopLoss: 1.095, takeProfit: 1.11 };
+  const result = await core.invoke("trade", "execute-trade", input);
+  assert.deepEqual(received, input);
+  assert.deepEqual(result, { created: true, id: "trade-1" });
+});
