@@ -115,7 +115,7 @@ async function fetchFcsFallback(pair, tf) {
   const symbol = pair === "GOLD" ? "XAUUSD" : (pair === "XAGUSD" ? "SILVER" : pair);
   const type = commodities.includes(pair) ? "&type=commodity" : "";
   const url = "https://api-v4.fcsapi.com/forex/history?symbol=" + encodeURIComponent(symbol) +
-    "&period=" + encodeURIComponent(period) + "&length=100&is_chart=0" + type +
+    "&period=" + encodeURIComponent(period) + "&length=150&is_chart=0" + type +
     "&access_key=" + encodeURIComponent(key);
   const result = await fetchJsonWithTimeout(url, { headers: { "Accept":"application/json" } }, 3500);
   if (!result.response.ok || result.data.status === false || result.data.status === "error" ||
@@ -267,7 +267,7 @@ module.exports = async function handler(req, res) {
       try {
         const url = "https://api.twelvedata.com/time_series?symbol=" +
           encodeURIComponent(symbol) + "&interval=" + interval.twelve +
-          "&outputsize=100&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
+          "&outputsize=150&timezone=UTC&apikey=" + encodeURIComponent(apiKey);
         const result = await fetchJsonWithTimeout(url, {}, 9000);
         const data = result.data;
         if (!result.response.ok || data.status === "error" || !Array.isArray(data.values)) {
