@@ -112,13 +112,39 @@ test("chart endpoint fails over to FCS when Twelve Data is unavailable", async (
   };
   try {
     const res = responseStub();
-    await handler(request("GBPUSD"), res);
+    await handler(request("EURCHF"), res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.source, "FCS");
     assert.equal(res.body.failover, true);
     assert.equal(res.body.marketDataType, "DIRECT");
     assert.equal(res.body.candles.length, 35);
     assert.equal(calls, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    restoreEnv("TWELVE_DATA_API_KEY", originalKey);
+    restoreEnv("FCS_API_KEY", originalFcsKey);
+  }
+});
+
+
+test("chart endpoint supports FX crosses through the shared Twelve Data symbol map", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.TWELVE_DATA_API_KEY;
+  const originalFcsKey = process.env.FCS_API_KEY;
+  process.env.TWELVE_DATA_API_KEY = "test-key";
+  delete process.env.FCS_API_KEY;
+  let requestedUrl = "";
+  globalThis.fetch = async url => {
+    requestedUrl = String(url);
+    return providerResponse({ meta: { symbol: "EUR/CHF" }, values: candles() });
+  };
+  try {
+    const res = responseStub();
+    await handler(request("EURAUD"), res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.source, "Twelve Data");
+    assert.match(requestedUrl, /symbol=EUR%2FAUD/);
+    assert.equal(res.body.candles.length, 35);
   } finally {
     globalThis.fetch = originalFetch;
     restoreEnv("TWELVE_DATA_API_KEY", originalKey);
