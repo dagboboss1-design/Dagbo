@@ -654,9 +654,15 @@
           (isSell && !(sl>entry && tp1<entry && tp2<tp1))) {
         return { pair: pair, error: 'Calculated trade levels failed price and risk validation. No executable signal issued.', errorStage: 'invalid-levels' };
       }
+      // Report the realized risk/reward after price rounding, not only the target multiplier.
+      var actualRisk=Math.abs(entry-sl),actualReward=Math.abs(tp1-entry);
+      var actualRR=actualRisk>0?actualReward/actualRisk:NaN;
+      if(!Number.isFinite(actualRR)||actualRR<=0){
+        return {pair:pair,error:'Rounded trade levels do not produce a valid risk/reward ratio.',errorStage:'invalid-levels'};
+      }
       var lastC=candles[candles.length-1];
       return {
-        pair:pair,final:final,entry:entry,currentPrice:entry,quoteProvider:liveQuote.provider||'Live quote',quoteTime:liveQuote.quoteTime||null,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+rr,rrMultiple:rr,timeframeContext:timeframeContext,
+        pair:pair,final:final,entry:entry,currentPrice:entry,quoteProvider:liveQuote.provider||'Live quote',quoteTime:liveQuote.quoteTime||null,sl:sl,tp1:tp1,tp2:tp2,rr:'1:'+actualRR.toFixed(1),rrMultiple:actualRR,timeframeContext:timeframeContext,
         provider:data.provider||'Market data',marketDataType:'DIRECT',sourceSymbol:data.sourceSymbol||null,marketLabel:data.marketLabel||null,proxyNotice:null,
         s1:analysis.emaTrend,s2:analysis.candleName,s3:analysis.structure,
         strategy:analysis.evidence.length?analysis.evidence.join(' · '):'No method produced directional evidence',
