@@ -208,7 +208,7 @@ module.exports = async function handler(req, res) {
         pushPrivateKey: !!process.env.VAPID_PRIVATE_KEY,
         pushSubject: !!process.env.VAPID_SUBJECT,
         pushStorage: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
-        marketData: !!process.env.TWELVE_DATA_API_KEY,
+        marketData: !!(process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_KEY || process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY),
         cronSecret: !!(process.env.CRON_SECRET || process.env.SIGNAL_PUSH_SECRET || process.env.DAGBO_CRON_SECRET || process.env.SIGNAL_PUSH_SECURITY || process.env.Signal_push_security)
       };
       return res.status(200).json({
@@ -479,7 +479,7 @@ module.exports = async function handler(req, res) {
         liveCandleContext = "No instrument was identified. Ask the user which pair or market and timeframe to analyse.";
       }
       if (asksPrice && !asksAnalysis) {
-        const quoteKey = process.env.TWELVE_DATA_API_KEY;
+        const quoteKey = process.env.TWELVE_DATA_API_KEY || process.env.TWELVE_DATA_KEY || process.env.NEWS_SPIKE_TWELVE_DATA_API_KEY;
         if (quotePair && quoteKey) {
           try {
             if (!await claimTwelveDataSlot()) throw new Error("Shared Twelve Data minute quota is busy; retry shortly.");
