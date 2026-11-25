@@ -428,14 +428,34 @@
   var dagboMarketRequestQueue = Promise.resolve();
   var dagboNextMarketRequestAt = 0;
   function fetchQueuedMarketData(url, options) {
-    var run = dagboMarketRequestQueue.then(async function() {
-      var wait = Math.max(0, dagboNextMarketRequestAt - Date.now());
-      if (wait) await new Promise(function(resolve){setTimeout(resolve,wait);});
-      dagboNextMarketRequestAt = Date.now() + 10000;
-      return fetch(url, options || {});
-    });
-    dagboMarketRequestQueue = run.then(function(){},function(){});
-    return run;
+    var requestOptions=Object.assign({},options||{});
+    // Queue wait is not network time. Start the abort clock only after a
+    // request receives its slot, otherwise later pairs can time out before
+    // their fetch even begins. Binance crypto is outside the Twelve Data
+    // quota and should not wait behind FX candle/quote requests.
+    var timeoutMs=Number(requestOptions.dagboTimeoutMs)||20000;
+    delete requestOptions.dagboTimeoutMs;
+    var match=String(url||'').match(/[?&]pair=([^&]+)/i);
+    var pair=match?decodeURIComponent(match[1]).toUpperCase():'';
+    var isCrypto=/^(BTC|BTCUSD|BTCUSDT|ETH|ETHUSD|ETHUSDT)$/.test(pair);
+    var run=async function(){
+      if(!isCrypto){
+        var wait=Math.max(0,dagboNextMarketRequestAt-Date.now());
+        if(wait)await new Promise(function(resolve){setTimeout(resolve,wait);});
+        dagboNextMarketRequestAt=Date.now()+10000;
+      }
+      var controller=typeof AbortController!=='undefined'?new AbortController():null;
+      var timer=controller?setTimeout(function(){controller.abort();},timeoutMs):null;
+      try{
+        var opts=Object.assign({},requestOptions);
+        if(controller)opts.signal=controller.signal;
+        return await fetch(url,opts);
+      }finally{if(timer)clearTimeout(timer);}
+    };
+    if(isCrypto)return run();
+    var queued=dagboMarketRequestQueue.then(run);
+    dagboMarketRequestQueue=queued.then(function(){},function(){});
+    return queued;
   }
 
   // --- FETCH REAL DATA ---
@@ -451,21 +471,17 @@
     try {
       // Bound every market-data request so a stalled provider cannot leave the
       // scanner waiting forever. A timeout is reported per pair, not as a page crash.
-      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 180000) : null;
       var res, data;
-      try {
-        res = await fetchQueuedMarketData(url, controller
-          ? { signal: controller.signal, cache: 'no-store', headers: { 'Accept': 'application/json' } }
-          : { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-        var contentType = res.headers && res.headers.get ? (res.headers.get('content-type') || '') : '';
-        if (contentType && contentType.indexOf('application/json') === -1) {
-          throw new Error('Market-data endpoint returned a non-JSON response (HTTP ' + res.status + ').');
-        }
-        data = await res.json();
-      } finally {
-        if (timeoutId) clearTimeout(timeoutId);
+      res = await fetchQueuedMarketData(url, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+        dagboTimeoutMs: 20000
+      });
+      var contentType = res.headers && res.headers.get ? (res.headers.get('content-type') || '') : '';
+      if (contentType && contentType.indexOf('application/json') === -1) {
+        throw new Error('Market-data endpoint returned a non-JSON response (HTTP ' + res.status + ').');
       }
+      data = await res.json();
       
       if (!res.ok || data.error || data.status === 'error') {
         var apiError = data.error || data.message || res.statusText || ('HTTP ' + res.status);
