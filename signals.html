@@ -59,7 +59,7 @@
   <section class="dg-card" style="margin:14px 0">
     <div class="dg-card__head"><h2 class="dg-card__title">BOSS1 · Eight-Method Analysis</h2><span class="dg-pill dg-pill--open">AUTO ANALYSIS</span></div>
     <p class="dg-muted" style="font-size:13px;line-height:1.6;margin:8px 0 0">Every scan audits Technical, Pure Price Action, ICT/SMC, Volume, Fundamental, Sentiment, Quantitative and Multi-Timeframe analysis. Only methods backed by verified data can confirm a direction. Missing feeds are shown as UNAVAILABLE, never guessed.</p>
-    <p class="dg-help" style="margin-top:8px">The current candle engine evaluates technical indicators, closed-candle price action, market structure and provider volume. Fundamental, positioning sentiment and synchronized cross-market feeds remain unavailable until connected. Quantitative z-score is a research diagnostic, not a machine-learning prediction or independent trade trigger.</p>
+    <p class="dg-help" style="margin-top:8px">The candle engine evaluates technical indicators, closed-candle price action, market structure and provider volume. Economic-calendar context and FMP weekly COT positioning are reported separately; neither is treated as a live order-flow signal. Quantitative z-score remains a research diagnostic, not a machine-learning prediction or independent trade trigger.</p>
   </section>
 
   <!-- PROFILE-DRIVEN SCANNER -->
@@ -172,6 +172,7 @@
   var latestEconomicEvents = [];
   var latestEconomicSource = 'FCS primary / FMP backup';
   var sentimentContextCache = {};
+  var higherTimeframeContextCache = {};
   var profilePreferenceStore = {};
   try { profilePreferenceStore=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}; } catch(e) {}
   var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
@@ -349,6 +350,16 @@
     };
   }
 
+  function getCachedHigherTimeframeContext(pair, profile, primaryTf) {
+    var key=[String(pair||'').toUpperCase(),String(profile||''),String(primaryTf||'')].join('|');
+    var cached=higherTimeframeContextCache[key];
+    if(cached&&Date.now()-cached.fetchedAt<5*60*1000)return Promise.resolve(cached.data);
+    return fetchHigherTimeframeContext(pair,profile,primaryTf).then(function(data){
+      higherTimeframeContextCache[key]={fetchedAt:Date.now(),data:data};
+      return data;
+    });
+  }
+
   // Higher-timeframe context runs only after a primary setup appears.
   // Scalping needs 15m + 1h agreement; intraday needs 1h + 4h;
   // swing/H4 needs daily context. Missing or mixed context fails closed.
@@ -359,6 +370,7 @@
       contextTfs=String(primaryTf)==='60'?['240','1day']:['60','240'];
     } else if(profile==='swing'||profile==='trend-following'||profile==='h4') contextTfs=['1day'];
     else if(profile==='position') contextTfs=[String(primaryTf)==='1week'?'1day':'1week'];
+    else if(profile==='event') contextTfs=['60','240'];
     else return {checked:false,direction:'WAIT',label:'Not required',checks:[]};
 
     var checks=[];
@@ -494,7 +506,7 @@
       // Missing or mixed context fails closed rather than guessing.
       if(final.indexOf('BUY')>=0||final.indexOf('SELL')>=0){
         try{
-          timeframeContext=await fetchHigherTimeframeContext(pair,activeTradingProfile,tf);
+          timeframeContext=await getCachedHigherTimeframeContext(pair,activeTradingProfile,tf);
           var primaryDirection=String(final).replace(/^HIGH CONFIDENCE\s+/,'');
           if(timeframeContext.checked&&timeframeContext.direction!==primaryDirection){
             analysis.final='NO TRADE';analysis.direction='WAIT';
