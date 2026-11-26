@@ -194,7 +194,8 @@
           entry:Number(trade.entry),
           stopLoss:Number(trade.stopLoss),
           takeProfit:Number(trade.takeProfit),
-          lotSize:Number(trade.lotSize)||0.01
+          lotSize:Number(trade.lotSize)||0.01,
+          timeframe:trade.timeframe || '15m'
         })
       });
       var data = await response.json().catch(function(){ return {}; });
