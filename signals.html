@@ -481,6 +481,22 @@
 
       var analysis=analyseAllMethods(candles, activeTradingProfile);
       if (!analysis) return { pair: pair, error: 'Analysis engine could not evaluate the returned candles.', errorStage: 'analysis' };
+      // Add a third-department market-intelligence context only when the
+      // server supplied a fresh, unexpired, pair-matched news candidate.
+      // This is context, not a standalone trade vote; Event mode keeps its
+      // stricter technical-reaction agreement gate below.
+      var canonicalPair=function(value){var key=String(value||'').toUpperCase();return key==='GOLD'?'XAUUSD':key==='NAS100'?'US100':key;};
+      var newsCandidate=latestNewsCandidates.find(function(candidate){
+        var created=Date.parse(candidate.createdAt||''),expires=Date.parse(candidate.expiresAt||'');
+        return canonicalPair(candidate.pair)===canonicalPair(pair)&&Number.isFinite(created)&&Date.now()>=created&&Date.now()-created<=90*60*1000&&Number.isFinite(expires)&&Date.now()<expires&&['BUY','SELL'].includes(String(candidate.direction||'').toUpperCase());
+      })||null;
+      var fundamentalDepartment=(analysis.departmentReports||[]).find(function(d){return d.name==='Fundamental & Market Intelligence';});
+      if(fundamentalDepartment&&newsCandidate){
+        fundamentalDepartment.direction=String(newsCandidate.direction).toUpperCase();
+        fundamentalDepartment.status='CONTEXT ONLY';
+        fundamentalDepartment.detail='Fresh pair-matched news/event context: '+String(newsCandidate.event||'Verified event context')+'. '+String(newsCandidate.evidence||'Direction is informational and does not independently trigger a trade.');
+        fundamentalDepartment.source='Fresh /api/news-signal candidate';
+      }
       var timeframeContext={checked:false,direction:'WAIT',label:'Not required'};
       var final=analysis.final;
       // News & Event is not a generic 15m technical profile. It must have a
@@ -870,7 +886,7 @@
       var methodAuditHtml = '<div style="margin-top:12px;padding:11px;border:1px solid var(--dg-line);border-radius:11px"><b style="font-size:12px">BOSS1 · METHOD AUDIT</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px">' +
         (Array.isArray(s.methodReports)?s.methodReports.map(function(m){
           var status=String(m.status||'UNAVAILABLE');
-          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='RESEARCH'?'RESEARCH ONLY':status==='NOT RUN'?'NOT RUN':'UNAVAILABLE';
+          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='CONFLICT'?'CONFLICT':status==='CONTEXT ONLY'?'CONTEXT ONLY':status==='RESEARCH'?'RESEARCH ONLY':status==='NOT RUN'?'NOT RUN':'UNAVAILABLE';
           var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'?'var(--dg-text-2)':'#b7791f';
           return '<div style="padding:7px 8px;border-radius:8px;background:var(--dg-fill);min-width:0"><div style="font-size:11px;font-weight:800">'+escapeNewsText(m.name)+'</div><div style="font-size:10px;font-weight:800;color:'+color+';margin-top:3px">'+label+' · '+escapeNewsText(m.direction||'WAIT')+'</div><div style="font-size:10px;color:var(--dg-text-2);line-height:1.4;margin-top:3px">'+escapeNewsText(m.detail||'No detail available')+'</div></div>';
         }).join(''):'<div class="dg-muted" style="font-size:11px">Method audit unavailable for this result.</div>') +
@@ -1192,8 +1208,7 @@
 
       // Event mode requires a current, pair-matched news/event context before
       // it can evaluate a directional setup. Other profiles keep this optional.
-      if(activeTradingProfile==='event') await loadNewsSignalContext();
-      else loadNewsSignalContext();
+      await loadNewsSignalContext();
 
       // Respect the shared Twelve Data Basic-tier request budget.
       // The API endpoint allows at most six uncached Twelve Data calls per
