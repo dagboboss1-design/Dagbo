@@ -66,6 +66,7 @@ module.exports = async function handler(req, res) {
   // /api/cron-scan directly and therefore will not start the news monitor.
   // Prevent near-simultaneous schedules from launching duplicate scans.
   const lockKey = "dagbo:cron:dispatcher:lock";
+  let lockAcquired = false;
   try {
     const acquired = await redis.set(lockKey, String(Date.now()), { nx: true, ex: 240 });
     if (acquired !== "OK") {
@@ -75,6 +76,7 @@ module.exports = async function handler(req, res) {
         reason: "DAGBO scan and news monitor are already running."
       });
     }
+    lockAcquired = true;
 
     const [scanner, news] = await Promise.all([
       invoke(runScanner, req),
@@ -102,8 +104,10 @@ module.exports = async function handler(req, res) {
       detail: String(error.message || error)
     });
   } finally {
-    try { await redis.del(lockKey); } catch (error) {
-      console.error("DAGBO cron dispatcher lock cleanup failed:", error.message);
+    if (lockAcquired) {
+      try { await redis.del(lockKey); } catch (error) {
+        console.error("DAGBO cron dispatcher lock cleanup failed:", error.message);
+      }
     }
   }
 };
