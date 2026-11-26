@@ -298,7 +298,7 @@ async function fetchLiveQuote(pair) {
   if (["US30","US100","NAS100","US500"].includes(pair)) {
     throw new Error("DIRECT INDEX DATA UNAVAILABLE · ETF proxy prices are not accepted.");
   }
-  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace("https://", "").replace("http://", "");
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace("https://", "").replace("http://", "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15&quote=1";
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
@@ -339,7 +339,7 @@ async function fetchTradeMarket(pair, timeframe) {
     throw new Error("DIRECT INDEX DATA UNAVAILABLE · No index CFD feed is connected; ETF proxy data is not accepted.");
   }
   const frame = TRADE_TIMEFRAMES[tradeTimeframe(timeframe)];
-  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace("https://", "").replace("http://", "");
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace("https://", "").replace("http://", "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) +
     "&tf=" + encodeURIComponent(frame.tf);
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
@@ -577,7 +577,7 @@ async function getHtfCandles(pair, frame, apiKey) {
   let data;
   const sharedTf = ({ "4h":"240", "1day":"1day", "1week":"1week" })[frame.key];
   if (sharedTf && pair !== "DXY") {
-  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace("https://", "").replace("http://", "");
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace("https://", "").replace("http://", "");
     const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=" + sharedTf;
     const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
     data = await response.json();
