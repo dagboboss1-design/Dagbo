@@ -171,7 +171,7 @@ async function broadcast(title, body, tag) {
 async function fetchPreNewsCandles(pair, cutoffMs, apiKey) {
   // Reuse the same provider manager as the live Signals page. This keeps
   // scheduled pre-news analysis eligible for Twelve Data -> FCS.
-  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace("https://", "").replace("http://", "");
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace("https://", "").replace("http://", "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
