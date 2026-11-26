@@ -89,7 +89,7 @@ body{min-height:100dvh}
     var pinned=localStorage.getItem('dagbo_chart_pinned_pair');
     if(pinned)state.pair=String(pinned).toUpperCase();
   }catch(e){}
-  var chart=null,series=null,drawings=[],pendingPoints=[],selectedId=null,loadToken=0;
+  var chart=null,series=null,drawings=[],pendingPoints=[],selectedId=null,loadToken=0,chartResizeObserver=null;
   var SVG='http://www.w3.org/2000/svg';
   function readSettings(){try{return JSON.parse(localStorage.getItem('dagbo_settings')||'{}')||{};}catch(e){return {};}}
   function enabledPairs(){
@@ -181,7 +181,7 @@ body{min-height:100dvh}
   function loadChart(){
     var token=++loadToken;setStatus('Loading '+state.pair+' '+state.interval+' candles…');
     document.getElementById('chartEmpty').classList.remove('show');
-    if(chart){chart.remove();chart=null;series=null;}
+    if(chartResizeObserver){chartResizeObserver.disconnect();chartResizeObserver=null;}\n    if(chart){chart.remove();chart=null;series=null;}
     document.getElementById('chartContainer').textContent='';
     document.getElementById('chartSvg').textContent='';
     var url='/api/chart?pair='+encodeURIComponent(state.pair)+'&interval='+encodeURIComponent(state.interval);
@@ -205,7 +205,7 @@ body{min-height:100dvh}
       chart.timeScale().subscribeVisibleLogicalRangeChange(renderDrawings);
       setStatus(state.pair+' · '+state.interval+' · '+data.candles.length+' candles · '+(data.source||'Live feed'));
       renderDrawings();
-      if(window.ResizeObserver){new ResizeObserver(function(){if(chart){var b=host.getBoundingClientRect();chart.applyOptions({width:Math.max(320,b.width),height:Math.max(260,b.height)});renderDrawings();}}).observe(host);}
+      if(window.ResizeObserver){chartResizeObserver=new ResizeObserver(function(){if(chart){var b=host.getBoundingClientRect();chart.applyOptions({width:Math.max(320,b.width),height:Math.max(260,b.height)});renderDrawings();}});chartResizeObserver.observe(host);}
     }).catch(function(error){
       if(token!==loadToken)return;
       document.getElementById('chartEmpty').textContent=error.message;
@@ -223,7 +223,7 @@ body{min-height:100dvh}
   document.getElementById('clearDrawings').addEventListener('click',function(){if(!window.confirm('Delete all saved drawings for this pair and timeframe?'))return;drawings=drawings.filter(function(d){return d.pair!==state.pair||d.interval!==state.interval;});selectedId=null;saveDrawings();renderDrawings();});
   window.addEventListener('storage',function(e){if(e.key==='dagbo_settings'){var before=state.pair;renderPairs();if(before!==state.pair)loadChart();}});
   window.addEventListener('focus',function(){var before=state.pair;renderPairs();if(before!==state.pair)loadChart();});
-  window.addEventListener('resize',function(){if(chart){var b=document.getElementById('chartContainer').getBoundingClientRect();chart.applyOptions({width:Math.max(320,b.width),height:Math.max(260,b.height)});renderDrawings();}});
+  if(!window.ResizeObserver)window.addEventListener('resize',function(){if(chart){var b=document.getElementById('chartContainer').getBoundingClientRect();chart.applyOptions({width:Math.max(320,b.width),height:Math.max(260,b.height)});renderDrawings();}});
   loadDrawings();renderPairs();renderTimeframes();
   document.getElementById('drawTools').hidden=!state.toolbar;
   document.getElementById('chartMain').classList.toggle('tools-hidden',!state.toolbar);
