@@ -101,16 +101,16 @@ if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";})
 if(!groups.length)return null;
 // Independent department results are computed AFTER profile detector filtering,
 // so a disabled strategy cannot appear to have produced active evidence.
-function departmentVote(names){
+function departmentVote(names,minVotes){
   var votes=groups.filter(function(g){return names.indexOf(g.name)>=0&&(g.dir==="BUY"||g.dir==="SELL");});
   var buys=votes.filter(function(g){return g.dir==="BUY";}).length;
   var sells=votes.filter(function(g){return g.dir==="SELL";}).length;
-  return {direction:buys>sells&&buys>=2?"BUY":sells>buys&&sells>=2?"SELL":"WAIT",
-    status:buys&&sells&&buys===sells?"CONFLICT":(buys||sells)?"ACTIVE":"NEUTRAL",
+  return {direction:buys>sells&&buys>=minVotes?"BUY":sells>buys&&sells>=minVotes?"SELL":"WAIT",
+    status:buys&&sells&&buys===sells?"CONFLICT":(Math.max(buys,sells)>=minVotes)?"ACTIVE":"NEUTRAL",
     buys:buys,sells:sells};
 }
-var technicalDept=departmentVote(["Trend","Momentum","Volatility","Volume"]);
-var priceDept=departmentVote(["Chart pattern","Market structure"]);
+var technicalDept=departmentVote(["Trend","Momentum","Volatility","Volume"],2);
+var priceDept=departmentVote(["Chart pattern","Market structure"],1);
 var departmentReports=[
   {name:"Technical Intelligence",direction:technicalDept.direction,status:technicalDept.status,
    methods:["Trend","Momentum","Volatility","Volume"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
