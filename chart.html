@@ -19,7 +19,7 @@ body{min-height:100dvh}
 #chartTimeframes button,#toolbarToggle{border:1px solid #333;background:#171717;color:#ddd;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:750;white-space:nowrap}
 #chartTimeframes button[aria-pressed=true]{background:#f1f1f1;color:#080808;border-color:#f1f1f1}
 #toolbarToggle{justify-self:end}
-#tv-full-chart{position:fixed;left:0;right:0;top:calc(96px + env(safe-area-inset-top,0px));bottom:0;background:#000}
+#tv-full-chart{position:fixed;left:0;right:0;top:calc(150px + env(safe-area-inset-top,0px));bottom:0;background:#000}
 #tv-full-chart .tradingview-widget-container,#tv-full-chart .tradingview-widget-container__widget{width:100%;height:100%}
 #tv-full-chart iframe{width:100%!important;height:100%!important;border:0!important}
 #chartStatus{position:fixed;z-index:110;left:12px;bottom:12px;max-width:calc(100vw - 24px);padding:6px 9px;background:#111d;color:#aaa;border:1px solid #333;border-radius:8px;font-size:10px;pointer-events:none}
@@ -105,7 +105,7 @@ body{min-height:100dvh}
     state.interval=button.dataset.tf;renderTimeframes();renderChart();
   });
   document.getElementById('toolbarToggle').addEventListener('click',function(){state.toolbar=!state.toolbar;renderChart();});
-  window.addEventListener('storage',function(event){if(event.key==='dagbo_settings'){renderPairs();renderChart();}});
+  window.addEventListener('storage',function(event){if(event.key==='dagbo_settings'){renderPairs();renderChart();}});\n  window.addEventListener('focus',function(){renderPairs();});\n  window.addEventListener('pageshow',function(){renderPairs();});
   renderPairs();renderTimeframes();renderChart();
 })();
 </script>
