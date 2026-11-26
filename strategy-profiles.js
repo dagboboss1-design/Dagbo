@@ -121,7 +121,8 @@
       priority:[
         ['Economic release','CPI / NFP / PMI / rate decisions','Compare verified actual, consensus and prior values'],
         ['Central bank','Rate Decision / Press Conference','Separate statement, decision and press-conference phases'],
-        ['Volatility','ATR Breakout / Range Expansion','Measure movement against recent realized volatility'],
+        ['Momentum','RSI + MACD reaction','Confirm the post-release direction from closed candles'],
+        ['Volume','Provider volume expansion','Count only when the market-data provider supplies usable volume'],
         ['Price action','Break & Retest / Failed Breakout','Wait for the market to confirm direction'],
         ['Cross-market','DXY / yields / gold reaction','Only with synchronized available data'],
         ['Risk','Event gap and slippage control','No fixed tight stop assumption during release volatility']
