@@ -171,7 +171,7 @@ async function broadcast(title, body, tag) {
 async function fetchPreNewsCandles(pair, cutoffMs, apiKey) {
   // Reuse the same provider manager as the live Signals page. This keeps
   // scheduled pre-news analysis eligible for Twelve Data -> FCS.
-  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
+  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace("https://", "").replace("http://", "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
@@ -298,7 +298,7 @@ async function fetchLiveQuote(pair) {
   if (["US30","US100","NAS100","US500"].includes(pair)) {
     throw new Error("DIRECT INDEX DATA UNAVAILABLE · ETF proxy prices are not accepted.");
   }
-  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
+  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace("https://", "").replace("http://", "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15&quote=1";
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
@@ -328,7 +328,7 @@ function normalizeTradeCandles(rows, timeframe) {
   const frame = TRADE_TIMEFRAMES[tradeTimeframe(timeframe)];
   return (Array.isArray(rows) ? rows : []).map(c => {
     const raw = String(c.datetime || "");
-    const time = Date.parse(raw.replace(" ", "T") + (raw.includes("Z") || /[+-]\\d\\d:\\d\\d$/.test(raw) ? "" : "Z"));
+    const time = Date.parse(raw.replace(" ", "T") + (raw.includes("Z") || /[+-][0-9]{2}:[0-9]{2}$/.test(raw) ? "" : "Z"));
     return { time, datetime: raw, high: num(c.high), low: num(c.low), close: num(c.close) };
   }).filter(c => Number.isFinite(c.time) && [c.high,c.low,c.close].every(v => v !== null) &&
     c.time + frame.ms <= Date.now()).sort((a,b) => a.time - b.time);
@@ -339,7 +339,7 @@ async function fetchTradeMarket(pair, timeframe) {
     throw new Error("DIRECT INDEX DATA UNAVAILABLE · No index CFD feed is connected; ETF proxy data is not accepted.");
   }
   const frame = TRADE_TIMEFRAMES[tradeTimeframe(timeframe)];
-  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace(/^https?:\\/\\//, "");
+  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace("https://", "").replace("http://", "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) +
     "&tf=" + encodeURIComponent(frame.tf);
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
@@ -380,7 +380,11 @@ async function monitorTrades(marketData, apiKey, tradeCandleCache) {
     const pair = String(item.trade.pair || "").toUpperCase();
     const timeframe = tradeTimeframe(item.trade.timeframe);
     const cached15m = timeframe === "15m" && tradeCandleCache && tradeCandleCache[pair];
-    if (!cached15m && SYMBOLS[pair]) requested.set(pair + "|" + timeframe, { pair, timeframe });
+    if (!SYMBOLS[pair]) {
+      dataErrors.push({ pair, timeframe, error: "DIRECT MARKET DATA UNAVAILABLE · Trade monitoring cannot verify this instrument without its direct feed." });
+    } else if (!cached15m) {
+      requested.set(pair + "|" + timeframe, { pair, timeframe });
+    }
   }
 
   const markets = new Map();
@@ -573,7 +577,7 @@ async function getHtfCandles(pair, frame, apiKey) {
   let data;
   const sharedTf = ({ "4h":"240", "1day":"1day", "1week":"1week" })[frame.key];
   if (sharedTf && pair !== "DXY") {
-    const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace(/^https?:\/\//, "");
+  const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace("https://", "").replace("http://", "");
     const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=" + sharedTf;
     const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
     data = await response.json();
