@@ -171,7 +171,7 @@ async function broadcast(title, body, tag) {
 async function fetchPreNewsCandles(pair, cutoffMs, apiKey) {
   // Reuse the same provider manager as the live Signals page. This keeps
   // scheduled pre-news analysis eligible for Twelve Data -> FCS.
-  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace("https://", "").replace("http://", "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
@@ -298,7 +298,7 @@ async function fetchLiveQuote(pair) {
   if (["US30","US100","NAS100","US500"].includes(pair)) {
     throw new Error("DIRECT INDEX DATA UNAVAILABLE · ETF proxy prices are not accepted.");
   }
-  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace("https://", "").replace("http://", "");
   const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15&quote=1";
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
@@ -309,29 +309,56 @@ async function fetchLiveQuote(pair) {
   return { price, provider: data.provider || "Live quote", quoteTime: data.quoteTime || new Date().toISOString() };
 }
 
-async function fetchTradeMarket(pair, apiKey) {
+const TRADE_TIMEFRAMES = {
+  "5m": { tf: "5", ms: 5 * 60 * 1000 },
+  "15m": { tf: "15", ms: 15 * 60 * 1000 },
+  "30m": { tf: "30", ms: 30 * 60 * 1000 },
+  "1h": { tf: "60", ms: 60 * 60 * 1000 },
+  "4h": { tf: "240", ms: 4 * 60 * 60 * 1000 },
+  "1D": { tf: "1day", ms: 24 * 60 * 60 * 1000 },
+  "1W": { tf: "1week", ms: 7 * 24 * 60 * 60 * 1000 }
+};
+
+function tradeTimeframe(value) {
+  const key = String(value || "15m");
+  return TRADE_TIMEFRAMES[key] ? key : "15m";
+}
+
+function normalizeTradeCandles(rows, timeframe) {
+  const frame = TRADE_TIMEFRAMES[tradeTimeframe(timeframe)];
+  return (Array.isArray(rows) ? rows : []).map(c => {
+    const raw = String(c.datetime || "");
+    const time = Date.parse(raw.replace(" ", "T") + (raw.includes("Z") || /[+-][0-9]{2}:[0-9]{2}$/.test(raw) ? "" : "Z"));
+    return { time, datetime: raw, high: num(c.high), low: num(c.low), close: num(c.close) };
+  }).filter(c => Number.isFinite(c.time) && [c.high,c.low,c.close].every(v => v !== null) &&
+    c.time + frame.ms <= Date.now()).sort((a,b) => a.time - b.time);
+}
+
+async function fetchTradeMarket(pair, timeframe) {
   if (["US30","US100","NAS100","US500"].includes(pair)) {
-    throw new Error("DIRECT INDEX DATA UNAVAILABLE · No index CFD feed is connected; ETF proxy prices are not accepted.");
+    throw new Error("DIRECT INDEX DATA UNAVAILABLE · No index CFD feed is connected; ETF proxy data is not accepted.");
   }
-  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace(/^https?:\/\//, "");
-  const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=15";
+  const frame = TRADE_TIMEFRAMES[tradeTimeframe(timeframe)];
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace("https://", "").replace("http://", "");
+  const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) +
+    "&tf=" + encodeURIComponent(frame.tf);
   const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
   const data = await response.json();
   if (!response.ok || data.stale || !Array.isArray(data.values) || !data.values.length) {
     throw new Error(data.error || "No fresh trade-monitor candles for " + pair);
   }
-  const candles = data.values.map(c => {
-    const raw = String(c.datetime || "");
-    const time = Date.parse(raw.replace(" ", "T") + (raw.includes("Z") || /[+-]\d\d:\d\d$/.test(raw) ? "" : "Z"));
-    return { time, datetime:raw, high:num(c.high), low:num(c.low), close:num(c.close) };
-  }).filter(c => Number.isFinite(c.time) && [c.high,c.low,c.close].every(v => v !== null))
-    .sort((a,b)=>a.time-b.time);
-  if (!candles.length) throw new Error("Invalid trade-monitor candle for " + pair);
-  const candle = candles[candles.length-1];
-  return { pair, entry:candle.close, candleHigh:candle.high, candleLow:candle.low,
-    candleTime:candle.datetime || null, signal:null };
+  const candles = normalizeTradeCandles(data.values, timeframe);
+  if (!candles.length) throw new Error("No fully closed trade-monitor candles for " + pair);
+  const last = candles[candles.length - 1];
+  return {
+    pair, timeframe: tradeTimeframe(timeframe), durationMs: frame.ms,
+    entry: last.close, candleHigh: last.high, candleLow: last.low,
+    candleTime: last.datetime || null, candles,
+    provider: data.provider || "Market data"
+  };
 }
-async function monitorTrades(marketData, apiKey) {
+
+async function monitorTrades(marketData, apiKey, tradeCandleCache) {
   const devices = await redis.smembers("dagbo:trades:devices");
   let closed = 0, warnings = 0, checked = 0, dataErrors = [];
   const openTrades = [];
@@ -346,64 +373,128 @@ async function monitorTrades(marketData, apiKey) {
     }
   }
 
-  // Do not depend on the user's normal signal-watchlist: every distinct pair
-  // with an OPEN tracked trade must have market data for its TP/SL check.
-  const neededPairs = Array.from(new Set(openTrades.map(x => String(x.trade.pair || "").toUpperCase())))
-    .filter(pair => SYMBOLS[pair] && (!marketData[pair] || num(marketData[pair].candleHigh) === null || num(marketData[pair].candleLow) === null));
-  const extraMarkets = await Promise.all(neededPairs.map(async pair => {
+  // Reuse the scheduled scanner's closed 15m candles whenever possible.
+  // Other trade timeframes get their own cached market-data request.
+  const requested = new Map();
+  for (const item of openTrades) {
+    const pair = String(item.trade.pair || "").toUpperCase();
+    const timeframe = tradeTimeframe(item.trade.timeframe);
+    const cached15m = timeframe === "15m" && tradeCandleCache && tradeCandleCache[pair];
+    if (!SYMBOLS[pair]) {
+      dataErrors.push({ pair, timeframe, error: "DIRECT MARKET DATA UNAVAILABLE · Trade monitoring cannot verify this instrument without its direct feed." });
+    } else if (!cached15m) {
+      requested.set(pair + "|" + timeframe, { pair, timeframe });
+    }
+  }
+
+  const markets = new Map();
+  for (const item of openTrades) {
+    const pair = String(item.trade.pair || "").toUpperCase();
+    const timeframe = tradeTimeframe(item.trade.timeframe);
+    const cached15m = timeframe === "15m" && tradeCandleCache && tradeCandleCache[pair];
+    if (cached15m && !markets.has(pair + "|" + timeframe)) {
+      const candles = normalizeTradeCandles(cached15m, timeframe);
+      if (candles.length) {
+        const last = candles[candles.length - 1];
+        markets.set(pair + "|" + timeframe, {
+          pair, timeframe, durationMs: TRADE_TIMEFRAMES[timeframe].ms,
+          entry: last.close, candleHigh: last.high, candleLow: last.low,
+          candleTime: last.datetime, candles, provider: "Scheduled scan candles"
+        });
+      }
+    }
+  }
+
+  const extraMarkets = await Promise.all(Array.from(requested.values()).map(async spec => {
     try {
-      if (!isMarketOpen(pair)) return { pair, closed: true };
-      return { pair, market: await fetchTradeMarket(pair, apiKey) };
+      if (!isMarketOpen(spec.pair)) return { ...spec, closed: true };
+      return { ...spec, market: await fetchTradeMarket(spec.pair, spec.timeframe) };
     } catch (error) {
-      return { pair, error: error.message };
+      return { ...spec, error: error.message };
     }
   }));
   for (const item of extraMarkets) {
-    if (item.market) marketData[item.pair] = item.market;
-    if (item.error) dataErrors.push({ pair: item.pair, error: item.error });
+    const key = item.pair + "|" + item.timeframe;
+    if (item.market) markets.set(key, item.market);
+    if (item.error) dataErrors.push({ pair: item.pair, timeframe: item.timeframe, error: item.error });
   }
 
   for (const item of openTrades) {
     const { deviceId, tradeId, key, trade } = item;
     const pair = String(trade.pair || "").toUpperCase();
     if (!isMarketOpen(pair)) continue;
-    const market = marketData[pair];
-    if (!market || market.marketClosed) continue;
+    const timeframe = tradeTimeframe(trade.timeframe);
+    const market = markets.get(pair + "|" + timeframe);
+    if (!market || !market.candles || !market.candles.length) continue;
     const buy = String(trade.direction).toUpperCase() === "BUY";
     const sl = num(trade.stopLoss), tp = num(trade.takeProfit);
     if (sl === null || tp === null) continue;
-    checked++;
-    const high = num(market.candleHigh), low = num(market.candleLow);
-    if (high === null || low === null) continue;
-    const hitSL = buy ? low <= sl : high >= sl;
-    const hitTP = buy ? high >= tp : low <= tp;
-    if (hitSL && hitTP) {
-      const flag = "both-hit:" + (market.candleTime || "unknown");
+
+    const openedAt = Date.parse(String(trade.dateOpened || ""));
+    if (!Number.isFinite(openedAt)) continue;
+    const firstAvailable = market.candles[0].time;
+    if (openedAt < firstAvailable) {
+      const flag = "history-window:" + firstAvailable;
       if (trade.lastWarning !== flag) {
-        await sendToDevice(deviceId, "⚠️ TRADE REVIEW NEEDED", trade.pair + ": TP and SL both fell inside the same 15m candle. The order is unknown; check your broker/chart manually. DAGBO has not guessed the result.", "trade-review-" + tradeId, "/journal.html");
+        await sendToDevice(deviceId, "⚠️ TRADE HISTORY NEEDS REVIEW",
+          trade.pair + " has been open longer than the available " + timeframe +
+          " candle history. DAGBO cannot verify whether SL or TP was touched in the missing period; check your broker history.",
+          "trade-history-" + tradeId, "/journal.html");
         trade.lastWarning = flag;
-        await redis.set(key, JSON.stringify(trade));
+        await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
         warnings++;
       }
       continue;
     }
-    if (hitSL || hitTP) {
+
+    const postOpenCandles = market.candles.filter(c => c.time >= openedAt);
+    if (!postOpenCandles.length) continue;
+    checked++;
+    let firstHit = null;
+    for (const candle of postOpenCandles) {
+      const hitSL = buy ? candle.low <= sl : candle.high >= sl;
+      const hitTP = buy ? candle.high >= tp : candle.low <= tp;
+      if (hitSL || hitTP) {
+        firstHit = { candle, hitSL, hitTP };
+        break;
+      }
+    }
+
+    if (firstHit && firstHit.hitSL && firstHit.hitTP) {
+      const flag = "both-hit:" + firstHit.candle.datetime;
+      if (trade.lastWarning !== flag) {
+        await sendToDevice(deviceId, "⚠️ TRADE REVIEW NEEDED",
+          trade.pair + ": TP and SL both fell inside the same " + timeframe +
+          " candle. The order is unknown; check your broker/chart manually. DAGBO has not guessed the result.",
+          "trade-review-" + tradeId, "/journal.html");
+        trade.lastWarning = flag;
+        await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
+        warnings++;
+      }
+      continue;
+    }
+
+    if (firstHit) {
       trade.status = "CLOSED";
-      trade.result = hitTP ? "WIN" : "LOSS";
-      trade.exit = hitTP ? tp : sl;
-      trade.closeReason = hitTP ? "TAKE_PROFIT" : "STOP_LOSS";
+      trade.result = firstHit.hitTP ? "WIN" : "LOSS";
+      trade.exit = firstHit.hitTP ? tp : sl;
+      trade.closeReason = firstHit.hitTP ? "TAKE_PROFIT" : "STOP_LOSS";
+      trade.hitCandleTime = firstHit.candle.datetime;
       trade.dateClosed = new Date().toISOString();
       await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
       closed++;
       try {
-        await sendToDevice(deviceId, hitTP ? "🎯 TAKE PROFIT HIT" : "🛑 STOP LOSS HIT",
-          trade.pair + " " + trade.direction + " reached " + (hitTP ? "Take Profit" : "Stop Loss") + " at " + trade.exit + ". Open Journal to see the recorded result.",
+        await sendToDevice(deviceId, firstHit.hitTP ? "🎯 TAKE PROFIT HIT" : "🛑 STOP LOSS HIT",
+          trade.pair + " " + trade.direction + " first reached " +
+          (firstHit.hitTP ? "Take Profit" : "Stop Loss") + " at " + trade.exit +
+          " on " + firstHit.candle.datetime + ". Open Journal to see the recorded result.",
           "trade-close-" + tradeId, "/journal.html");
       } catch (pushError) {
         console.error("Trade result saved; push notification failed:", pushError.message);
       }
       continue;
     }
+
     const current = num(market.entry);
     const riskDistance = Math.abs(Number(trade.entry) - sl);
     const rewardDistance = Math.abs(tp - Number(trade.entry));
@@ -420,20 +511,22 @@ async function monitorTrades(marketData, apiKey) {
       }
       if (targetRemaining > 0 && targetRemaining / rewardDistance <= 0.20 && !trade.nearTpAlerted) {
         await sendToDevice(deviceId, "🎯 PRICE NEAR TAKE PROFIT",
-          trade.pair + " is within about 20% of your Take Profit distance. Consider your trade-management plan.",
+          trade.pair + " is within about 20% of the remaining distance to your Take Profit. Consider your trade-management plan.",
           "trade-near-tp-" + tradeId, "/journal.html");
         trade.nearTpAlerted = true;
         await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
         warnings++;
       }
     }
-    const opposite = market.signal && market.signal !== "NO TRADE" &&
-      ((buy && market.signal.includes("SELL")) || (!buy && market.signal.includes("BUY")));
+
+    const signalMarket = marketData[pair];
+    const opposite = signalMarket && signalMarket.signal && signalMarket.signal !== "NO TRADE" &&
+      ((buy && signalMarket.signal.includes("SELL")) || (!buy && signalMarket.signal.includes("BUY")));
     if (opposite) {
-      const flag = "opposite:" + market.signal;
+      const flag = "opposite:" + signalMarket.signal;
       if (trade.lastWarning !== flag) {
         await sendToDevice(deviceId, "⚠️ TRADE DIRECTION WARNING",
-          market.signal + " signal appeared for " + trade.pair + " while your " + trade.direction + " trade is open. Review your risk; this does not close the trade.",
+          signalMarket.signal + " signal appeared for " + trade.pair + " while your " + trade.direction + " trade is open. Review your risk; this does not close the trade.",
           "trade-opposite-" + tradeId, "/journal.html");
         trade.lastWarning = flag;
         await redis.set(key, JSON.stringify(trade), { ex: 60 * 60 * 24 * 90 });
@@ -441,7 +534,11 @@ async function monitorTrades(marketData, apiKey) {
       }
     }
   }
-  return { closed, warnings, checked, monitoredPairs: Array.from(new Set(openTrades.map(x => x.trade.pair))), dataErrors };
+  return {
+    closed, warnings, checked,
+    monitoredPairs: Array.from(new Set(openTrades.map(x => x.trade.pair))),
+    dataErrors
+  };
 }
 
 
@@ -480,7 +577,7 @@ async function getHtfCandles(pair, frame, apiKey) {
   let data;
   const sharedTf = ({ "4h":"240", "1day":"1day", "1week":"1week" })[frame.key];
   if (sharedTf && pair !== "DXY") {
-    const host = String(process.env.VERCEL_URL || "dagbob.vercel.app").replace(/^https?:\/\//, "");
+  const host = String(process.env.VERCEL_URL || "dagboboss.vercel.app").replace("https://", "").replace("http://", "");
     const url = "https://" + host + "/api/market-data?pair=" + encodeURIComponent(pair) + "&tf=" + sharedTf;
     const response = await fetch(url, { headers: { "Cache-Control": "no-cache" } });
     data = await response.json();
@@ -745,7 +842,7 @@ module.exports = async function handler(req, res) {
     // context feeds (for example DXY/monthly history). The shared market-data
     // endpoint remains the primary provider/failover path for trade pairs.
     const apiKey = process.env.TWELVE_DATA_API_KEY || "";
-    const results = {}, errors = [];
+    const results = {}, errors = [], tradeCandleCache = {};
     const configuredPairs = await getConfiguredPairs();
     const pairsToScan = await selectRotatingBatch("dagbo:scan:cursor:main", configuredPairs, MAX_PAIRS);
     const fetched = await Promise.all(pairsToScan.map(async pair => {
@@ -775,12 +872,12 @@ module.exports = async function handler(req, res) {
           const ta = Date.parse(String(a.datetime).replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(String(a.datetime)) ? "" : "Z"));
           const tb = Date.parse(String(b.datetime).replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(String(b.datetime)) ? "" : "Z"));
           return ta-tb;
-        }).slice(-60);
+        }).slice(-100);
         if (closedCandles.length < 60) throw new Error("Only " + closedCandles.length + " valid, fully closed 15m candles; 60 are required.");
         const analysis = analyze(closedCandles, pair);
         if (!analysis) throw new Error("Could not calculate indicators from provider candles.");
         return {
-          pair, analysis, provider: data.provider || "Market-data failover manager",
+          pair, analysis, candles: closedCandles, provider: data.provider || "Market-data failover manager",
           marketDataType: data.marketDataType || "DIRECT",
           sourceSymbol: data.sourceSymbol || null,
           marketLabel: data.marketLabel || null,
@@ -807,6 +904,7 @@ module.exports = async function handler(req, res) {
         continue;
       }
       const pair = item.pair, analysis = item.analysis;
+      if (Array.isArray(item.candles)) tradeCandleCache[pair] = item.candles;
       Object.assign(analysis, {
         provider: item.provider, marketDataType: item.marketDataType,
         sourceSymbol: item.sourceSymbol, marketLabel: item.marketLabel,
@@ -874,7 +972,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    const tradeSummary = await monitorTrades(results, apiKey);
+    const tradeSummary = await monitorTrades(results, apiKey, tradeCandleCache);
     const newsSummary = { delegatedTo: "/api/news-monitor", note: "Economic-news and spike alerts run in the dedicated 5-minute news monitor." };
     const errorKey = "dagbo:scan:error:last";
     const previousErrorRaw = await redis.get(errorKey);
