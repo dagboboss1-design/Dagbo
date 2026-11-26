@@ -105,7 +105,9 @@ body{min-height:100dvh}
     state.interval=button.dataset.tf;renderTimeframes();renderChart();
   });
   document.getElementById('toolbarToggle').addEventListener('click',function(){state.toolbar=!state.toolbar;renderChart();});
-  window.addEventListener('storage',function(event){if(event.key==='dagbo_settings'){renderPairs();renderChart();}});\n  window.addEventListener('focus',function(){renderPairs();});\n  window.addEventListener('pageshow',function(){renderPairs();});
+  window.addEventListener('storage',function(event){if(event.key==='dagbo_settings'){renderPairs();renderChart();}});
+  window.addEventListener('focus',function(){renderPairs();});
+  window.addEventListener('pageshow',function(){renderPairs();});
   renderPairs();renderTimeframes();renderChart();
 })();
 </script>
