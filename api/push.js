@@ -43,12 +43,10 @@ function getRedis() {
   if (!url || !token) throw new Error("Push storage is not configured");
   return new Redis({ url, token });
 }
+const { claimTwelveDataSlot: reserveTwelveDataSlot } = require("../lib/twelve-data-quota");
+
 async function claimTwelveDataSlot() {
-  const redis = getRedis();
-  const key = "dagbo:market:twelve:minute";
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, 60);
-  return count <= 7;
+  return reserveTwelveDataSlot(getRedis());
 }
 
 function configureVapid() {
