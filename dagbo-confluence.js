@@ -91,6 +91,24 @@ var quantDirection=logReturns.length>=20&&qZ>=1.5&&close>e20?"BUY":logReturns.le
 methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,"RESEARCH",
   "Latest log return compared with the prior 20-return baseline: z-score "+qZ.toFixed(2)+". Requires 20 baseline returns; research-only, not machine learning, back-tested performance, or a trade vote.","Closed-candle statistical baseline"));
 
+// Three independent analysis departments. Each department reports only
+// evidence available from the current, closed-candle scan; missing external
+// feeds stay UNAVAILABLE and never become guessed directional votes.
+var departmentReports=[
+  {name:"Technical Intelligence",direction:technicalDirection,
+   status:technicalDirection!=="WAIT"?"ACTIVE":"NEUTRAL",
+   methods:["Trend","Momentum","Volatility","Volume"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
+   detail:"EMA/MACD trend, RSI/Stochastic momentum, Bollinger/ATR volatility and provider volume where supplied.",
+   source:"Verified closed OHLC candles"},
+  {name:"Price Action & Market Structure",direction:(patternGroupDir!=="WAIT"&&structureGroupDir===patternGroupDir)?patternGroupDir:(patternGroupDir!=="WAIT"&&structureGroupDir==="WAIT"?patternGroupDir:(structureGroupDir!=="WAIT"&&patternGroupDir==="WAIT"?structureGroupDir:"WAIT")),
+   status:(patternGroupDir!=="WAIT"||structureGroupDir!=="WAIT")?"ACTIVE":"NEUTRAL",
+   methods:["Chart pattern","Market structure"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
+   detail:"Closed-candle patterns, engulfing/pin bars, BOS, liquidity sweeps, FVG and key-level breaks.",
+   source:"Verified closed OHLC candles"},
+  {name:"Fundamental & Market Intelligence",direction:"WAIT",status:"UNAVAILABLE",
+   methods:[],detail:"A verified pair-matched economic calendar, actual-versus-forecast surprise, central-bank data and synchronized DXY/yield feeds are not available inside this candle-analysis call. No fundamental direction is guessed.",
+   source:"External verified macro/news feeds"}
+];
 var requestedGroups=options&&Array.isArray(options.enabledGroups)?options.enabledGroups:null;
 if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.indexOf(g.name)>=0;});
 // Contrarian entries need reversal structure and chart-pattern agreement. The
@@ -120,7 +138,7 @@ var signal=dir==="WAIT"?"NO TRADE":(leadConfidence>=85&&source==="MAIN CONFLUENC
 var confidenceValue=source==="FAST MOMENTUM CHANNEL"?65:leadConfidence;
 var quality=confidenceValue>=85?"HIGH":confidenceValue>=70?"MEDIUM":"LOW";
 var buy=dir==="BUY";
-return {pair:pair,profile:profile,signal:signal,direction:dir,source:source,confidence:confidenceValue,quality:quality,threshold:threshold,methodReports:methodReports,entry:close,stopLoss:buy?close-atr*1.5:close+atr*1.5,takeProfit:buy?close+atr*2:close-atr*2,tp2:buy?close+atr*3.5:close-atr*3.5,atr:atr,atrPct:atrPct,atrOk:atrOk,rsi:Number(rv.toFixed(1)),stochasticK:Number(stoch.k.toFixed(1)),williamsR:wrNow===null?null:Number(wrNow.toFixed(1)),momentumTrigger:momentumTrigger,evidence:evidence,buyScore:score.BUY,sellScore:score.SELL,totalMethods:groups.length*2,groups:groups,pattern:pattern.name,patternDirection:pattern.direction,patternConfirmed:pattern.confirmed,candlePattern:candleName,candleDirection:candleDir,indicatorCombo:indicatorComboDir,keyLevel:levelDir,structure:structureDir,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,candleHigh:high,candleLow:low,candleTime:last.datetime||null,macd:macd,emaTrend:trendDir};}
+return {pair:pair,profile:profile,signal:signal,direction:dir,source:source,confidence:confidenceValue,quality:quality,threshold:threshold,departmentReports:departmentReports,methodReports:methodReports,entry:close,stopLoss:buy?close-atr*1.5:close+atr*1.5,takeProfit:buy?close+atr*2:close-atr*2,tp2:buy?close+atr*3.5:close-atr*3.5,atr:atr,atrPct:atrPct,atrOk:atrOk,rsi:Number(rv.toFixed(1)),stochasticK:Number(stoch.k.toFixed(1)),williamsR:wrNow===null?null:Number(wrNow.toFixed(1)),momentumTrigger:momentumTrigger,evidence:evidence,buyScore:score.BUY,sellScore:score.SELL,totalMethods:groups.length*2,groups:groups,pattern:pattern.name,patternDirection:pattern.direction,patternConfirmed:pattern.confirmed,candlePattern:candleName,candleDirection:candleDir,indicatorCombo:indicatorComboDir,keyLevel:levelDir,structure:structureDir,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,candleHigh:high,candleLow:low,candleTime:last.datetime||null,macd:macd,emaTrend:trendDir};}
 
 return {analyze:analyze,patternScan:patternScan};
 });
