@@ -161,7 +161,7 @@ body{min-height:100dvh}
       }
     });
     var actions=document.getElementById('drawingActions');
-    actions.classList.toggle('visible',!!selectedId&&visible.some(function(d){return d.id===selectedId;}));
+    actions.classList.toggle('visible',visible.length>0);
     document.getElementById('deleteSelected').disabled=!selectedId;
   }
   function requiredPoints(tool){return tool==='horizontal'?1:tool==='long'||tool==='short'?3:2;}
