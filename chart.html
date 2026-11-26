@@ -181,7 +181,8 @@ body{min-height:100dvh}
   function loadChart(){
     var token=++loadToken;setStatus('Loading '+state.pair+' '+state.interval+' candles…');
     document.getElementById('chartEmpty').classList.remove('show');
-    if(chartResizeObserver){chartResizeObserver.disconnect();chartResizeObserver=null;}\n    if(chart){chart.remove();chart=null;series=null;}
+    if(chartResizeObserver){chartResizeObserver.disconnect();chartResizeObserver=null;}
+    if(chart){chart.remove();chart=null;series=null;}
     document.getElementById('chartContainer').textContent='';
     document.getElementById('chartSvg').textContent='';
     var url='/api/chart?pair='+encodeURIComponent(state.pair)+'&interval='+encodeURIComponent(state.interval);
