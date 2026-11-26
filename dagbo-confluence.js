@@ -91,24 +91,6 @@ var quantDirection=logReturns.length>=20&&qZ>=1.5&&close>e20?"BUY":logReturns.le
 methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,"RESEARCH",
   "Latest log return compared with the prior 20-return baseline: z-score "+qZ.toFixed(2)+". Requires 20 baseline returns; research-only, not machine learning, back-tested performance, or a trade vote.","Closed-candle statistical baseline"));
 
-// Three independent analysis departments. Each department reports only
-// evidence available from the current, closed-candle scan; missing external
-// feeds stay UNAVAILABLE and never become guessed directional votes.
-var departmentReports=[
-  {name:"Technical Intelligence",direction:technicalDirection,
-   status:technicalDirection!=="WAIT"?"ACTIVE":"NEUTRAL",
-   methods:["Trend","Momentum","Volatility","Volume"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
-   detail:"EMA/MACD trend, RSI/Stochastic momentum, Bollinger/ATR volatility and provider volume where supplied.",
-   source:"Verified closed OHLC candles"},
-  {name:"Price Action & Market Structure",direction:(patternGroupDir!=="WAIT"&&structureGroupDir===patternGroupDir)?patternGroupDir:(patternGroupDir!=="WAIT"&&structureGroupDir==="WAIT"?patternGroupDir:(structureGroupDir!=="WAIT"&&patternGroupDir==="WAIT"?structureGroupDir:"WAIT")),
-   status:(patternGroupDir!=="WAIT"||structureGroupDir!=="WAIT")?(patternGroupDir!=="WAIT"&&structureGroupDir!=="WAIT"&&patternGroupDir!==structureGroupDir?"CONFLICT":"ACTIVE"):"NEUTRAL",
-   methods:["Chart pattern","Market structure"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
-   detail:"Closed-candle patterns, engulfing/pin bars, BOS, liquidity sweeps, FVG and key-level breaks.",
-   source:"Verified closed OHLC candles"},
-  {name:"Fundamental & Market Intelligence",direction:"WAIT",status:"UNAVAILABLE",
-   methods:[],detail:"A verified pair-matched economic calendar, actual-versus-forecast surprise, central-bank data and synchronized DXY/yield feeds are not available inside this candle-analysis call. No fundamental direction is guessed.",
-   source:"External verified macro/news feeds"}
-];
 var requestedGroups=options&&Array.isArray(options.enabledGroups)?options.enabledGroups:null;
 if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.indexOf(g.name)>=0;});
 // Contrarian entries need reversal structure and chart-pattern agreement. The
@@ -117,6 +99,31 @@ if(isContrarian)groups=groups.filter(function(g){return g.name!=="Trend";});
 // Missing provider volume must not count as a failed vote or dilute confidence.
 if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";});
 if(!groups.length)return null;
+// Independent department results are computed AFTER profile detector filtering,
+// so a disabled strategy cannot appear to have produced active evidence.
+function departmentVote(names){
+  var votes=groups.filter(function(g){return names.indexOf(g.name)>=0&&(g.dir==="BUY"||g.dir==="SELL");});
+  var buys=votes.filter(function(g){return g.dir==="BUY";}).length;
+  var sells=votes.filter(function(g){return g.dir==="SELL";}).length;
+  return {direction:buys>sells&&buys>=2?"BUY":sells>buys&&sells>=2?"SELL":"WAIT",
+    status:buys&&sells&&buys===sells?"CONFLICT":(buys||sells)?"ACTIVE":"NEUTRAL",
+    buys:buys,sells:sells};
+}
+var technicalDept=departmentVote(["Trend","Momentum","Volatility","Volume"]);
+var priceDept=departmentVote(["Chart pattern","Market structure"]);
+var departmentReports=[
+  {name:"Technical Intelligence",direction:technicalDept.direction,status:technicalDept.status,
+   methods:["Trend","Momentum","Volatility","Volume"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
+   detail:"EMA/MACD trend, RSI/Stochastic momentum, Bollinger/ATR volatility and provider volume where supplied. Direction requires at least two aligned active technical checks.",
+   source:"Verified closed OHLC candles"},
+  {name:"Price Action & Market Structure",direction:priceDept.direction,status:priceDept.status,
+   methods:["Chart pattern","Market structure"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
+   detail:"Closed-candle patterns, engulfing/pin bars, BOS, liquidity sweeps, FVG and key-level breaks. Conflicting active checks remain WAIT.",
+   source:"Verified closed OHLC candles"},
+  {name:"Fundamental & Market Intelligence",direction:"WAIT",status:"UNAVAILABLE",
+   methods:[],detail:"A verified pair-matched economic calendar, actual-versus-forecast surprise, central-bank data and synchronized DXY/yield feeds are not available inside this candle-analysis call. No fundamental direction is guessed.",
+   source:"External verified macro/news feeds"}
+];
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
 var threshold=(profile==="swing"||profile==="position"||isH4)?55:50,
