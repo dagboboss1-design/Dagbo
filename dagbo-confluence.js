@@ -101,7 +101,7 @@ if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";})
 if(!groups.length)return null;
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
-var threshold=isScalp?55:(profile==="swing"||profile==="position"||isH4)?60:55,
+var threshold=(profile==="swing"||profile==="position"||isH4)?55:50,
 minGroups=Math.min(2,groups.length);
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
