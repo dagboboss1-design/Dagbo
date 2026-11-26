@@ -67,6 +67,8 @@ module.exports = async function handler(req, res) {
       const direction = String(body.direction || "").toUpperCase();
       const entry = positive(body.entry), stopLoss = positive(body.stopLoss), takeProfit = positive(body.takeProfit);
       const lotSize = positive(body.lotSize) || 0.01;
+      const allowedTimeframes = new Set(["5m","15m","30m","1h","4h","1D","1W"]);
+      const timeframe = allowedTimeframes.has(String(body.timeframe || "")) ? String(body.timeframe) : "15m";
       if (!/^[A-Z0-9]{3,12}$/.test(pair) || !["BUY","SELL"].includes(direction) ||
           entry === null || stopLoss === null || takeProfit === null ||
           (direction === "BUY" && !(stopLoss < entry && takeProfit > entry)) ||
@@ -88,7 +90,7 @@ module.exports = async function handler(req, res) {
       }
       const tradeId = crypto.randomUUID();
       const trade = {
-        id: tradeId, journalTradeId, pair, direction, entry, stopLoss, takeProfit, lotSize,
+        id: tradeId, journalTradeId, pair, direction, entry, stopLoss, takeProfit, lotSize, timeframe,
         status: "OPEN", result: "OPEN", pnl: 0,
         dateOpened: new Date().toISOString(), dateClosed: null
       };
