@@ -1,27 +1,115 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#000000"><title>Chart · DAGBO SIGNAL</title>
-<link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="stylesheet" href="dagbo.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Chart · DAGBO SIGNAL</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="dagbo.css">
 <style>
-html,body{margin:0;padding:0;background:#000;color:#fff;height:100%;overflow:hidden}body{min-height:100dvh}
-#tv-full-chart{position:fixed;inset:0 0 72px;width:100%;height:calc(100dvh - 72px);background:#000}
+:root{color-scheme:dark}
+html,body{margin:0;padding:0;background:#000;color:#fff;min-height:100%;overflow:hidden}
+body{min-height:100dvh}
+#chartControls{position:fixed;z-index:100;top:0;left:0;right:0;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px 58px;background:#080808;border-bottom:1px solid #242424;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;align-items:center}
+#chartBrand{font-size:12px;font-weight:850;letter-spacing:.7px;color:#ddd}
+#chartPair{min-width:0;width:100%;background:#171717;color:#fff;border:1px solid #343434;border-radius:10px;padding:10px 12px;font-size:14px;font-weight:750}
+#chartTimeframes{grid-column:1/-1;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+#chartTimeframes button,#toolbarToggle{border:1px solid #333;background:#171717;color:#ddd;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:750;white-space:nowrap}
+#chartTimeframes button[aria-pressed=true]{background:#f1f1f1;color:#080808;border-color:#f1f1f1}
+#toolbarToggle{justify-self:end}
+#tv-full-chart{position:fixed;left:0;right:0;top:calc(96px + env(safe-area-inset-top,0px));bottom:0;background:#000}
 #tv-full-chart .tradingview-widget-container,#tv-full-chart .tradingview-widget-container__widget{width:100%;height:100%}
 #tv-full-chart iframe{width:100%!important;height:100%!important;border:0!important}
-.dg-tabbar{position:fixed!important;left:0;right:0;bottom:0;z-index:50;background:#000!important;border-top:1px solid #252525!important}
-</style></head><body>
-<div id="tv-full-chart"><div class="tradingview-widget-container" style="height:100%;width:100%">
-<div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div>
-<script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-{"autosize":true,"symbol":"CAPITALCOM:XAUUSD","interval":"15","timezone":"Africa/Lagos","theme":"dark","style":"1","locale":"en","allow_symbol_change":true,"hide_top_toolbar":false,"hide_side_toolbar":false,"hide_legend":false,"hide_volume":false,"withdateranges":true,"save_image":true,"calendar":false,"details":false,"hotlist":false,"studies":[],"backgroundColor":"#000000","gridColor":"rgba(255,255,255,0.08)"}
-</script></div></div>
-<nav class="dg-tabbar" aria-label="Main">
-<a class="dg-tab" href="index.html"><span class="dg-tab__icon">◈</span>Home</a>
-<a class="dg-tab" href="signals.html"><span class="dg-tab__icon">⚡︎</span>Signals</a>
-<a class="dg-tab" aria-current="page" href="chart.html"><span class="dg-tab__icon">▥</span>Chart</a>
-<a class="dg-tab" href="news.html"><span class="dg-tab__icon">📰</span>News</a>
-<a class="dg-tab" href="boss1.html"><span class="dg-tab__icon">👑</span>BOSS1</a>
-<a class="dg-tab" href="journal.html"><span class="dg-tab__icon">✎</span>Journal</a>
-<a class="dg-tab" href="ai.html"><span class="dg-tab__icon">✦</span>AI</a></nav>
-<script src="pwa.js" defer></script><script src="navigation.js" defer></script></body></html>
+#chartStatus{position:fixed;z-index:110;left:12px;bottom:12px;max-width:calc(100vw - 24px);padding:6px 9px;background:#111d;color:#aaa;border:1px solid #333;border-radius:8px;font-size:10px;pointer-events:none}
+</style>
+</head>
+<body>
+<header id="chartControls">
+  <div id="chartBrand">◈ DAGBO SIGNAL · CHART</div>
+  <button id="toolbarToggle" type="button" aria-pressed="true">Hide tools</button>
+  <select id="chartPair" aria-label="Market pair"></select>
+  <div id="chartTimeframes" role="group" aria-label="Chart timeframe">
+    <button type="button" data-tf="5" aria-pressed="false">5m</button>
+    <button type="button" data-tf="15" aria-pressed="true">15m</button>
+    <button type="button" data-tf="30" aria-pressed="false">30m</button>
+    <button type="button" data-tf="60" aria-pressed="false">1h</button>
+    <button type="button" data-tf="240" aria-pressed="false">4h</button>
+    <button type="button" data-tf="D" aria-pressed="false">1D</button>
+    <button type="button" data-tf="W" aria-pressed="false">1W</button>
+  </div>
+</header>
+<div id="tv-full-chart" aria-label="Live TradingView chart"></div>
+<div id="chartStatus" role="status">Live chart · TradingView data feed · Drawing tools are provided by TradingView</div>
+<script>
+(function(){
+  'use strict';
+  var SYMBOLS={
+    XAUUSD:'OANDA:XAUUSD',GOLD:'OANDA:XAUUSD',
+    EURUSD:'OANDA:EURUSD',GBPUSD:'OANDA:GBPUSD',USDJPY:'OANDA:USDJPY',
+    GBPJPY:'OANDA:GBPJPY',AUDUSD:'OANDA:AUDUSD',USDCHF:'OANDA:USDCHF',
+    USDCAD:'OANDA:USDCAD',NZDUSD:'OANDA:NZDUSD',EURJPY:'OANDA:EURJPY',
+    EURGBP:'OANDA:EURGBP',BTCUSD:'BINANCE:BTCUSDT',BTC:'BINANCE:BTCUSDT',
+    ETHUSD:'BINANCE:ETHUSDT',ETH:'BINANCE:ETHUSDT',
+    US30:'CAPITALCOM:US30',US100:'CAPITALCOM:US100',NAS100:'CAPITALCOM:US100',
+    US500:'CAPITALCOM:US500'
+  };
+  var DEFAULT_PAIRS=['XAUUSD','EURUSD','GBPUSD','USDJPY','GBPJPY','US30','US100','US500','BTCUSD','ETHUSD','AUDUSD','USDCHF'];
+  var state={pair:'XAUUSD',interval:'15',toolbar:true};
+  try{var saved=JSON.parse(localStorage.getItem('dagbo_chart_state')||'{}');if(saved&&typeof saved==='object'){if(saved.pair)state.pair=String(saved.pair).toUpperCase();if(saved.interval)state.interval=String(saved.interval);if(typeof saved.toolbar==='boolean')state.toolbar=saved.toolbar;}}catch(e){}
+  function readSettings(){try{return JSON.parse(localStorage.getItem('dagbo_settings')||'{}')||{};}catch(e){return {};}}
+  function enabledPairs(){
+    var settings=readSettings(),pairs=Array.isArray(settings.pairs)?settings.pairs:DEFAULT_PAIRS;
+    var clean=pairs.map(function(p){p=String(p||'').toUpperCase();return p==='GOLD'?'XAUUSD':p;});
+    clean=clean.filter(function(p,i){return SYMBOLS[p]&&clean.indexOf(p)===i;});
+    return clean.length?clean:DEFAULT_PAIRS.slice();
+  }
+  function save(){try{localStorage.setItem('dagbo_chart_state',JSON.stringify(state));}catch(e){}}
+  function renderPairs(){
+    var select=document.getElementById('chartPair'),pairs=enabledPairs();
+    if(pairs.indexOf(state.pair)<0)state.pair=pairs.indexOf('XAUUSD')>=0?'XAUUSD':pairs[0];
+    select.textContent='';
+    pairs.forEach(function(pair){var option=document.createElement('option');option.value=pair;option.textContent=pair;select.appendChild(option);});
+    select.value=state.pair;save();
+  }
+  function renderTimeframes(){
+    document.querySelectorAll('#chartTimeframes button').forEach(function(button){
+      button.setAttribute('aria-pressed',String(button.dataset.tf===state.interval));
+    });
+  }
+  function renderChart(){
+    var host=document.getElementById('tv-full-chart');host.textContent='';
+    var container=document.createElement('div');container.className='tradingview-widget-container';container.style.cssText='height:100%;width:100%';
+    var widget=document.createElement('div');widget.className='tradingview-widget-container__widget';widget.style.cssText='height:100%;width:100%';
+    container.appendChild(widget);
+    var script=document.createElement('script');script.type='text/javascript';script.async=true;
+    script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.textContent=JSON.stringify({
+      autosize:true,symbol:SYMBOLS[state.pair],interval:state.interval,timezone:'Africa/Lagos',
+      theme:'dark',style:'1',locale:'en',allow_symbol_change:false,
+      hide_top_toolbar:false,hide_side_toolbar:!state.toolbar,hide_legend:false,
+      hide_volume:false,withdateranges:true,save_image:true,calendar:false,
+      details:false,hotlist:false,studies:[],backgroundColor:'#000000',
+      gridColor:'rgba(255,255,255,0.08)'
+    });
+    container.appendChild(script);host.appendChild(container);
+    document.getElementById('toolbarToggle').textContent=state.toolbar?'Hide tools':'Show tools';
+    document.getElementById('toolbarToggle').setAttribute('aria-pressed',String(state.toolbar));
+    document.getElementById('chartStatus').textContent=state.pair+' · '+state.interval+' · TradingView live chart';
+    save();
+  }
+  document.getElementById('chartPair').addEventListener('change',function(){state.pair=this.value;renderChart();});
+  document.getElementById('chartTimeframes').addEventListener('click',function(event){
+    var button=event.target.closest('button[data-tf]');if(!button)return;
+    state.interval=button.dataset.tf;renderTimeframes();renderChart();
+  });
+  document.getElementById('toolbarToggle').addEventListener('click',function(){state.toolbar=!state.toolbar;renderChart();});
+  window.addEventListener('storage',function(event){if(event.key==='dagbo_settings'){renderPairs();renderChart();}});
+  renderPairs();renderTimeframes();renderChart();
+})();
+</script>
+<script src="pwa.js" defer></script>
+<script src="navigation.js" defer></script>
+</body>
+</html>
