@@ -2,7 +2,7 @@
 "use strict";
 function n(v){var x=Number(v);return Number.isFinite(x)?x:null;}
 function ema(a,p){if(!a.length)return 0;var k=2/(p+1),v=a[0];for(var i=1;i<a.length;i++)v=a[i]*k+v*(1-k);return v;}
-function rsi(a,p){if(a.length<=p)return 50;var g=0,l=0;for(var i=a.length-p;i<a.length;i++){var d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}if(!l)return 100;return 100-100/(1+g/l);}
+function rsi(a,p){if(!Array.isArray(a)||a.length<=p)return 50;var g=0,l=0;for(var i=1;i<=p;i++){var d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}var ag=g/p,al=l/p;for(var j=p+1;j<a.length;j++){var ch=a[j]-a[j-1],gain=ch>0?ch:0,loss=ch<0?-ch:0;ag=((ag*(p-1))+gain)/p;al=((al*(p-1))+loss)/p;}if(al===0)return ag===0?50:100;return 100-100/(1+ag/al);}
 function pivots(candles,radius){var out=[];for(var i=radius;i<candles.length-radius;i++){var hi=n(candles[i].high),lo=n(candles[i].low),isH=true,isL=true;for(var j=i-radius;j<=i+radius;j++){if(j===i)continue;if(n(candles[j].high)>=hi)isH=false;if(n(candles[j].low)<=lo)isL=false;}if(isH)out.push({i,type:"H",price:hi});if(isL)out.push({i,type:"L",price:lo});}return out.sort(function(a,b){return a.i-b.i;});}
 function patternScan(candles,closes){candles=candles.slice(-100);closes=closes.slice(-100);var p=pivots(candles,3),last=closes[closes.length-1],prior=closes[closes.length-2],out={direction:"WAIT",name:"No confirmed chart pattern",confirmed:false};
 function near(a,b,t){return Math.abs(a-b)/Math.max(Math.abs(a),Math.abs(b),1e-9)<=t;}
@@ -24,8 +24,8 @@ var slowKs=[];for(var j=0;j<raw.length;j++){var part=raw.slice(Math.max(0,j-kSmo
 var k=slowKs[slowKs.length-1],tail=slowKs.slice(-3),d=tail.reduce(function(a,b){return a+b},0)/tail.length;return {k:k,d:d};
 }
 function analyze(candles,pair,profile,options){
-profile=["scalp","day","intraday","swing","position","event"].indexOf(profile)>=0?profile:"intraday";
-var isScalp=profile==="scalp",isPosition=profile==="position",rsiPeriod=isScalp?7:14,emaFast=isPosition?50:20,emaSlow=isPosition?100:50;
+profile=["scalp","day","intraday","swing","position","event","h4","contrarian"].indexOf(profile)>=0?profile:"intraday";
+var isScalp=profile==="scalp",isPosition=profile==="position",isH4=profile==="h4",isContrarian=profile==="contrarian",rsiPeriod=isScalp?7:14,emaFast=isPosition?50:20,emaSlow=isPosition?100:50;
 if(!Array.isArray(candles)||candles.length<(isScalp?30:60))return null;
 var cs=candles.map(function(x){return n(x.close)}),hs=candles.map(function(x){return n(x.high)}),ls=candles.map(function(x){return n(x.low)});
 if(cs.some(function(x){return x===null})||hs.some(function(x){return x===null})||ls.some(function(x){return x===null}))return null;
@@ -67,8 +67,8 @@ methodReports.push(methodReport("Technical Analysis",technicalDirection,
   technicalDirection!=="WAIT"?"ACTIVE":"NEUTRAL",
   "EMA "+emaFast+"/"+emaSlow+", RSI("+rsiPeriod+") "+rv.toFixed(1)+", MACD and Bollinger/ATR checks."));
 var priceDirection=patternGroupDir;
-methodReports.push(methodReport("Pure Price Action",priceDirection,
-  priceDirection!=="WAIT"?"ACTIVE":"NEUTRAL",
+var priceStatus=priceDirection!=="WAIT"?"ACTIVE":"NEUTRAL";
+methodReports.push(methodReport("Pure Price Action",priceDirection,priceStatus,
   priceDirection!=="WAIT"?"A closed-candle chart pattern or candle pattern has confirmed a direction.":"No confirmed chart or candle pattern."));
 methodReports.push(methodReport("Volume Analysis",volumeDir,
   avg>0&&v!==null?"ACTIVE":"UNAVAILABLE",
@@ -82,13 +82,14 @@ methodReports.push(methodReport("ICT / SMC",structureDirFinal,
   structureDirFinal!=="WAIT"?"ACTIVE":"NEUTRAL",
   "BOS: "+structureDir+" · liquidity sweep: "+sweepDir+" · FVG: "+fvgDir+". A direction is reported only when at least two of these three structure checks agree.","Closed-candle structure data"));
 var logReturns=[];
-for(var qi=Math.max(1,cs.length-21);qi<cs.length;qi++)logReturns.push(Math.log(cs[qi]/cs[qi-1]));
-var qMean=logReturns.reduce(function(a,b){return a+b;},0)/Math.max(1,logReturns.length);
-var qVariance=logReturns.reduce(function(a,b){return a+(b-qMean)*(b-qMean);},0)/Math.max(1,logReturns.length);
-var qStd=Math.sqrt(qVariance),qZ=qStd>0?(logReturns[logReturns.length-1]-qMean)/qStd:0;
-var quantDirection=qZ>=0.75&&close>e20?"BUY":qZ<=-0.75&&close<e20?"SELL":"WAIT";
+for(var qi=Math.max(1,cs.length-21);qi<cs.length-1;qi++)logReturns.push(Math.log(cs[qi]/cs[qi-1]));
+var latestReturn=Math.log(cs[cs.length-1]/cs[cs.length-2]);
+var qMean=logReturns.length?logReturns.reduce(function(a,b){return a+b;},0)/logReturns.length:0;
+var qVariance=logReturns.length>1?logReturns.reduce(function(a,b){return a+(b-qMean)*(b-qMean);},0)/(logReturns.length-1):0;
+var qStd=Math.sqrt(qVariance),qZ=qStd>0?(latestReturn-qMean)/qStd:0;
+var quantDirection=logReturns.length>=20&&qZ>=1.5&&close>e20?"BUY":logReturns.length>=20&&qZ<=-1.5&&close<e20?"SELL":"WAIT";
 methodReports.push(methodReport("Quantitative / Algorithmic",quantDirection,"RESEARCH",
-  "Experimental 20-return z-score "+qZ.toFixed(2)+" with EMA context. Research diagnostic only; not machine learning and not counted as a trade vote.","Closed-candle statistical baseline"));
+  "Latest log return compared with the prior 20-return baseline: z-score "+qZ.toFixed(2)+". Requires 20 baseline returns; research-only, not machine learning, back-tested performance, or a trade vote.","Closed-candle statistical baseline"));
 
 var requestedGroups=options&&Array.isArray(options.enabledGroups)?options.enabledGroups:null;
 if(requestedGroups)groups=groups.filter(function(g){return requestedGroups.indexOf(g.name)>=0;});
@@ -97,7 +98,8 @@ if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";})
 if(!groups.length)return null;
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
-var threshold=profile==="scalp"?65:(profile==="swing"||profile==="position")?75:70,minGroups=isScalp||profile==="position"||profile==="event"?3:4;
+var threshold=profile==="scalp"?65:(profile==="swing"||profile==="position"||isH4)?75:70,
+minGroups=isScalp||isPosition||isH4||isContrarian||profile==="event"?3:4;
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
 var dir=atrOk&&lead!=="WAIT"&&leadConfidence>=threshold&&leadGroups>=minGroups?lead:"WAIT";
