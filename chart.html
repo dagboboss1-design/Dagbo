@@ -56,7 +56,8 @@ body{min-height:100dvh}
     US500:'CAPITALCOM:US500'
   };
   var DEFAULT_PAIRS=['XAUUSD','EURUSD','GBPUSD','USDJPY','GBPJPY','US30','US100','US500','BTCUSD','ETHUSD','AUDUSD','USDCHF'];
-  var VALID_INTERVALS=['5','15','30','60','240','D','W'];\n  var state={pair:'XAUUSD',interval:'15',toolbar:true};
+  var VALID_INTERVALS=['5','15','30','60','240','D','W'];
+  var state={pair:'XAUUSD',interval:'15',toolbar:true};
   try{var saved=JSON.parse(localStorage.getItem('dagbo_chart_state')||'{}');if(saved&&typeof saved==='object'){if(saved.pair)state.pair=String(saved.pair).toUpperCase();if(saved.interval&&VALID_INTERVALS.indexOf(String(saved.interval))>=0)state.interval=String(saved.interval);if(typeof saved.toolbar==='boolean')state.toolbar=saved.toolbar;}}catch(e){}
   function readSettings(){try{return JSON.parse(localStorage.getItem('dagbo_settings')||'{}')||{};}catch(e){return {};}}
   function enabledPairs(){
@@ -106,8 +107,8 @@ body{min-height:100dvh}
   });
   document.getElementById('toolbarToggle').addEventListener('click',function(){state.toolbar=!state.toolbar;renderChart();});
   window.addEventListener('storage',function(event){if(event.key==='dagbo_settings'){renderPairs();renderChart();}});
-  window.addEventListener('focus',function(){renderPairs();});
-  window.addEventListener('pageshow',function(){renderPairs();});
+  window.addEventListener('focus',function(){var before=state.pair;renderPairs();if(before!==state.pair)renderChart();});
+  window.addEventListener('pageshow',function(){var before=state.pair;renderPairs();if(before!==state.pair)renderChart();});
   renderPairs();renderTimeframes();renderChart();
 })();
 </script>
