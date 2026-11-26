@@ -72,9 +72,15 @@ async function getConfiguredPairs() {
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
 async function claimTwelveDataSlot() {
   const key = "dagbo:market:twelve:minute";
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, 60);
-  return count <= 7;
+  // Share the exact same atomic quota reservation used by /api/market-data.
+  // INCR + EXPIRE in separate requests can race and leave the shared counter
+  // without a TTL, permanently blocking market-data requests.
+  const count = Number(await redis.eval(
+    "local count = redis.call('INCR', KEYS[1]); if count == 1 then redis.call('EXPIRE', KEYS[1], 60); end; return count",
+    [key],
+    []
+  ));
+  return Number.isFinite(count) && count <= 7;
 }
 function ema(values, period) {
   if (values.length < period) return values[values.length - 1];
