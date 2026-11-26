@@ -99,10 +99,35 @@ if(isContrarian)groups=groups.filter(function(g){return g.name!=="Trend";});
 // Missing provider volume must not count as a failed vote or dilute confidence.
 if(avg<=0||v===null)groups=groups.filter(function(g){return g.name!=="Volume";});
 if(!groups.length)return null;
+// Independent department results are computed AFTER profile detector filtering,
+// so a disabled strategy cannot appear to have produced active evidence.
+function departmentVote(names,minVotes){
+  var votes=groups.filter(function(g){return names.indexOf(g.name)>=0&&(g.dir==="BUY"||g.dir==="SELL");});
+  var buys=votes.filter(function(g){return g.dir==="BUY";}).length;
+  var sells=votes.filter(function(g){return g.dir==="SELL";}).length;
+  return {direction:buys>sells&&buys>=minVotes?"BUY":sells>buys&&sells>=minVotes?"SELL":"WAIT",
+    status:buys&&sells&&buys===sells?"CONFLICT":(Math.max(buys,sells)>=minVotes)?"ACTIVE":"NEUTRAL",
+    buys:buys,sells:sells};
+}
+var technicalDept=departmentVote(["Trend","Momentum","Volatility","Volume"],2);
+var priceDept=departmentVote(["Chart pattern","Market structure"],1);
+var departmentReports=[
+  {name:"Technical Intelligence",direction:technicalDept.direction,status:technicalDept.status,
+   methods:["Trend","Momentum","Volatility","Volume"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
+   detail:"EMA/MACD trend, RSI/Stochastic momentum, Bollinger/ATR volatility and provider volume where supplied. Direction requires at least two aligned active technical checks.",
+   source:"Verified closed OHLC candles"},
+  {name:"Price Action & Market Structure",direction:priceDept.direction,status:priceDept.status,
+   methods:["Chart pattern","Market structure"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
+   detail:"Closed-candle patterns, engulfing/pin bars, BOS, liquidity sweeps, FVG and key-level breaks. Conflicting active checks remain WAIT.",
+   source:"Verified closed OHLC candles"},
+  {name:"Fundamental & Market Intelligence",direction:"WAIT",status:"UNAVAILABLE",
+   methods:[],detail:"A verified pair-matched economic calendar, actual-versus-forecast surprise, central-bank data and synchronized DXY/yield feeds are not available inside this candle-analysis call. No fundamental direction is guessed.",
+   source:"External verified macro/news feeds"}
+];
 var score={BUY:0,SELL:0},active={BUY:0,SELL:0},evidence=[];groups.forEach(function(g){if(g.dir==="BUY"||g.dir==="SELL"){score[g.dir]+=2;active[g.dir]++;evidence.push(g.name+": "+g.detail+" ("+g.dir+")");}});
 var maxScore=groups.length*2,confidence={BUY:Math.min(100,Math.round(score.BUY/maxScore*100+(isScalp&&active.BUY>=3?15:active.BUY>=4?4:0))),SELL:Math.min(100,Math.round(score.SELL/maxScore*100+(isScalp&&active.SELL>=3?15:active.SELL>=4?4:0)))};
-var threshold=profile==="scalp"?65:(profile==="swing"||profile==="position"||isH4)?75:70,
-minGroups=isScalp||isPosition||isH4||profile==="event"?3:(isContrarian?2:4);
+var threshold=(profile==="swing"||profile==="position"||isH4)?55:50,
+minGroups=Math.min(2,groups.length);
 var lead=score.BUY>score.SELL?"BUY":score.SELL>score.BUY?"SELL":"WAIT";
 var leadScore=lead==="WAIT"?0:score[lead],leadGroups=lead==="WAIT"?0:active[lead],leadConfidence=lead==="WAIT"?0:confidence[lead];
 var dir=atrOk&&lead!=="WAIT"&&leadConfidence>=threshold&&leadGroups>=minGroups?lead:"WAIT";
@@ -120,7 +145,7 @@ var signal=dir==="WAIT"?"NO TRADE":(leadConfidence>=85&&source==="MAIN CONFLUENC
 var confidenceValue=source==="FAST MOMENTUM CHANNEL"?65:leadConfidence;
 var quality=confidenceValue>=85?"HIGH":confidenceValue>=70?"MEDIUM":"LOW";
 var buy=dir==="BUY";
-return {pair:pair,profile:profile,signal:signal,direction:dir,source:source,confidence:confidenceValue,quality:quality,threshold:threshold,methodReports:methodReports,entry:close,stopLoss:buy?close-atr*1.5:close+atr*1.5,takeProfit:buy?close+atr*2:close-atr*2,tp2:buy?close+atr*3.5:close-atr*3.5,atr:atr,atrPct:atrPct,atrOk:atrOk,rsi:Number(rv.toFixed(1)),stochasticK:Number(stoch.k.toFixed(1)),williamsR:wrNow===null?null:Number(wrNow.toFixed(1)),momentumTrigger:momentumTrigger,evidence:evidence,buyScore:score.BUY,sellScore:score.SELL,totalMethods:groups.length*2,groups:groups,pattern:pattern.name,patternDirection:pattern.direction,patternConfirmed:pattern.confirmed,candlePattern:candleName,candleDirection:candleDir,indicatorCombo:indicatorComboDir,keyLevel:levelDir,structure:structureDir,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,candleHigh:high,candleLow:low,candleTime:last.datetime||null,macd:macd,emaTrend:trendDir};}
+return {pair:pair,profile:profile,signal:signal,direction:dir,source:source,confidence:confidenceValue,quality:quality,threshold:threshold,departmentReports:departmentReports,methodReports:methodReports,entry:close,stopLoss:buy?close-atr*1.5:close+atr*1.5,takeProfit:buy?close+atr*2:close-atr*2,tp2:buy?close+atr*3.5:close-atr*3.5,atr:atr,atrPct:atrPct,atrOk:atrOk,rsi:Number(rv.toFixed(1)),stochasticK:Number(stoch.k.toFixed(1)),williamsR:wrNow===null?null:Number(wrNow.toFixed(1)),momentumTrigger:momentumTrigger,evidence:evidence,buyScore:score.BUY,sellScore:score.SELL,totalMethods:groups.length*2,groups:groups,pattern:pattern.name,patternDirection:pattern.direction,patternConfirmed:pattern.confirmed,candlePattern:candleName,candleDirection:candleDir,indicatorCombo:indicatorComboDir,keyLevel:levelDir,structure:structureDir,sweep:sweepDir,fvg:fvgDir,bb:bbDir,volume:volumeDir,candleHigh:high,candleLow:low,candleTime:last.datetime||null,macd:macd,emaTrend:trendDir};}
 
 return {analyze:analyze,patternScan:patternScan};
 });
