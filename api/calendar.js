@@ -7,7 +7,7 @@ module.exports = async function handler(req, res) {
     const events = await fetchFcsCalendarEvents();
     const now = Date.now();
     const visible = events.filter(event =>
-      event.date.getTime() >= now - 30 * 60 * 1000 &&
+      event.date.getTime() >= now - 3 * 60 * 60 * 1000 &&
       event.date.getTime() <= now + 7 * 24 * 60 * 60 * 1000
     ).map(event => ({
       id: event.id,
