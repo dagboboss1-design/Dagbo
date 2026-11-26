@@ -48,7 +48,8 @@ module.exports = async function handler(req,res){
       .filter(c=>Number.isFinite(c.time)&&[c.open,c.high,c.low,c.close].every(Number.isFinite)).sort((a,b)=>a.time-b.time);
     if(!candles.length)return res.status(502).json({error:'The market provider returned no valid candles.'});
     const result={pair,interval,candles,source:'Twelve Data',marketDataType:'DIRECT',timezone:'UTC'};
-    await redis.set(cacheKey,JSON.stringify(result),{ex:CACHE_SECONDS});
+    try{await redis.set(cacheKey,JSON.stringify(result),{ex:CACHE_SECONDS});}
+    catch(cacheError){console.warn('DAGBO chart cache write failed:',cacheError.message);}
     memoryCache.set(cacheKey,{data:result,expiresAt:Date.now()+CACHE_SECONDS*1000});
     return res.status(200).json(result);
   }catch(error){
