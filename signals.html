@@ -372,8 +372,11 @@
       checks.push({checked:true,timeframe:contextTf,label:contextLabel,direction:direction,provider:payload.provider||'Market data'});
     }
     var directions=checks.map(function(x){return x.direction;});
-    var aggregate=directions.length&&directions.every(function(x){return x==='BUY';})?'BUY':
-      directions.length&&directions.every(function(x){return x==='SELL';})?'SELL':'WAIT';
+    // One confirmed higher timeframe is sufficient when the other is neutral;
+    // opposing confirmed directions still block the setup.
+    var confirmedDirections=directions.filter(function(x){return x==='BUY'||x==='SELL';});
+    var aggregate=confirmedDirections.length&&confirmedDirections.every(function(x){return x===confirmedDirections[0];})
+      ? confirmedDirections[0] : 'WAIT';
     return {checked:true,direction:aggregate,label:checks.map(function(x){return x.label;}).join(' + '),checks:checks};
   }
 
