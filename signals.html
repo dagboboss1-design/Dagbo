@@ -878,7 +878,7 @@
       var departmentAuditHtml = '<div style="margin-top:12px;padding:11px;border:1px solid var(--dg-line);border-radius:11px"><b style="font-size:12px">THREE INDEPENDENT ANALYSIS DEPARTMENTS</b><div style="display:grid;grid-template-columns:1fr;gap:7px;margin-top:8px">' +
         (Array.isArray(s.departmentReports)?s.departmentReports.map(function(d){
           var status=String(d.status||'UNAVAILABLE');
-          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':'FEED UNAVAILABLE';
+          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='CONFLICT'?'CONFLICT':status==='CONTEXT ONLY'?'CONTEXT ONLY':'FEED UNAVAILABLE';
           var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'?'var(--dg-text-2)':'#b7791f';
           return '<div style="padding:8px;border-radius:8px;background:var(--dg-fill);min-width:0"><div style="font-size:11px;font-weight:800">'+escapeNewsText(d.name)+'</div><div style="font-size:10px;font-weight:800;color:'+color+';margin-top:3px">'+label+' · '+escapeNewsText(d.direction||'WAIT')+'</div><div style="font-size:10px;color:var(--dg-text-2);line-height:1.4;margin-top:3px">'+escapeNewsText(d.detail||'No department detail available')+'</div></div>';
         }).join(''):'<div class="dg-muted" style="font-size:11px">Department diagnostics unavailable.</div>') +
