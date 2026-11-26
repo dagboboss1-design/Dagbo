@@ -838,7 +838,7 @@ module.exports = async function handler(req, res) {
     // context feeds (for example DXY/monthly history). The shared market-data
     // endpoint remains the primary provider/failover path for trade pairs.
     const apiKey = process.env.TWELVE_DATA_API_KEY || "";
-    const results = {}, errors = [];
+    const results = {}, errors = [], tradeCandleCache = {};
     const configuredPairs = await getConfiguredPairs();
     const pairsToScan = await selectRotatingBatch("dagbo:scan:cursor:main", configuredPairs, MAX_PAIRS);
     const fetched = await Promise.all(pairsToScan.map(async pair => {
@@ -873,7 +873,7 @@ module.exports = async function handler(req, res) {
         const analysis = analyze(closedCandles, pair);
         if (!analysis) throw new Error("Could not calculate indicators from provider candles.");
         return {
-          pair, analysis, provider: data.provider || "Market-data failover manager",
+          pair, analysis, candles: closedCandles, provider: data.provider || "Market-data failover manager",
           marketDataType: data.marketDataType || "DIRECT",
           sourceSymbol: data.sourceSymbol || null,
           marketLabel: data.marketLabel || null,
@@ -900,6 +900,7 @@ module.exports = async function handler(req, res) {
         continue;
       }
       const pair = item.pair, analysis = item.analysis;
+      if (Array.isArray(item.candles)) tradeCandleCache[pair] = item.candles;
       Object.assign(analysis, {
         provider: item.provider, marketDataType: item.marketDataType,
         sourceSymbol: item.sourceSymbol, marketLabel: item.marketLabel,
@@ -967,7 +968,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    const tradeSummary = await monitorTrades(results, apiKey);
+    const tradeSummary = await monitorTrades(results, apiKey, tradeCandleCache);
     const newsSummary = { delegatedTo: "/api/news-monitor", note: "Economic-news and spike alerts run in the dedicated 5-minute news monitor." };
     const errorKey = "dagbo:scan:error:last";
     const previousErrorRaw = await redis.get(errorKey);
