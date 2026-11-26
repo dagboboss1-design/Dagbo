@@ -354,7 +354,8 @@
     if(profile==='scalping'||profile==='momentum') contextTfs=['15','60'];
     else if(profile==='day'||['mean-reversion','contrarian','range','breakout'].indexOf(profile)>=0) {
       contextTfs=String(primaryTf)==='60'?['240','1day']:['60','240'];
-    } else if(profile==='swing'||profile==='trend-following'||profile==='h4') contextTfs=['1day'];
+    } else if(profile==='h4') contextTfs=['1day'];
+    else if(profile==='swing'||profile==='trend-following') contextTfs=[String(primaryTf)==='1day'?'1week':'1day'];
     else if(profile==='position') contextTfs=[String(primaryTf)==='1week'?'1day':'1week'];
     else return {checked:false,direction:'WAIT',label:'Not required',checks:[]};
 
