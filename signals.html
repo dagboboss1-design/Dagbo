@@ -364,7 +364,7 @@
       var contextLabel=profile==='position'
         ? (contextTf==='1week'?'Weekly macro-trend confirmation':'Daily timing confirmation')
         : timeframeLabel(contextTf)+' confirmation';
-      var response=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(contextTf),{cache:'no-store',headers:{'Accept':'application/json'}});
+      var response=await fetchQueuedMarketData('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(contextTf),{cache:'no-store',headers:{'Accept':'application/json'},dagboTimeoutMs:20000});
       var payload=await response.json();
       if(!response.ok||payload.error||payload.stale||!Array.isArray(payload.values)) throw new Error(payload.error||('No fresh '+contextLabel+' candles'));
       var duration=TF_MILLISECONDS[String(contextTf)]||86400000;
@@ -383,6 +383,38 @@
     return {checked:true,direction:aggregate,label:checks.map(function(x){return x.label;}).join(' + '),checks:checks};
   }
 
+  // One browser-wide queue serializes every Twelve Data-backed request:
+  // primary candles, higher-timeframe checks and executable quotes. This avoids
+  // exhausting the account-wide server quota when a setup triggers extra checks.
+  var dagboMarketRequestQueue = Promise.resolve();
+  var dagboNextMarketRequestAt = 0;
+  function fetchQueuedMarketData(url, options) {
+    var requestOptions=Object.assign({},options||{});
+    var timeoutMs=Number(requestOptions.dagboTimeoutMs)||20000;
+    delete requestOptions.dagboTimeoutMs;
+    var match=String(url||'').match(/[?&]pair=([^&]+)/i);
+    var pair=match?decodeURIComponent(match[1]).toUpperCase():'';
+    var isCrypto=/^(BTC|BTCUSD|BTCUSDT|ETH|ETHUSD|ETHUSDT)$/.test(pair);
+    var run=async function(){
+      if(!isCrypto){
+        var wait=Math.max(0,dagboNextMarketRequestAt-Date.now());
+        if(wait)await new Promise(function(resolve){setTimeout(resolve,wait);});
+        dagboNextMarketRequestAt=Date.now()+10000;
+      }
+      var controller=typeof AbortController!=='undefined'?new AbortController():null;
+      var timer=controller?setTimeout(function(){controller.abort();},timeoutMs):null;
+      try{
+        var opts=Object.assign({},requestOptions);
+        if(controller)opts.signal=controller.signal;
+        return await fetch(url,opts);
+      }finally{if(timer)clearTimeout(timer);}
+    };
+    if(isCrypto)return run();
+    var queued=dagboMarketRequestQueue.then(run);
+    dagboMarketRequestQueue=queued.then(function(){},function(){});
+    return queued;
+  }
+
   // --- FETCH REAL DATA ---
   async function fetchPairData(pair, tf) {
     // Hedging is basket-level intelligence, not a single-pair BUY/SELL strategy.
@@ -396,21 +428,17 @@
     try {
       // Bound every market-data request so a stalled provider cannot leave the
       // scanner waiting forever. A timeout is reported per pair, not as a page crash.
-      var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      var timeoutId = controller ? setTimeout(function(){ controller.abort(); }, 35000) : null;
-      var res, data;
-      try {
-        res = await fetch(url, controller
-          ? { signal: controller.signal, cache: 'no-store', headers: { 'Accept': 'application/json' } }
-          : { cache: 'no-store', headers: { 'Accept': 'application/json' } });
-        var contentType = res.headers && res.headers.get ? (res.headers.get('content-type') || '') : '';
-        if (contentType && contentType.indexOf('application/json') === -1) {
-          throw new Error('Market-data endpoint returned a non-JSON response (HTTP ' + res.status + ').');
-        }
-        data = await res.json();
-      } finally {
-        if (timeoutId) clearTimeout(timeoutId);
+      var res = await fetchQueuedMarketData(url, {
+        cache: 'no-store',
+        headers: { 'Accept': 'application/json' },
+        dagboTimeoutMs: 20000
+      });
+      var data;
+      var contentType = res.headers && res.headers.get ? (res.headers.get('content-type') || '') : '';
+      if (contentType && contentType.indexOf('application/json') === -1) {
+        throw new Error('Market-data endpoint returned a non-JSON response (HTTP ' + res.status + ').');
       }
+      data = await res.json();
       
       if (!res.ok || data.error || data.status === 'error') {
         var apiError = data.error || data.message || res.statusText || ('HTTP ' + res.status);
@@ -554,7 +582,7 @@
         }
       }
       var isBuy=final.includes('BUY'),isSell=final.includes('SELL');
-      var quoteResponse=await fetch('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(tf)+'&quote=1',{cache:'no-store',headers:{'Accept':'application/json'}});
+      var quoteResponse=await fetchQueuedMarketData('/api/market-data?pair='+encodeURIComponent(pair)+'&tf='+encodeURIComponent(tf)+'&quote=1',{cache:'no-store',headers:{'Accept':'application/json'},dagboTimeoutMs:12000});
       var liveQuote=await quoteResponse.json();
       if(!quoteResponse.ok||!Number.isFinite(Number(liveQuote.price))||Number(liveQuote.price)<=0){
         return {pair:pair,error:liveQuote.error||'Live executable quote is unavailable. No entry, SL or TP issued.',errorStage:'live-quote'};
@@ -1161,18 +1189,9 @@
       // and do not consume a new provider request.
       var completedPairs = 0;
       var results = [];
-      var lastMarketRequestAt = 0;
       for (var pairIndex = 0; pairIndex < openPairs.length; pairIndex++) {
         if(thisScan!==scanGeneration)return;
         var pair = openPairs[pairIndex];
-        var waitMs = Math.max(0, 10200 - (Date.now() - lastMarketRequestAt));
-        if (waitMs > 0) {
-          if (loading) loading.innerText = 'Respecting live-data API limits · ' +
-            completedPairs + '/' + openPairs.length + ' markets checked...';
-          await new Promise(function(resolve) { setTimeout(resolve, waitMs); });
-        }
-        if(thisScan!==scanGeneration)return;
-        lastMarketRequestAt = Date.now();
         var pairResult;
         try {
           var pairData = await fetchPairData(pair, currentSignalTF);
