@@ -10,7 +10,7 @@
 <div class="sp-tabs" id="profileTabs" role="tablist" aria-label="Trading profiles"></div>
 <section class="dg-card" id="profileSummary" aria-live="polite"></section>
 <section class="dg-card" style="margin-top:14px"><div class="dg-card__head"><h2 class="dg-card__title">Profile indicators</h2><span class="dg-pill dg-pill--open">PLAYBOOK</span></div><div id="indicators"></div></section>
-<section class="dg-card" style="margin-top:14px"><div class="dg-card__head"><h2 class="dg-card__title">Priority strategy library</h2><span class="dg-muted" id="enabledCount" style="font-size:11px"></span></div><p class="sp-note">These are the methods prioritized for this trading style. You can switch methods on or off in this profile. Preferences are saved on this device.</p><div id="methods"></div></section>
+<section class="dg-card" style="margin-top:14px"><div class="dg-card__head"><h2 class="dg-card__title">Priority strategy library</h2><span class="dg-muted" id="enabledCount" style="font-size:11px"></span></div><p class="sp-note">These are the methods prioritized for this trading style. Supported live detector methods can be switched on or off. Context-only checks, execution rules and methods awaiting a verified data feed are labelled separately.</p><div id="methods"></div></section>
 <section class="dg-card" style="margin-top:14px"><h2 class="dg-card__title">Execution rules</h2><ul id="filters" class="sp-note" style="padding-left:18px;line-height:1.8"></ul></section>
 <section class="dg-card" style="margin-top:14px"><h2 class="dg-card__title">All trading styles</h2><div id="allStyles" class="sp-meta"></div><p class="sp-note">Trading style is the top-level profile. Indicator combinations, candlestick patterns, chart patterns, price action, SMC/ICT, news, sentiment, macro and risk methods are assigned according to their suitability—not all are forced into every scan.</p></section>
 <p class="dg-note">The selected profile is shared with the Signal Board. Its enabled strategy categories control which live detector groups are considered: Trend, Momentum, Volatility, Volume, Chart Pattern and Market Structure. The wider strategy library remains a prioritized playbook; a detector is only reported as evidence when the live engine has actually evaluated it from available market data.</p>
@@ -22,7 +22,16 @@
  try{var shared=localStorage.getItem('dagbo_active_trading_profile');if(shared&&profiles.some(function(p){return p.id===shared}))active=shared;}catch(e){}
  if(store.active&&profiles.some(function(p){return p.id===store.active})&&!localStorage.getItem('dagbo_active_trading_profile'))active=store.active;
  function save(){store.active=active;localStorage.setItem('dagbo_strategy_profile_settings',JSON.stringify(store));localStorage.setItem('dagbo_active_trading_profile',active);}
- function enabled(p,item){var key=p.id+'::'+item[1];return !store.disabled||!store.disabled[key]}
+ var feedUnavailable=['Intermarket','Relative strength','Carry'];
+ var contextOnly=['Cross-market','Economic release','Central bank'];
+ var guardrails=['Risk'];
+ function methodSupport(category){
+  if(feedUnavailable.indexOf(category)>=0)return {enabled:false,label:'Feed not connected'};
+  if(contextOnly.indexOf(category)>=0)return {enabled:false,label:'Context only'};
+  if(guardrails.indexOf(category)>=0)return {enabled:false,label:'Risk rule'};
+  return {enabled:true,label:'Live detector'};
+ }
+ function enabled(p,item){var support=methodSupport(item[0]);var key=p.id+'::'+item[1];return support.enabled&&(!store.disabled||!store.disabled[key])}
  function render(){
   var p=api.getProfile(active),tabs=document.getElementById('profileTabs');tabs.textContent='';
   profiles.forEach(function(x){var b=document.createElement('button');b.className='sp-tab';b.type='button';b.textContent=x.name;b.setAttribute('role','tab');b.setAttribute('aria-selected',String(x.id===active));b.addEventListener('click',function(){active=x.id;save();render()});tabs.appendChild(b)});
@@ -33,7 +42,7 @@
   [p.tag,'Primary: '+p.primary,'Sessions: '+p.sessions.join(', '),'WAT: '+p.nigeriaWindow].forEach(function(v){var s=document.createElement('span');s.className='sp-chip';s.textContent=v;meta.appendChild(s)});summary.appendChild(meta);
   var ind=document.getElementById('indicators');ind.textContent='';p.indicators.forEach(function(v){var s=document.createElement('span');s.className='sp-chip';s.style.display='inline-block';s.style.margin='3px';s.textContent=v;ind.appendChild(s)});
   var methods=document.getElementById('methods');methods.textContent='';var count=0;
-  p.priority.forEach(function(item){var row=document.createElement('div');row.className='sp-method';var left=document.createElement('div'),title=document.createElement('strong'),desc2=document.createElement('small');title.textContent=item[1];desc2.textContent=item[0]+' · '+item[2];left.appendChild(title);left.appendChild(desc2);var b=document.createElement('button');b.type='button';var on=enabled(p,item);if(on)count++;b.textContent=on?'Enabled':'Disabled';b.setAttribute('aria-pressed',String(on));b.addEventListener('click',function(){store.disabled=store.disabled||{};var key=p.id+'::'+item[1];if(enabled(p,item))store.disabled[key]=true;else delete store.disabled[key];save();render()});row.appendChild(left);row.appendChild(b);methods.appendChild(row)});
+  p.priority.forEach(function(item){var row=document.createElement('div');row.className='sp-method';var left=document.createElement('div'),title=document.createElement('strong'),desc2=document.createElement('small');title.textContent=item[1];var support=methodSupport(item[0]);desc2.textContent=item[0]+' · '+item[2]+' · '+support.label;left.appendChild(title);left.appendChild(desc2);var b=document.createElement('button');b.type='button';var on=enabled(p,item);if(support.enabled&&on)count++;b.textContent=support.enabled?(on?'Enabled':'Disabled'):support.label;b.disabled=!support.enabled;b.setAttribute('aria-pressed',String(on));if(support.enabled)b.addEventListener('click',function(){store.disabled=store.disabled||{};var key=p.id+'::'+item[1];if(enabled(p,item))store.disabled[key]=true;else delete store.disabled[key];save();render()});row.appendChild(left);row.appendChild(b);methods.appendChild(row)});
   document.getElementById('enabledCount').textContent=count+'/'+p.priority.length+' enabled';
   var filters=document.getElementById('filters');filters.textContent='';p.filters.forEach(function(v){var li=document.createElement('li');li.textContent=v;filters.appendChild(li)});
   var styles=document.getElementById('allStyles');styles.textContent='';api.allStyles.forEach(function(x){var s=document.createElement('span');s.className='sp-chip';s.textContent=x[0]+' → '+x[1].split(' ').map(function(id){var q=api.getProfile(id);return q.name}).join(' / ');styles.appendChild(s)});
