@@ -152,14 +152,6 @@
     BTCUSD: 'CRYPTO', BTCUSDT: 'CRYPTO', BTC: 'CRYPTO', ETHUSD: 'CRYPTO', ETHUSDT: 'CRYPTO', ETH: 'CRYPTO'
   };
 
-  var API_SYMBOLS = {
-    XAUUSD: 'XAU/USD', GOLD: 'XAU/USD', XAGUSD: 'XAG/USD', SILVER: 'XAG/USD',
-    EURUSD: 'EUR/USD', GBPUSD: 'GBP/USD', USDJPY: 'USD/JPY', GBPJPY: 'GBP/JPY',
-    AUDUSD: 'AUD/USD', USDCHF: 'USD/CHF', USDCAD: 'USD/CAD', NZDUSD: 'NZD/USD', EURJPY: 'EUR/JPY', EURGBP: 'EUR/GBP',
-    US30: 'DIA', US100: 'QQQ', NAS100: 'QQQ', US500: 'SPY',
-    BTCUSD: 'BTC/USD', BTC: 'BTC/USD', ETHUSD: 'ETH/USD', ETH: 'ETH/USD'
-  };
-
   var currentFilter = 'ALL';
   var signalsData = {};
   var profileApi = window.DagboStrategyProfiles;
@@ -778,7 +770,10 @@
         '<div class="dg-muted" style="font-size:12px;line-height:1.5;margin-top:6px">' + escapeNewsText(latestNewsCandidate.evidence) + '</div>' +
         '<div style="font-size:11px;color:var(--dg-text-2);margin-top:7px">A trade signal appears only if the independent technical scan agrees. Check the ' + escapeNewsText(latestNewsCandidate.pair) + ' card below.</div>';
     } catch (error) {
+      // Never reuse a previously fetched event bias after the context endpoint
+      // fails. Event mode must fail closed rather than trade on stale memory.
       latestNewsCandidate = null;
+      latestNewsCandidates = [];
       panel.style.display = 'none';
       console.warn('News signal context unavailable:', error);
     }
