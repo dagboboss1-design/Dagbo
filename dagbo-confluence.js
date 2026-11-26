@@ -101,7 +101,7 @@ var departmentReports=[
    detail:"EMA/MACD trend, RSI/Stochastic momentum, Bollinger/ATR volatility and provider volume where supplied.",
    source:"Verified closed OHLC candles"},
   {name:"Price Action & Market Structure",direction:(patternGroupDir!=="WAIT"&&structureGroupDir===patternGroupDir)?patternGroupDir:(patternGroupDir!=="WAIT"&&structureGroupDir==="WAIT"?patternGroupDir:(structureGroupDir!=="WAIT"&&patternGroupDir==="WAIT"?structureGroupDir:"WAIT")),
-   status:(patternGroupDir!=="WAIT"||structureGroupDir!=="WAIT")?"ACTIVE":"NEUTRAL",
+   status:(patternGroupDir!=="WAIT"||structureGroupDir!=="WAIT")?(patternGroupDir!=="WAIT"&&structureGroupDir!=="WAIT"&&patternGroupDir!==structureGroupDir?"CONFLICT":"ACTIVE"):"NEUTRAL",
    methods:["Chart pattern","Market structure"].filter(function(name){return groups.some(function(g){return g.name===name;});}),
    detail:"Closed-candle patterns, engulfing/pin bars, BOS, liquidity sweeps, FVG and key-level breaks.",
    source:"Verified closed OHLC candles"},
