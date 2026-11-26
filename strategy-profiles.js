@@ -74,6 +74,7 @@
       priority:[
         ['Trend','H4 EMA + MACD + RSI','4-hour trend direction and momentum confirmation'],
         ['Trend strength','EMA + MACD + ADX','Filter weak and directionless conditions'],
+        ['Momentum','4H RSI + MACD','Confirm directional momentum on closed 4H candles'],
         ['Structure','BOS / CHoCH / MSS','Confirmed 4H swing break'],
         ['Liquidity','Equal Highs/Lows Sweep','Sweep and close back through a confirmed level'],
         ['SMC','H4 Order Block + FVG','Require displacement and measurable invalidation'],
@@ -102,9 +103,9 @@
       filters:['Daily setup with weekly/monthly context','Macro calendar and central-bank regime check','Carry, swap and funding costs matter','Lower turnover; no scalping triggers'],
       indicators:['EMA 50 / 100 / 200','Weekly RSI (14)','Weekly MACD','ADX (14)','ATR (14)','ROC','Relative strength','Long-term support/resistance'],
       priority:[
-        ['Macro trend','Macro Trend Trading','Rates, inflation, employment and policy regime'],
-        ['Intermarket','DXY / yields / gold / commodities','Use only verified and timestamped data'],
-        ['Trend','Weekly EMA + MACD + ADX','Major trend and strength confirmation'],
+        ['Macro trend','Weekly EMA + daily trend alignment','Use closed weekly context to confirm the long-term price regime'],
+        ['Intermarket','DXY / yields / gold / commodities','Context unavailable unless synchronized market feeds are verified'],
+        ['Momentum','Daily RSI + MACD','Confirm daily momentum in the direction of the weekly trend'],
         ['Relative strength','Relative Strength Rotation','Compare instruments on consistent lookback windows'],
         ['Carry','Carry Trade Context','Yield differential plus financing and risk checks'],
         ['Structure','Weekly BOS / major S/R flip','Confirmed higher-timeframe break and retest'],
