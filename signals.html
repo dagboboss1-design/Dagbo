@@ -506,6 +506,23 @@
         fundamentalDepartment.detail='Fresh pair-matched news/event context: '+String(newsCandidate.event||'Verified event context')+'. '+String(newsCandidate.evidence||'Direction is informational and does not independently trigger a trade.');
         fundamentalDepartment.source='Fresh /api/news-signal candidate';
       }
+      // Master decision consumes the third department as a soft, independent
+      // macro vote. It can strengthen or weaken an existing technical setup,
+      // but cannot create a trade when the candle engine says WAIT.
+      var primaryMacroDirection=macroContext.direction;
+      if(primaryMacroDirection==='BUY'||primaryMacroDirection==='SELL'){
+        var primaryTechnicalDirection=String(analysis.direction||'WAIT').toUpperCase();
+        if(primaryTechnicalDirection===primaryMacroDirection){
+          analysis.confidence=Math.min(95,Number(analysis.confidence||0)+5);
+          analysis.evidence=(analysis.evidence||[]).concat(['Fundamental department agrees: '+macroContext.event+'.']);
+        }else if(primaryTechnicalDirection==='BUY'||primaryTechnicalDirection==='SELL'){
+          analysis.confidence=Math.max(0,Number(analysis.confidence||0)-10);
+          analysis.evidence=(analysis.evidence||[]).concat(['Fundamental department conflicts with '+primaryTechnicalDirection+': '+macroContext.event+'. Confidence reduced; no macro-only reversal is allowed.']);
+        }
+        analysis.quality=analysis.confidence>=85?'HIGH':analysis.confidence>=70?'MEDIUM':'LOW';
+      }else if(macroContext.status==='RISK WINDOW'){
+        analysis.evidence=(analysis.evidence||[]).concat(['High-impact event risk window: '+macroContext.event+'. Check spreads and slippage before entry.']);
+      }
       var timeframeContext={checked:false,direction:'WAIT',label:'Not required'};
       var final=analysis.final;
       // News & Event is not a generic 15m technical profile. It must have a
@@ -957,7 +974,7 @@
       var departmentAuditHtml = '<div style="margin-top:12px;padding:11px;border:1px solid var(--dg-line);border-radius:11px"><b style="font-size:12px">THREE INDEPENDENT ANALYSIS DEPARTMENTS</b><div style="display:grid;grid-template-columns:1fr;gap:7px;margin-top:8px">' +
         (Array.isArray(s.departmentReports)?s.departmentReports.map(function(d){
           var status=String(d.status||'UNAVAILABLE');
-          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='CONFLICT'?'CONFLICT':status==='CONTEXT ONLY'?'CONTEXT ONLY':'FEED UNAVAILABLE';
+          var label=status==='ACTIVE'?'ACTIVE':status==='NEUTRAL'?'NEUTRAL':status==='CONFLICT'?'CONFLICT':status==='CONTEXT ONLY'?'CONTEXT ONLY':status==='RISK WINDOW'?'HIGH-IMPACT RISK WINDOW':'FEED UNAVAILABLE';
           var color=status==='ACTIVE'?'var(--dg-green)':status==='NEUTRAL'?'var(--dg-text-2)':'#b7791f';
           return '<div style="padding:8px;border-radius:8px;background:var(--dg-fill);min-width:0"><div style="font-size:11px;font-weight:800">'+escapeNewsText(d.name)+'</div><div style="font-size:10px;font-weight:800;color:'+color+';margin-top:3px">'+label+' · '+escapeNewsText(d.direction||'WAIT')+'</div><div style="font-size:10px;color:var(--dg-text-2);line-height:1.4;margin-top:3px">'+escapeNewsText(d.detail||'No department detail available')+'</div></div>';
         }).join(''):'<div class="dg-muted" style="font-size:11px">Department diagnostics unavailable.</div>') +
