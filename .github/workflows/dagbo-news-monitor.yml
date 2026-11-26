@@ -4,6 +4,14 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/dagbo-news-monitor.yml"
+      - "api/news-monitor.js"
+      - "lib/news-monitor.js"
+      - "lib/fcs-calendar.js"
 
 permissions:
   contents: read
@@ -26,9 +34,14 @@ jobs:
             echo "::error::Missing repository secret DAGBO_CRON_SECRET"
             exit 1
           fi
-          curl --fail-with-body --silent --show-error --retry 2 --retry-delay 5 --max-time 120 \
+          response=$(curl --fail-with-body --silent --show-error --retry 2 --retry-delay 5 --max-time 120 \
             --request POST \
             -H "Authorization: Bearer $DAGBO_CRON_SECRET" \
             -H "Content-Type: application/json" \
             --data '{}' \
-            "$DAGBO_BASE_URL/api/news-monitor"
+            "$DAGBO_BASE_URL/api/news-monitor")
+          echo "$response" | jq .
+          echo "$response" | jq -e '.success == true' >/dev/null || {
+            echo "::error::News monitor did not report success. Check Vercel logs and calendar provider access."
+            exit 1
+          }
