@@ -18,8 +18,12 @@ async function checkAiRateLimit(req) {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
     try {
       const redis = getRedis();
-      const count = await redis.incr(key);
-      if (count === 1) await redis.expire(key, AI_RATE_WINDOW_SECONDS);
+      const count = Number(await redis.eval(
+        "local count = redis.call('INCR', KEYS[1]); if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; return count",
+        [key],
+        [AI_RATE_WINDOW_SECONDS]
+      ));
+      if (!Number.isFinite(count) || count < 1) throw new Error("AI rate-limit reservation returned an invalid count");
       return { allowed: count <= AI_RATE_LIMIT, remaining: Math.max(0, AI_RATE_LIMIT - count) };
     } catch (error) {
       console.error("AI Commander rate-limit Redis error:", error.message);
