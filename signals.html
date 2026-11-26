@@ -853,8 +853,8 @@
     if(recent){
       var actualText=String(recent.actual).replace(/,/g,'').trim();
       var forecastText=String(recent.forecast).replace(/,/g,'').trim();
-      var actualMatch=actualText.match(/[-+]?\\d+(?:\\.\\d+)?/);
-      var forecastMatch=forecastText.match(/[-+]?\\d+(?:\\.\\d+)?/);
+      var actualMatch=actualText.match(/[-+]?\d+(?:\.\d+)?/);
+      var forecastMatch=forecastText.match(/[-+]?\d+(?:\.\d+)?/);
       var actual=actualMatch?Number(actualMatch[0]):NaN;
       var forecast=forecastMatch?Number(forecastMatch[0]):NaN;
       var title=String(recent.name||recent.title||'').toLowerCase();
