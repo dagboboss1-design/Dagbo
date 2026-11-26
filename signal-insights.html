@@ -46,16 +46,27 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
 <script>
 (function(){
  function read(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch(e){return fallback}}
+ var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
+ var TF_MS={'5':300000,'15':900000,'30':1800000,'60':3600000,'240':14400000,'1day':86400000,'1week':604800000};
+ function directionOf(value){var v=String(value||'').toUpperCase();return v.indexOf('BUY')>=0?'BUY':v.indexOf('SELL')>=0?'SELL':'WAIT'}
+ function freshLevels(levels,tf,pair,direction){
+  if(direction!=='BUY'&&direction!=='SELL')return null;
+  var level=levels[String(tf)+':'+pair];if(!level||directionOf(level.direction)!==direction)return null;
+  var stamp=Date.parse(level.updatedAt||''),age=Date.now()-stamp,maxAge=(TF_MS[String(tf)]||900000)*2;
+  if(!Number.isFinite(stamp)||age<0||age>maxAge)return null;
+  if(![Number(level.entry),Number(level.sl),Number(level.tp)].every(Number.isFinite))return null;
+  return level;
+ }
  function render(){
-  var saved=read('dagbo_best_opportunities',null),best=document.getElementById('bestList');
+  var levels=read('dagbo_signal_trade_levels',{}),saved=read('dagbo_best_opportunities',null),best=document.getElementById('bestList');
   best.textContent='';
   if(saved&&Array.isArray(saved.items)){
-   document.getElementById('bestTf').textContent=saved.timeframe+'m scan';
+   document.getElementById('bestTf').textContent=(TF_LABELS[String(saved.timeframe)]||String(saved.timeframe))+' scan';
    if(!saved.items.length){best.textContent='No setup currently meets the active profile threshold. Wait for confirmation.'}
    saved.items.forEach(function(item,index){
     var row=document.createElement('div');row.className='intel-row';
     var left=document.createElement('div');var name=document.createElement('strong');name.textContent=(index+1)+'. '+item.pair;
-    var detail=document.createElement('div');detail.className='intel-muted';var lv=levels[String(saved.timeframe)+':'+item.pair]||item;detail.textContent=item.score+'/12 confluence points · '+(item.quality||'')+' '+(item.confidence||0)+'% · Entry '+(lv.entry??'—')+' · SL '+(lv.sl??'—')+' · TP '+(lv.tp??'—');
+    var detail=document.createElement('div');detail.className='intel-muted';var lv=freshLevels(levels,saved.timeframe,item.pair,item.direction);detail.textContent=item.score+'/'+(item.totalMethods||12)+' confluence points · '+(item.quality||'')+' '+(item.confidence||0)+'% · '+(lv?'Entry '+lv.entry+' · SL '+lv.sl+' · TP '+lv.tp:'Trade levels unavailable or expired — refresh the scan');
     left.appendChild(name);left.appendChild(detail);
     var pill=document.createElement('span');pill.className='intel-pill'+(item.direction==='SELL'?' sell':'');pill.textContent=item.signal;
     row.appendChild(left);row.appendChild(pill);best.appendChild(row);
@@ -65,12 +76,14 @@ body{background:#080d15;color:#eef4ff}.intel-page{max-width:760px;margin:auto;pa
   trend.textContent='';
   if(!pairs.length){trend.textContent='No saved timeframe comparison yet. Run both 5m and 15m scans on the Signals page.';return;}
   pairs.forEach(function(pair){
-   var a=String(five[pair]||'').indexOf('BUY')>=0?'BUY':String(five[pair]||'').indexOf('SELL')>=0?'SELL':'WAIT';
-   var b=String(fifteen[pair]||'').indexOf('BUY')>=0?'BUY':String(fifteen[pair]||'').indexOf('SELL')>=0?'SELL':'WAIT';
+   var a=directionOf(five[pair]),b=directionOf(fifteen[pair]);
    var status=a===b&&a!=='WAIT'?'ALIGNED':a==='WAIT'||b==='WAIT'?'INCOMPLETE':'CONFLICT';
+   var fiveLevel=freshLevels(levels,'5',pair,a),fifteenLevel=freshLevels(levels,'15',pair,b);
+   var fiveText='5m '+a+(a==='WAIT'?'':fiveLevel?' · Entry '+fiveLevel.entry+' · SL '+fiveLevel.sl+' · TP '+fiveLevel.tp:' · levels unavailable');
+   var fifteenText='15m '+b+(b==='WAIT'?'':fifteenLevel?' · Entry '+fifteenLevel.entry+' · SL '+fifteenLevel.sl+' · TP '+fifteenLevel.tp:' · levels unavailable');
    var row=document.createElement('div');row.className='intel-row';
    var name=document.createElement('strong');name.textContent=pair;
-   var value=document.createElement('span');value.className='intel-muted';value.textContent='5m '+a+' · 15m '+b+' · '+status;
+   var value=document.createElement('span');value.className='intel-muted';value.textContent=fiveText+' | '+fifteenText+' · '+status;
    row.appendChild(name);row.appendChild(value);trend.appendChild(row);
   });
  }
