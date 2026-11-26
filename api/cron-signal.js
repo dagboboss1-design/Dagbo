@@ -61,9 +61,10 @@ module.exports = async function handler(req, res) {
     return res.status(503).json({ success: false, error: "Upstash Redis is not configured" });
   }
 
-  // All legacy Cron-job.org entries still point at /api/cron-signal.
-  // Run both current workers from that one compatibility endpoint, while
-  // preventing five near-simultaneous schedules from launching duplicate scans.
+  // Configure Cron-job.org to call /api/cron-signal when one schedule should
+  // run both the scanner and news monitor. Older schedules may still call
+  // /api/cron-scan directly and therefore will not start the news monitor.
+  // Prevent near-simultaneous schedules from launching duplicate scans.
   const lockKey = "dagbo:cron:dispatcher:lock";
   try {
     const acquired = await redis.set(lockKey, String(Date.now()), { nx: true, ex: 240 });
@@ -79,8 +80,9 @@ module.exports = async function handler(req, res) {
       invoke(runScanner, req),
       invoke(runNewsMonitor, req)
     ]);
-    const success = scanner.status >= 200 && scanner.status < 300 &&
-      news.status >= 200 && news.status < 300;
+    const workerOk = worker => worker.status >= 200 && worker.status < 300 &&
+      !!worker.result && typeof worker.result === "object" && !worker.result.error && worker.result.success !== false;
+    const success = workerOk(scanner) && workerOk(news);
     const response = {
       success,
       checkedAt: new Date().toISOString(),
