@@ -169,6 +169,7 @@
   var activeProfileConfig = profileApi ? profileApi.getProfile(activeTradingProfile) : null;
   var currentSignalTF = activeProfileConfig && activeProfileConfig.primaryTf || '15';
   var latestNewsCandidate = null;
+  var latestNewsCandidates = [];
   var profilePreferenceStore = {};
   try { profilePreferenceStore=JSON.parse(localStorage.getItem('dagbo_strategy_profile_settings')||'{}')||{}; } catch(e) {}
   var TF_LABELS={'5':'5m','15':'15m','30':'30m','60':'1h','240':'4h','1day':'1D','1week':'1W'};
@@ -488,9 +489,10 @@
       // live, unexpired, pair-matched event/news context and technical reaction
       // must agree with that context; headlines alone never create a trade.
       if(activeTradingProfile==='event'){
-        var eventCandidate=latestNewsCandidate;
+        var canonicalEventPair=function(value){var key=String(value||'').toUpperCase();return key==='GOLD'?'XAUUSD':key==='NAS100'?'US100':key;};
+        var eventCandidate=latestNewsCandidates.find(function(candidate){return canonicalEventPair(candidate.pair)===canonicalEventPair(pair);})||null;
         var eventAge=eventCandidate&&eventCandidate.createdAt?Date.now()-new Date(eventCandidate.createdAt).getTime():Infinity;
-        var eventValid=!!(eventCandidate&&String(eventCandidate.pair||'').toUpperCase()===String(pair).toUpperCase()&&
+        var eventValid=!!(eventCandidate&&canonicalEventPair(eventCandidate.pair)===canonicalEventPair(pair)&&
           Number.isFinite(eventAge)&&eventAge>=0&&eventAge<=90*60*1000&&
           eventCandidate.expiresAt&&Date.now()<new Date(eventCandidate.expiresAt).getTime()&&
           ['BUY','SELL'].includes(String(eventCandidate.direction||'').toUpperCase()));
@@ -759,7 +761,9 @@
       }
       if (!response.ok) throw new Error('News context unavailable');
       var data = await response.json();
-      latestNewsCandidate = data && data.candidate ? data.candidate : null;
+      latestNewsCandidates = data && Array.isArray(data.candidates) ? data.candidates :
+        (data && data.candidate ? [data.candidate] : []);
+      latestNewsCandidate = latestNewsCandidates[0] || null;
       if (!latestNewsCandidate) {
         panel.style.display = 'none';
         return;
