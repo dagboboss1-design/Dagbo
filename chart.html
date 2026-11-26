@@ -10,26 +10,40 @@
 <link rel="stylesheet" href="dagbo.css">
 <style>
 :root{color-scheme:dark}
-html,body{margin:0;padding:0;background:#000;color:#fff;min-height:100%;overflow:hidden}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#050505;color:#f4f4f4}
 body{min-height:100dvh}
-#chartControls{position:fixed;z-index:100;top:0;left:0;right:0;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px 58px;background:#080808;border-bottom:1px solid #242424;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 10px;align-items:center}
-#chartBrand{font-size:12px;font-weight:850;letter-spacing:.7px;color:#ddd}
-#chartPair{min-width:0;width:100%;background:#171717;color:#fff;border:1px solid #343434;border-radius:10px;padding:10px 12px;font-size:14px;font-weight:750}
-#chartTimeframes{grid-column:1/-1;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
-#chartTimeframes button,#toolbarToggle{border:1px solid #333;background:#171717;color:#ddd;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:750;white-space:nowrap}
-#chartTimeframes button[aria-pressed=true]{background:#f1f1f1;color:#080808;border-color:#f1f1f1}
-#toolbarToggle{justify-self:end}
-#tv-full-chart{position:fixed;left:0;right:0;top:calc(150px + env(safe-area-inset-top,0px));bottom:0;background:#000}
-#tv-full-chart .tradingview-widget-container,#tv-full-chart .tradingview-widget-container__widget{width:100%;height:100%}
-#tv-full-chart iframe{width:100%!important;height:100%!important;border:0!important}
-#chartStatus{position:fixed;z-index:110;left:12px;bottom:12px;max-width:calc(100vw - 24px);padding:6px 9px;background:#111d;color:#aaa;border:1px solid #333;border-radius:8px;font-size:10px;pointer-events:none}
+#chartControls{position:fixed;z-index:100;top:0;left:0;right:0;padding:calc(9px + env(safe-area-inset-top,0px)) 10px 9px 56px;background:#080808;border-bottom:1px solid #242424;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 8px;align-items:center}
+#chartBrand{font-size:11px;font-weight:850;letter-spacing:.7px;color:#d8d8d8}
+#chartPair{min-width:0;width:100%;background:#171717;color:#fff;border:1px solid #343434;border-radius:9px;padding:9px 10px;font-size:14px;font-weight:750}
+#toolbarToggle,#pinPair{border:1px solid #333;background:#171717;color:#ddd;border-radius:9px;padding:8px 10px;font-size:11px;font-weight:750;white-space:nowrap}
+#chartTimeframes{grid-column:1/-1;display:flex;gap:5px;overflow-x:auto;scrollbar-width:none}
+#chartTimeframes button,#drawTools button,#drawingActions button{border:1px solid #333;background:#171717;color:#ccc;border-radius:8px;padding:8px 10px;font-size:11px;font-weight:750;white-space:nowrap}
+#chartTimeframes button[aria-pressed=true],#drawTools button[aria-pressed=true]{background:#f1f1f1;color:#080808;border-color:#f1f1f1}
+#drawTools{position:fixed;z-index:95;top:calc(140px + env(safe-area-inset-top,0px));left:0;right:0;padding:7px 10px;background:#0b0b0b;border-bottom:1px solid #242424;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+#drawTools[hidden]{display:none}
+#chartMain{position:fixed;left:0;right:0;top:calc(190px + env(safe-area-inset-top,0px));bottom:0;background:#050505}
+#chartMain.tools-hidden{top:calc(140px + env(safe-area-inset-top,0px))}
+#chartContainer{position:absolute;inset:0}
+#chartSvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.chart-drawing{fill:none;stroke:#f1f1f1;stroke-width:1.6;vector-effect:non-scaling-stroke}
+.chart-drawing.selected{stroke-width:2.8;stroke:#fff}
+.chart-zone{fill:rgba(255,255,255,.07);stroke:rgba(255,255,255,.75);stroke-width:1;vector-effect:non-scaling-stroke}
+.chart-label{fill:#f1f1f1;font:11px sans-serif}
+#drawingActions{position:absolute;z-index:20;left:10px;bottom:14px;display:none;gap:6px}
+#drawingActions.visible{display:flex}
+#chartStatus{position:absolute;z-index:15;left:10px;top:10px;max-width:calc(100% - 20px);padding:6px 9px;background:rgba(10,10,10,.86);color:#aaa;border:1px solid #303030;border-radius:8px;font-size:10px;pointer-events:none}
+#chartEmpty{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:30px;color:#bbb;background:#050505;z-index:10}
+#chartEmpty.show{display:flex}
+@media(max-width:390px){#chartControls{padding-right:7px;gap:6px}#drawTools button{padding:7px 8px;font-size:10px}#chartTimeframes button{padding:7px 8px}}
 </style>
+<script src="https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
 <header id="chartControls">
   <div id="chartBrand">◈ DAGBO SIGNAL · CHART</div>
   <button id="toolbarToggle" type="button" aria-pressed="true">Hide tools</button>
   <select id="chartPair" aria-label="Market pair"></select>
+  <button id="pinPair" type="button" aria-pressed="false">Pin pair</button>
   <div id="chartTimeframes" role="group" aria-label="Chart timeframe">
     <button type="button" data-tf="5" aria-pressed="false">5m</button>
     <button type="button" data-tf="15" aria-pressed="true">15m</button>
@@ -40,76 +54,183 @@ body{min-height:100dvh}
     <button type="button" data-tf="W" aria-pressed="false">1W</button>
   </div>
 </header>
-<div id="tv-full-chart" aria-label="Live TradingView chart"></div>
-<div id="chartStatus" role="status">Live chart · TradingView data feed · Drawing tools are provided by TradingView</div>
+<div id="drawTools" aria-label="Chart drawing tools">
+  <button type="button" data-tool="cursor" aria-pressed="true">Cursor</button>
+  <button type="button" data-tool="trendline" aria-pressed="false">Trendline</button>
+  <button type="button" data-tool="horizontal" aria-pressed="false">Horizontal</button>
+  <button type="button" data-tool="rectangle" aria-pressed="false">Rectangle</button>
+  <button type="button" data-tool="long" aria-pressed="false">Long</button>
+  <button type="button" data-tool="short" aria-pressed="false">Short</button>
+</div>
+<main id="chartMain">
+  <div id="chartContainer"></div>
+  <svg id="chartSvg" aria-label="Saved chart drawings"></svg>
+  <div id="chartStatus" role="status">Loading live market candles…</div>
+  <div id="chartEmpty"></div>
+  <div id="drawingActions">
+    <button id="deleteSelected" type="button">Delete selected</button>
+    <button id="clearDrawings" type="button">Clear drawings</button>
+  </div>
+</main>
 <script>
 (function(){
   'use strict';
-  var SYMBOLS={
-    XAUUSD:'OANDA:XAUUSD',GOLD:'OANDA:XAUUSD',
-    EURUSD:'OANDA:EURUSD',GBPUSD:'OANDA:GBPUSD',USDJPY:'OANDA:USDJPY',
-    GBPJPY:'OANDA:GBPJPY',AUDUSD:'OANDA:AUDUSD',USDCHF:'OANDA:USDCHF',
-    USDCAD:'OANDA:USDCAD',NZDUSD:'OANDA:NZDUSD',EURJPY:'OANDA:EURJPY',
-    EURGBP:'OANDA:EURGBP',BTCUSD:'BINANCE:BTCUSDT',BTC:'BINANCE:BTCUSDT',
-    ETHUSD:'BINANCE:ETHUSDT',ETH:'BINANCE:ETHUSDT',
-    US30:'CAPITALCOM:US30',US100:'CAPITALCOM:US100',NAS100:'CAPITALCOM:US100',
-    US500:'CAPITALCOM:US500'
-  };
+  var SYMBOLS={XAUUSD:true,GOLD:true,EURUSD:true,GBPUSD:true,USDJPY:true,GBPJPY:true,AUDUSD:true,USDCHF:true,USDCAD:true,NZDUSD:true,EURJPY:true,EURGBP:true,BTCUSD:true,ETHUSD:true,US30:true,US100:true,NAS100:true,US500:true};
   var DEFAULT_PAIRS=['XAUUSD','EURUSD','GBPUSD','USDJPY','GBPJPY','US30','US100','US500','BTCUSD','ETHUSD','AUDUSD','USDCHF'];
-  var VALID_INTERVALS=['5','15','30','60','240','D','W'];
-  var state={pair:'XAUUSD',interval:'15',toolbar:true};
-  try{var saved=JSON.parse(localStorage.getItem('dagbo_chart_state')||'{}');if(saved&&typeof saved==='object'){if(saved.pair)state.pair=String(saved.pair).toUpperCase();if(saved.interval&&VALID_INTERVALS.indexOf(String(saved.interval))>=0)state.interval=String(saved.interval);if(typeof saved.toolbar==='boolean')state.toolbar=saved.toolbar;}}catch(e){}
+  var VALID_TF=['5','15','30','60','240','D','W'];
+  var state={pair:'XAUUSD',interval:'15',toolbar:true,tool:'cursor'};
+  try{
+    var saved=JSON.parse(localStorage.getItem('dagbo_chart_state')||'{}');
+    if(saved&&typeof saved==='object'){
+      if(saved.pair)state.pair=String(saved.pair).toUpperCase();
+      if(saved.interval&&VALID_TF.indexOf(String(saved.interval))>=0)state.interval=String(saved.interval);
+      if(typeof saved.toolbar==='boolean')state.toolbar=saved.toolbar;
+    }
+    var pinned=localStorage.getItem('dagbo_chart_pinned_pair');
+    if(pinned)state.pair=String(pinned).toUpperCase();
+  }catch(e){}
+  var chart=null,series=null,drawings=[],pendingPoints=[],selectedId=null,loadToken=0,chartResizeObserver=null;
+  var SVG='http://www.w3.org/2000/svg';
   function readSettings(){try{return JSON.parse(localStorage.getItem('dagbo_settings')||'{}')||{};}catch(e){return {};}}
   function enabledPairs(){
-    var settings=readSettings(),pairs=Array.isArray(settings.pairs)?settings.pairs:DEFAULT_PAIRS;
+    var raw=readSettings().pairs,pairs=Array.isArray(raw)?raw:DEFAULT_PAIRS;
     var clean=pairs.map(function(p){p=String(p||'').toUpperCase();return p==='GOLD'?'XAUUSD':p;});
     clean=clean.filter(function(p,i){return SYMBOLS[p]&&clean.indexOf(p)===i;});
     return clean.length?clean:DEFAULT_PAIRS.slice();
   }
-  function save(){try{localStorage.setItem('dagbo_chart_state',JSON.stringify(state));}catch(e){}}
+  function saveState(){try{localStorage.setItem('dagbo_chart_state',JSON.stringify({pair:state.pair,interval:state.interval,toolbar:state.toolbar}));}catch(e){}}
+  function pairDrawings(){return drawings.filter(function(d){return d.pair===state.pair&&d.interval===state.interval;});}
+  function saveDrawings(){try{localStorage.setItem('dagbo_chart_drawings',JSON.stringify(drawings));}catch(e){setStatus('Could not save drawings on this device.');}}
+  function loadDrawings(){
+    try{var raw=JSON.parse(localStorage.getItem('dagbo_chart_drawings')||'[]');drawings=Array.isArray(raw)?raw.filter(function(d){return d&&d.id&&SYMBOLS[d.pair]&&VALID_TF.indexOf(String(d.interval))>=0&&Array.isArray(d.points);}):[];}catch(e){drawings=[];}
+  }
+  function setStatus(message){document.getElementById('chartStatus').textContent=message;}
   function renderPairs(){
     var select=document.getElementById('chartPair'),pairs=enabledPairs();
     if(pairs.indexOf(state.pair)<0)state.pair=pairs.indexOf('XAUUSD')>=0?'XAUUSD':pairs[0];
     select.textContent='';
     pairs.forEach(function(pair){var option=document.createElement('option');option.value=pair;option.textContent=pair;select.appendChild(option);});
-    select.value=state.pair;save();
+    select.value=state.pair;
+    var pinned='';try{pinned=localStorage.getItem('dagbo_chart_pinned_pair')||'';}catch(e){}
+    document.getElementById('pinPair').textContent=pinned===state.pair?'Pinned':'Pin pair';
+    document.getElementById('pinPair').setAttribute('aria-pressed',String(pinned===state.pair));
+    saveState();
   }
-  function renderTimeframes(){
-    document.querySelectorAll('#chartTimeframes button').forEach(function(button){
-      button.setAttribute('aria-pressed',String(button.dataset.tf===state.interval));
+  function renderTimeframes(){document.querySelectorAll('#chartTimeframes button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.tf===state.interval));});}
+  function selectTool(tool){
+    state.tool=tool;pendingPoints=[];
+    document.querySelectorAll('#drawTools button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.tool===tool));});
+    setStatus(tool==='cursor'?'Chart ready · Saved drawings stay on this device until deleted.':'Tap the chart to place '+(tool==='long'||tool==='short'?'entry, stop, then target':'the required points for '+tool)+'.');
+  }
+  function svgNode(tag,attrs,drawingId,selectable){
+    var el=document.createElementNS(SVG,tag);
+    Object.keys(attrs).forEach(function(k){el.setAttribute(k,String(attrs[k]));});
+    if(selectable){
+      el.setAttribute('data-drawing-id',drawingId);
+      el.style.pointerEvents=tag==='line'?'stroke':'all';
+      el.addEventListener('click',function(e){e.stopPropagation();selectedId=drawingId;renderDrawings();});
+    }
+    document.getElementById('chartSvg').appendChild(el);return el;
+  }
+  function coord(point){
+    if(!chart||!series||!point)return null;
+    var x=chart.timeScale().timeToCoordinate(point.time),y=series.priceToCoordinate(Number(point.price));
+    return Number.isFinite(x)&&Number.isFinite(y)?{x:x,y:y}:null;
+  }
+  function renderDrawings(){
+    var svg=document.getElementById('chartSvg'),host=document.getElementById('chartContainer');
+    var rect=host.getBoundingClientRect();svg.setAttribute('viewBox','0 0 '+Math.max(1,rect.width)+' '+Math.max(1,rect.height));svg.textContent='';
+    var visible=pairDrawings();
+    visible.forEach(function(d){
+      var p=d.points.map(coord);if(p.some(function(x){return !x;}))return;
+      var selected=d.id===selectedId,cls='chart-drawing'+(selected?' selected':'');
+      if(d.type==='horizontal'){
+        svgNode('line',{x1:0,y1:p[0].y,x2:rect.width,y2:p[0].y,class:cls},d.id,true);
+      }else if(d.type==='trendline'){
+        svgNode('line',{x1:p[0].x,y1:p[0].y,x2:p[1].x,y2:p[1].y,class:cls},d.id,true);
+      }else if(d.type==='rectangle'){
+        svgNode('rect',{x:Math.min(p[0].x,p[1].x),y:Math.min(p[0].y,p[1].y),width:Math.max(1,Math.abs(p[1].x-p[0].x)),height:Math.max(1,Math.abs(p[1].y-p[0].y)),class:cls},d.id,true);
+      }else if(d.type==='long'||d.type==='short'){
+        var entry=Number(d.points[0].price),stop=Number(d.points[1].price),target=Number(d.points[2].price);
+        var x=Math.min(p[0].x,p[1].x,p[2].x),right=Math.max(p[0].x,p[1].x,p[2].x),width=Math.max(2,right-x);
+        var stopTop=Math.min(p[0].y,p[1].y),targetTop=Math.min(p[0].y,p[2].y);
+        svgNode('rect',{x:x,y:stopTop,width:width,height:Math.max(1,Math.abs(p[1].y-p[0].y)),class:'chart-zone',strokeDasharray:'4 3'},d.id,true);
+        svgNode('rect',{x:x,y:targetTop,width:width,height:Math.max(1,Math.abs(p[2].y-p[0].y)),class:'chart-zone'},d.id,true);
+        var label=svgNode('text',{x:x+5,y:Math.max(12,Math.min(p[0].y,p[1].y,p[2].y)-5),class:'chart-label'},d.id,true);
+        label.textContent=(d.type==='long'?'LONG':'SHORT')+' · Entry '+entry+' · SL '+stop+' · TP '+target;
+      }
+    });
+    var actions=document.getElementById('drawingActions');
+    actions.classList.toggle('visible',!!selectedId&&visible.some(function(d){return d.id===selectedId;}));
+    document.getElementById('deleteSelected').disabled=!selectedId;
+  }
+  function requiredPoints(tool){return tool==='horizontal'?1:tool==='long'||tool==='short'?3:2;}
+  function addPointFromClick(event){
+    if(state.tool==='cursor'||!chart||!series)return;
+    var rect=document.getElementById('chartContainer').getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top;
+    var time=chart.timeScale().coordinateToTime(x),price=series.coordinateToPrice(y);
+    if(time===null||time===undefined||!Number.isFinite(price)){setStatus('Tap inside the candle area to place the drawing.');return;}
+    if(typeof time==='object'&&time.year){setStatus('Select a candle with a valid time coordinate.');return;}
+    pendingPoints.push({time:Number(time),price:Number(price)});
+    var need=requiredPoints(state.tool);
+    if(pendingPoints.length<need){setStatus('Point '+pendingPoints.length+' of '+need+' placed.');return;}
+    var drawing={id:String(Date.now())+'-'+Math.random().toString(36).slice(2),pair:state.pair,interval:state.interval,type:state.tool,points:pendingPoints.slice(),createdAt:new Date().toISOString()};
+    drawings.push(drawing);selectedId=drawing.id;saveDrawings();pendingPoints=[];renderDrawings();
+    selectTool('cursor');
+  }
+  function loadChart(){
+    var token=++loadToken;setStatus('Loading '+state.pair+' '+state.interval+' candles…');
+    document.getElementById('chartEmpty').classList.remove('show');
+    if(chartResizeObserver){chartResizeObserver.disconnect();chartResizeObserver=null;}
+    if(chart){chart.remove();chart=null;series=null;}
+    document.getElementById('chartContainer').textContent='';
+    document.getElementById('chartSvg').textContent='';
+    var url='/api/chart?pair='+encodeURIComponent(state.pair)+'&interval='+encodeURIComponent(state.interval);
+    fetch(url,{cache:'no-store'}).then(function(response){return response.json().then(function(data){if(!response.ok)throw new Error(data.error||'Chart feed unavailable');return data;});}).then(function(data){
+      if(token!==loadToken)return;
+      if(!Array.isArray(data.candles)||!data.candles.length)throw new Error('No valid candle data was returned for '+state.pair+'.');
+      var host=document.getElementById('chartContainer'),bounds=host.getBoundingClientRect();
+      chart=LightweightCharts.createChart(host,{
+        width:Math.max(320,bounds.width),height:Math.max(260,bounds.height),
+        layout:{background:{type:'solid',color:'#050505'},textColor:'#bdbdbd',fontFamily:'Arial, sans-serif'},
+        grid:{vertLines:{color:'rgba(255,255,255,.045)'},horzLines:{color:'rgba(255,255,255,.045)'}},
+        crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+        rightPriceScale:{borderColor:'#333',scaleMargins:{top:.12,bottom:.12}},
+        timeScale:{borderColor:'#333',timeVisible:true,secondsVisible:false},
+        handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:true},
+        handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true}
+      });
+      series=chart.addCandlestickSeries({upColor:'#e8e8e8',downColor:'#777',borderUpColor:'#e8e8e8',borderDownColor:'#777',wickUpColor:'#e8e8e8',wickDownColor:'#777'});
+      series.setData(data.candles.map(function(c){return {time:c.time,open:c.open,high:c.high,low:c.low,close:c.close};}));
+      chart.timeScale().fitContent();
+      chart.timeScale().subscribeVisibleLogicalRangeChange(renderDrawings);
+      setStatus(state.pair+' · '+state.interval+' · '+data.candles.length+' candles · '+(data.source||'Live feed'));
+      renderDrawings();
+      if(window.ResizeObserver){chartResizeObserver=new ResizeObserver(function(){if(chart){var b=host.getBoundingClientRect();chart.applyOptions({width:Math.max(320,b.width),height:Math.max(260,b.height)});renderDrawings();}});chartResizeObserver.observe(host);}
+    }).catch(function(error){
+      if(token!==loadToken)return;
+      document.getElementById('chartEmpty').textContent=error.message;
+      document.getElementById('chartEmpty').classList.add('show');
+      setStatus('Chart data unavailable · No substitute prices shown.');
     });
   }
-  function renderChart(){
-    var host=document.getElementById('tv-full-chart');host.textContent='';
-    var container=document.createElement('div');container.className='tradingview-widget-container';container.style.cssText='height:100%;width:100%';
-    var widget=document.createElement('div');widget.className='tradingview-widget-container__widget';widget.style.cssText='height:100%;width:100%';
-    container.appendChild(widget);
-    var script=document.createElement('script');script.type='text/javascript';script.async=true;
-    script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.textContent=JSON.stringify({
-      autosize:true,symbol:SYMBOLS[state.pair],interval:state.interval,timezone:'Africa/Lagos',
-      theme:'dark',style:'1',locale:'en',allow_symbol_change:false,
-      hide_top_toolbar:false,hide_side_toolbar:!state.toolbar,hide_legend:false,
-      hide_volume:false,withdateranges:true,save_image:true,calendar:false,
-      details:false,hotlist:false,studies:[],backgroundColor:'#000000',
-      gridColor:'rgba(255,255,255,0.08)'
-    });
-    container.appendChild(script);host.appendChild(container);
-    document.getElementById('toolbarToggle').textContent=state.toolbar?'Hide tools':'Show tools';
-    document.getElementById('toolbarToggle').setAttribute('aria-pressed',String(state.toolbar));
-    document.getElementById('chartStatus').textContent=state.pair+' · '+state.interval+' · TradingView live chart';
-    save();
-  }
-  document.getElementById('chartPair').addEventListener('change',function(){state.pair=this.value;renderChart();});
-  document.getElementById('chartTimeframes').addEventListener('click',function(event){
-    var button=event.target.closest('button[data-tf]');if(!button)return;
-    state.interval=button.dataset.tf;renderTimeframes();renderChart();
-  });
-  document.getElementById('toolbarToggle').addEventListener('click',function(){state.toolbar=!state.toolbar;renderChart();});
-  window.addEventListener('storage',function(event){if(event.key==='dagbo_settings'){renderPairs();renderChart();}});
-  window.addEventListener('focus',function(){var before=state.pair;renderPairs();if(before!==state.pair)renderChart();});
-  window.addEventListener('pageshow',function(){var before=state.pair;renderPairs();if(before!==state.pair)renderChart();});
-  renderPairs();renderTimeframes();renderChart();
+  document.getElementById('chartPair').addEventListener('change',function(){state.pair=this.value;selectedId=null;renderPairs();loadChart();});
+  document.getElementById('chartTimeframes').addEventListener('click',function(e){var b=e.target.closest('button[data-tf]');if(!b)return;state.interval=b.dataset.tf;selectedId=null;renderTimeframes();saveState();loadChart();});
+  document.getElementById('toolbarToggle').addEventListener('click',function(){state.toolbar=!state.toolbar;document.getElementById('drawTools').hidden=!state.toolbar;document.getElementById('chartMain').classList.toggle('tools-hidden',!state.toolbar);this.textContent=state.toolbar?'Hide tools':'Show tools';this.setAttribute('aria-pressed',String(state.toolbar));saveState();});
+  document.getElementById('pinPair').addEventListener('click',function(){try{var current=localStorage.getItem('dagbo_chart_pinned_pair');if(current===state.pair)localStorage.removeItem('dagbo_chart_pinned_pair');else localStorage.setItem('dagbo_chart_pinned_pair',state.pair);}catch(e){}renderPairs();});
+  document.getElementById('drawTools').addEventListener('click',function(e){var b=e.target.closest('button[data-tool]');if(b)selectTool(b.dataset.tool);});
+  document.getElementById('chartContainer').addEventListener('click',addPointFromClick);
+  document.getElementById('deleteSelected').addEventListener('click',function(){if(!selectedId)return;drawings=drawings.filter(function(d){return d.id!==selectedId;});selectedId=null;saveDrawings();renderDrawings();});
+  document.getElementById('clearDrawings').addEventListener('click',function(){if(!window.confirm('Delete all saved drawings for this pair and timeframe?'))return;drawings=drawings.filter(function(d){return d.pair!==state.pair||d.interval!==state.interval;});selectedId=null;saveDrawings();renderDrawings();});
+  window.addEventListener('storage',function(e){if(e.key==='dagbo_settings'){var before=state.pair;renderPairs();if(before!==state.pair)loadChart();}});
+  window.addEventListener('focus',function(){var before=state.pair;renderPairs();if(before!==state.pair)loadChart();});
+  if(!window.ResizeObserver)window.addEventListener('resize',function(){if(chart){var b=document.getElementById('chartContainer').getBoundingClientRect();chart.applyOptions({width:Math.max(320,b.width),height:Math.max(260,b.height)});renderDrawings();}});
+  loadDrawings();renderPairs();renderTimeframes();
+  document.getElementById('drawTools').hidden=!state.toolbar;
+  document.getElementById('chartMain').classList.toggle('tools-hidden',!state.toolbar);
+  document.getElementById('toolbarToggle').textContent=state.toolbar?'Hide tools':'Show tools';
+  document.getElementById('toolbarToggle').setAttribute('aria-pressed',String(state.toolbar));
+  selectTool('cursor');loadChart();
 })();
 </script>
 <script src="pwa.js" defer></script>
