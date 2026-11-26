@@ -868,7 +868,7 @@ module.exports = async function handler(req, res) {
           const ta = Date.parse(String(a.datetime).replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(String(a.datetime)) ? "" : "Z"));
           const tb = Date.parse(String(b.datetime).replace(" ", "T") + (/(Z|[+-]\d\d:\d\d)$/.test(String(b.datetime)) ? "" : "Z"));
           return ta-tb;
-        }).slice(-60);
+        }).slice(-100);
         if (closedCandles.length < 60) throw new Error("Only " + closedCandles.length + " valid, fully closed 15m candles; 60 are required.");
         const analysis = analyze(closedCandles, pair);
         if (!analysis) throw new Error("Could not calculate indicators from provider candles.");
